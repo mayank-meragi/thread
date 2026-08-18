@@ -34,6 +34,43 @@ export const semanticPrefixPlugin = $prose(() => new Plugin({
   },
 }))
 
+export const activeOutlinePathPlugin = $prose(() => new Plugin({
+  view(editorView) {
+    const syncPath = () => {
+      editorView.dom.querySelectorAll('.is-active-path, .is-active-node').forEach((element) => {
+        element.classList.remove('is-active-path', 'is-active-node')
+      })
+
+      const { $from } = editorView.state.selection
+      const itemDepths: number[] = []
+      for (let depth = 1; depth <= $from.depth; depth += 1) {
+        if ($from.node(depth).type.name === 'list_item') itemDepths.push(depth)
+      }
+
+      itemDepths.forEach((depth, index) => {
+        const nodeView = editorView.nodeDOM($from.before(depth))
+        if (!(nodeView instanceof HTMLElement)) return
+        const element = nodeView.matches('li')
+          ? nodeView
+          : nodeView.querySelector<HTMLElement>(':scope > li.list-item')
+        if (!element) return
+        element.classList.add('is-active-path')
+        if (index === itemDepths.length - 1) element.classList.add('is-active-node')
+      })
+    }
+
+    syncPath()
+    return {
+      update: syncPath,
+      destroy() {
+        editorView.dom.querySelectorAll('.is-active-path, .is-active-node').forEach((element) => {
+          element.classList.remove('is-active-path', 'is-active-node')
+        })
+      },
+    }
+  },
+}))
+
 const handleOutlinerBackspace: Command = (state, dispatch) => {
   const { selection } = state
   if (!(selection instanceof TextSelection) || !selection.empty) return false

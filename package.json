@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@milkdown/core": "^7.22.1",
     "@milkdown/crepe": "latest",
     "@milkdown/plugin-trailing": "^7.22.1",
     "@milkdown/preset-commonmark": "^7.22.1",
