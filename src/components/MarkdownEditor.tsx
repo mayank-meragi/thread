@@ -136,7 +136,14 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
       if (target?.closest('input[type="checkbox"], .label.checked, .label.unchecked')) markUserMutation()
     }
     const markKeyboardMutation = (event: KeyboardEvent) => {
-      if (event.key === 'Backspace' || event.key === 'Delete') markUserMutation()
+      if (event.key === 'Backspace' || event.key === 'Delete') {
+        markUserMutation()
+        return
+      }
+      // Undo/redo mutate the document without passing through beforeinput, so
+      // they were never marked dirty and silently failed to persist.
+      const key = event.key.toLowerCase()
+      if ((event.metaKey || event.ctrlKey) && (key === 'z' || key === 'y')) markUserMutation()
     }
 
     root.addEventListener('beforeinput', markUserMutation, true)
@@ -147,30 +154,25 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
     root.addEventListener('keydown', markKeyboardMutation, true)
 
     const syncFocusedTask = () => {
-      const active = document.activeElement instanceof Element ? document.activeElement : null
+      // The caret/selection position is the reliable signal for "which task
+      // line is active" -- document.activeElement is the outer contenteditable
+      // root itself for a ProseMirror editor, never a specific <li>, so it was
+      // previously checked first and made the selection-based lookup below
+      // unreachable, clearing the row on almost every focus/selection event.
       const selectionNode = document.getSelection()?.anchorNode
       const selectionElement = selectionNode instanceof Element ? selectionNode : selectionNode?.parentElement
-      const target = active && root.contains(active) ? active : selectionElement && root.contains(selectionElement) ? selectionElement : null
+      const active = document.activeElement
+      const target = selectionElement && root.contains(selectionElement)
+        ? selectionElement
+        : active instanceof Element && root.contains(active) ? active : null
       const focusedTask = target?.closest<HTMLLIElement>('li.task-block') ?? null
-      root.querySelectorAll('li.task-focused').forEach((item) => item.classList.remove('task-focused'))
+      root.querySelectorAll('li.task-focused').forEach((item) => {
+        if (item !== focusedTask) item.classList.remove('task-focused')
+      })
       focusedTask?.classList.add('task-focused')
-    }
-    const focusTaskFromPointer = (event: PointerEvent) => {
-      const target = event.target instanceof Element ? event.target : null
-      const focusedTask = target && root.contains(target) ? target.closest<HTMLLIElement>('li.task-block') : null
-      root.querySelectorAll('li.task-focused').forEach((item) => item.classList.remove('task-focused'))
-      focusedTask?.classList.add('task-focused')
-      if (focusedTask) {
-        window.setTimeout(() => {
-          if (disposed) return
-          root.querySelectorAll('li.task-focused').forEach((item) => item.classList.remove('task-focused'))
-          focusedTask.classList.add('task-focused')
-        }, 0)
-      }
     }
     document.addEventListener('selectionchange', syncFocusedTask)
     document.addEventListener('selectionchange', syncToolbar)
-    document.addEventListener('pointerdown', focusTaskFromPointer)
     root.addEventListener('focusin', syncFocusedTask)
     root.addEventListener('focusin', syncToolbar)
     root.addEventListener('focusout', syncToolbarAfterFocus)
@@ -194,8 +196,13 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
       dirty = false
       userMutationPending = false
       crepe.editor.action(replaceAll(wikiLinksToEditor(detail.markdown.trim() ? detail.markdown : '- ')))
+      if (metadataTimer) window.clearTimeout(metadataTimer)
       metadataTimer = window.setTimeout(() => {
-        if (!disposed) void installCollapseControls(root, day)
+        if (disposed) return
+        void installCollapseControls(root, day)
+        crepe.editor.action((ctx) => {
+          void installTaskControls(ctx.get(editorViewCtx), day)
+        })
       }, 120)
     }
     window.addEventListener('thread:day-external-update', applyExternalUpdate)
@@ -223,7 +230,7 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
     }
 
     crepe.on((listener) => {
-      listener.markdownUpdated((_ctx, markdown, previous) => {
+      listener.markdownUpdated((ctx, markdown, previous) => {
         // Milkdown can emit updates while it is hydrating or being destroyed.
         // Only an active editor is allowed to write to the journal.
         if (!active || disposed || markdown === previous || !userMutationPending) return
@@ -234,13 +241,14 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
         dirty = true
         if (saveTimer) window.clearTimeout(saveTimer)
         saveTimer = window.setTimeout(persist, 180)
+        if (collapseTimer) window.clearTimeout(collapseTimer)
         collapseTimer = window.setTimeout(() => {
           if (!disposed) void installCollapseControls(root, day)
         }, 0)
-        if (metadataTimer) window.clearTimeout(metadataTimer)
-        metadataTimer = window.setTimeout(() => {
-          if (!disposed) void installTaskControls(root, day)
-        }, 360)
+        // Walk the live document in the same tick the transaction landed, so
+        // the DOM node and its identity always come from the same node --
+        // never a DOM query zipped against a separately fetched list.
+        void installTaskControls(ctx.get(editorViewCtx), day)
       })
       listener.blur(() => {
         if (saveTimer) window.clearTimeout(saveTimer)
@@ -255,10 +263,9 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
       }
       setReady(true)
       void installCollapseControls(root, day)
-      void installTaskControls(root, day)
-      metadataTimer = window.setTimeout(() => {
-        if (!disposed) void installTaskControls(root, day)
-      }, 700)
+      crepe.editor.action((ctx) => {
+        void installTaskControls(ctx.get(editorViewCtx), day)
+      })
       // Let initialization events drain before accepting editor writes.
       activationFrame = window.requestAnimationFrame(() => {
         if (!disposed) active = true
@@ -284,7 +291,6 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
       root.removeEventListener('keydown', markKeyboardMutation, true)
       document.removeEventListener('selectionchange', syncFocusedTask)
       document.removeEventListener('selectionchange', syncToolbar)
-      document.removeEventListener('pointerdown', focusTaskFromPointer)
       root.removeEventListener('focusin', syncFocusedTask)
       root.removeEventListener('focusin', syncToolbar)
       root.removeEventListener('focusout', syncToolbarAfterFocus)
@@ -361,16 +367,72 @@ function setCurrentBlockKind(
   view.dispatch(transaction)
 }
 
-async function installTaskControls(root: HTMLElement, day: string): Promise<void> {
-  const tasks = await db.tasks.where('day').equals(day).sortBy('order')
-  const taskItems = Array.from(root.querySelectorAll<HTMLLIElement>('.ProseMirror li'))
-    .filter((item) => Boolean(item.querySelector(':scope > .label-wrapper .label.checked, :scope > .label-wrapper .label.unchecked')))
+interface LiveTaskNode {
+  id: string
+  dom: HTMLElement
+  checked: boolean
+}
 
-  taskItems.forEach((item, index) => {
-    const task = tasks[index]
-    if (!task) return
+// Walk the live ProseMirror document -- not a separately queried DOM list, not
+// a separately fetched DB array -- and read each task's identity and its DOM
+// element off the very same node in the very same pass. Two lists derived at
+// different times (or from different sources) can drift out of step with each
+// other; a single node can't drift out of step with itself.
+function collectTaskNodes(view: EditorView, day: string): LiveTaskNode[] {
+  const results: LiveTaskNode[] = []
+  const pathStack: Array<{ path: string; nextIndex: number }> = [{ path: '', nextIndex: 0 }]
+
+  view.state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'list_item') return true
+
+    let itemDepth = 0
+    const resolved = view.state.doc.resolve(pos)
+    for (let depth = 1; depth <= resolved.depth; depth += 1) {
+      if (resolved.node(depth).type.name === 'list_item') itemDepth += 1
+    }
+
+    // Mirrors the indentation-based path Thread's markdown parser assigns to
+    // the same block (see parseOutline in lib/outline.ts), so a task's DOM
+    // node and its persisted TaskRecord always resolve to the same id.
+    while (pathStack.length > itemDepth + 1) pathStack.pop()
+    const level = pathStack[itemDepth]
+    const index = level.nextIndex
+    level.nextIndex += 1
+    const path = level.path ? `${level.path}.${index}` : `${index}`
+    pathStack[itemDepth + 1] = { path, nextIndex: 0 }
+
+    if (typeof node.attrs.checked === 'boolean') {
+      // Crepe's list-item node view registers a wrapper div as the node's DOM
+      // root; the actual <li> we render controls onto is that wrapper's
+      // direct child.
+      const wrapper = view.nodeDOM(pos)
+      const dom = wrapper instanceof HTMLElement ? wrapper.querySelector<HTMLElement>(':scope > li') ?? wrapper : null
+      if (dom instanceof HTMLElement) results.push({ id: `${day}:${path}`, dom, checked: node.attrs.checked })
+    }
+    return true
+  })
+
+  return results
+}
+
+async function installTaskControls(view: EditorView, day: string): Promise<void> {
+  const nodes = collectTaskNodes(view, day)
+
+  await Promise.all(nodes.map(async ({ id, dom: item, checked }) => {
     item.classList.add('task-block')
-    item.dataset.taskId = task.id
+    item.dataset.taskId = id
+
+    const persisted = await db.tasks.get(id)
+    const task: TaskRecord = persisted ?? {
+      id,
+      blockId: id,
+      day,
+      line: 0,
+      order: 0,
+      text: item.textContent ?? '',
+      checked,
+      updatedAt: '',
+    }
 
     const children = item.querySelector<HTMLElement>(':scope > .children') ?? item
     let chips = item.querySelector<HTMLElement>(':scope > .children > .task-inline-meta')
@@ -396,18 +458,18 @@ async function installTaskControls(root: HTMLElement, day: string): Promise<void
     dueInput.value = task.dueDate ?? ''
     priorityInput.value = task.priority ?? ''
     dueInput.onchange = () => {
-      void updateTaskMetadata(task.id, { dueDate: dueInput.value || undefined }).then(async () => {
-        const updated = await db.tasks.get(task.id)
+      void updateTaskMetadata(id, { dueDate: dueInput.value || undefined }).then(async () => {
+        const updated = await db.tasks.get(id)
         if (updated) renderTaskChips(chips!, updated)
       })
     }
     priorityInput.onchange = () => {
-      void updateTaskMetadata(task.id, { priority: priorityInput.value as TaskPriority || undefined }).then(async () => {
-        const updated = await db.tasks.get(task.id)
+      void updateTaskMetadata(id, { priority: priorityInput.value as TaskPriority || undefined }).then(async () => {
+        const updated = await db.tasks.get(id)
         if (updated) renderTaskChips(chips!, updated)
       })
     }
-  })
+  }))
 }
 
 function renderTaskChips(container: HTMLElement, task: TaskRecord): void {
@@ -476,7 +538,6 @@ async function installCollapseControls(root: HTMLElement, day: string): Promise<
     }
   })
   installBlockKindControls(root)
-  await installTaskControls(root, day)
 }
 
 function installBlockKindControls(root: HTMLElement): void {
