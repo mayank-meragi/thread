@@ -453,3 +453,18 @@ export async function markThreadNoteSynced(threadId: string, sha: string): Promi
     await db.outbox.delete(`thread-note:${threadId}`)
   })
 }
+
+// While a conflict is unresolved, syncPending skips that day entirely rather
+// than re-fetching and re-recording it every cycle. Resolving clears that gate
+// so the next sync can proceed with a fresh remote SHA.
+export async function resolveConflict(conflictId: string, resolution: 'local' | 'remote'): Promise<void> {
+  const conflict = await db.conflicts.get(conflictId)
+  if (!conflict) return
+  if (resolution === 'remote') {
+    // Accepting the remote copy clears day.remoteSha's staleness by routing
+    // through saveDay, which re-queues an outbox entry; since the content will
+    // now match remote, the next sync marks it synced without a network write.
+    await saveDay(conflict.day, conflict.remoteMarkdown)
+  }
+  await db.conflicts.update(conflictId, { resolvedAt: new Date().toISOString() })
+}

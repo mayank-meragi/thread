@@ -10,6 +10,7 @@ import '@milkdown/crepe/theme/common/style.css'
 import { db, updateTaskMetadata, type TaskPriority, type TaskRecord } from '../db'
 import { activeOutlinePathPlugin, outlinerInvariantPlugin, outlinerKeymap, semanticPrefixPlugin } from '../lib/blockKinds'
 import { inlineSuggestionsPlugin } from '../lib/inlineSuggestions'
+import { parseOutline } from '../lib/outline'
 import type { BlockConversionKind } from '../lib/suggestions'
 import { editorLinksToWiki, wikiLinkInputRule, wikiLinkInteractionPlugin, wikiLinksToEditor } from '../lib/wikilinks'
 import { replaceAll } from '@milkdown/utils'
@@ -201,7 +202,7 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
         if (disposed) return
         void installCollapseControls(root, day)
         crepe.editor.action((ctx) => {
-          void installTaskControls(ctx.get(editorViewCtx), day)
+          void installTaskControls(ctx.get(editorViewCtx), day, detail.markdown)
         })
       }, 120)
     }
@@ -248,7 +249,7 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
         // Walk the live document in the same tick the transaction landed, so
         // the DOM node and its identity always come from the same node --
         // never a DOM query zipped against a separately fetched list.
-        void installTaskControls(ctx.get(editorViewCtx), day)
+        void installTaskControls(ctx.get(editorViewCtx), day, canonical)
       })
       listener.blur(() => {
         if (saveTimer) window.clearTimeout(saveTimer)
@@ -264,7 +265,7 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
       setReady(true)
       void installCollapseControls(root, day)
       crepe.editor.action((ctx) => {
-        void installTaskControls(ctx.get(editorViewCtx), day)
+        void installTaskControls(ctx.get(editorViewCtx), day, latest)
       })
       // Let initialization events drain before accepting editor writes.
       activationFrame = window.requestAnimationFrame(() => {
@@ -378,45 +379,39 @@ interface LiveTaskNode {
 // element off the very same node in the very same pass. Two lists derived at
 // different times (or from different sources) can drift out of step with each
 // other; a single node can't drift out of step with itself.
-function collectTaskNodes(view: EditorView, day: string): LiveTaskNode[] {
-  const results: LiveTaskNode[] = []
-  const pathStack: Array<{ path: string; nextIndex: number }> = [{ path: '', nextIndex: 0 }]
-
+//
+// The block-id path scheme (day:0.1.2, following indentation nesting) has one
+// canonical implementation: parseOutline in lib/outline.ts, which is also
+// what produces the TaskRecord ids stored in Dexie. Re-deriving that same
+// scheme here from the live ProseMirror tree would mean two algorithms have
+// to stay in lockstep forever; instead we pair each live task DOM node with
+// its parsed block purely by shared document order -- both are walked from
+// the same markdown snapshot in the same synchronous pass, so their order and
+// count always agree.
+function collectTaskNodes(view: EditorView, day: string, markdown: string): LiveTaskNode[] {
+  const domNodes: HTMLElement[] = []
   view.state.doc.descendants((node, pos) => {
-    if (node.type.name !== 'list_item') return true
-
-    let itemDepth = 0
-    const resolved = view.state.doc.resolve(pos)
-    for (let depth = 1; depth <= resolved.depth; depth += 1) {
-      if (resolved.node(depth).type.name === 'list_item') itemDepth += 1
-    }
-
-    // Mirrors the indentation-based path Thread's markdown parser assigns to
-    // the same block (see parseOutline in lib/outline.ts), so a task's DOM
-    // node and its persisted TaskRecord always resolve to the same id.
-    while (pathStack.length > itemDepth + 1) pathStack.pop()
-    const level = pathStack[itemDepth]
-    const index = level.nextIndex
-    level.nextIndex += 1
-    const path = level.path ? `${level.path}.${index}` : `${index}`
-    pathStack[itemDepth + 1] = { path, nextIndex: 0 }
-
-    if (typeof node.attrs.checked === 'boolean') {
-      // Crepe's list-item node view registers a wrapper div as the node's DOM
-      // root; the actual <li> we render controls onto is that wrapper's
-      // direct child.
-      const wrapper = view.nodeDOM(pos)
-      const dom = wrapper instanceof HTMLElement ? wrapper.querySelector<HTMLElement>(':scope > li') ?? wrapper : null
-      if (dom instanceof HTMLElement) results.push({ id: `${day}:${path}`, dom, checked: node.attrs.checked })
-    }
+    if (node.type.name !== 'list_item' || typeof node.attrs.checked !== 'boolean') return true
+    // Crepe's list-item node view registers a wrapper div as the node's DOM
+    // root; the actual <li> we render controls onto is that wrapper's direct
+    // child.
+    const wrapper = view.nodeDOM(pos)
+    const dom = wrapper instanceof HTMLElement ? wrapper.querySelector<HTMLElement>(':scope > li') ?? wrapper : null
+    if (dom instanceof HTMLElement) domNodes.push(dom)
     return true
   })
 
-  return results
+  const taskBlocks = parseOutline(markdown, day).blocks.filter((block) => block.kind === 'task')
+  // A mismatch means the document has already moved on from this markdown
+  // snapshot by the time this ran -- skip rather than risk pairing the wrong
+  // id with the wrong DOM node. The next scheduled pass retries.
+  if (domNodes.length !== taskBlocks.length) return []
+
+  return domNodes.map((dom, index) => ({ id: taskBlocks[index].id, dom, checked: taskBlocks[index].checked }))
 }
 
-async function installTaskControls(view: EditorView, day: string): Promise<void> {
-  const nodes = collectTaskNodes(view, day)
+async function installTaskControls(view: EditorView, day: string, markdown: string): Promise<void> {
+  const nodes = collectTaskNodes(view, day, markdown)
 
   // A block that stops being a task (e.g. converted to a question/decision/
   // idea via the slash command) still carries the classes and DOM controls
@@ -509,6 +504,15 @@ function formatCompactDate(date: string): string {
     .format(new Date(`${date}T12:00:00`))
 }
 
+const BLOCK_KINDS = [
+  { className: 'kind-question', pattern: /^\?\s+/, label: 'Question' },
+  { className: 'kind-decision', pattern: /^(?:=|\\=)\s+/, label: 'Decision' },
+  { className: 'kind-idea', pattern: /^!\s+/, label: 'Idea' },
+] as const
+
+// Collapse toggles and question/decision/idea styling both need one pass over
+// every list item; walking the tree twice (once per concern) doubles DOM
+// query cost on every edit for no benefit, so they're combined here.
 async function installCollapseControls(root: HTMLElement, day: string): Promise<void> {
   const view = `today:${day}`
   const states = await db.viewState.where('view').equals(view).toArray()
@@ -521,57 +525,43 @@ async function installCollapseControls(root: HTMLElement, day: string): Promise<
     const existing = label?.querySelector<HTMLButtonElement>(':scope > .collapse-toggle')
     if (!childList) {
       existing?.remove()
-      return
+    } else {
+      const blockId = `${day}:editor:${index}`
+      const button = existing ?? document.createElement('button')
+      button.type = 'button'
+      button.className = 'collapse-toggle'
+      button.contentEditable = 'false'
+      button.tabIndex = 0
+      button.setAttribute('aria-label', 'Collapse bullet')
+      button.setAttribute('title', 'Collapse bullet')
+      button.textContent = '›'
+      item.classList.toggle('thread-collapsed', collapsed.get(blockId) === true)
+      button.setAttribute('aria-expanded', String(!item.classList.contains('thread-collapsed')))
+
+      if (!existing && label) label.append(button)
+      button.onclick = (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        const next = !item.classList.contains('thread-collapsed')
+        item.classList.toggle('thread-collapsed', next)
+        button.setAttribute('aria-expanded', String(!next))
+        void db.viewState.put({
+          key: `${view}:${blockId}`,
+          view,
+          blockId,
+          collapsed: next,
+          updatedAt: new Date().toISOString(),
+        })
+      }
     }
 
-    const blockId = `${day}:editor:${index}`
-    const button = existing ?? document.createElement('button')
-    button.type = 'button'
-    button.className = 'collapse-toggle'
-    button.contentEditable = 'false'
-    button.tabIndex = 0
-    button.setAttribute('aria-label', 'Collapse bullet')
-    button.setAttribute('title', 'Collapse bullet')
-    button.textContent = '›'
-    item.classList.toggle('thread-collapsed', collapsed.get(blockId) === true)
-    button.setAttribute('aria-expanded', String(!item.classList.contains('thread-collapsed')))
-
-    if (!existing && label) label.append(button)
-    button.onclick = (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-      const next = !item.classList.contains('thread-collapsed')
-      item.classList.toggle('thread-collapsed', next)
-      button.setAttribute('aria-expanded', String(!next))
-      void db.viewState.put({
-        key: `${view}:${blockId}`,
-        view,
-        blockId,
-        collapsed: next,
-        updatedAt: new Date().toISOString(),
-      })
-    }
-  })
-  installBlockKindControls(root)
-}
-
-function installBlockKindControls(root: HTMLElement): void {
-  const kinds = [
-    { className: 'kind-question', pattern: /^\?\s+/, label: 'Question' },
-    { className: 'kind-decision', pattern: /^(?:=|\\=)\s+/, label: 'Decision' },
-    { className: 'kind-idea', pattern: /^!\s+/, label: 'Idea' },
-  ] as const
-
-  root.querySelectorAll<HTMLLIElement>('.ProseMirror li').forEach((item) => {
-    item.classList.remove('kind-block', ...kinds.map((kind) => kind.className))
+    item.classList.remove('kind-block', ...BLOCK_KINDS.map((kind) => kind.className))
     item.removeAttribute('data-kind-label')
-
     if (item.classList.contains('task-block')) return
     const paragraph = item.querySelector<HTMLElement>(':scope > .children > .content-dom > p:first-child')
     const content = paragraph?.textContent?.trim() ?? ''
-    const kind = kinds.find((candidate) => candidate.pattern.test(content))
+    const kind = BLOCK_KINDS.find((candidate) => candidate.pattern.test(content))
     if (!kind) return
-
     item.classList.add('kind-block', kind.className)
     item.dataset.kindLabel = kind.label
   })

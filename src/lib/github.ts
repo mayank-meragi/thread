@@ -99,6 +99,8 @@ export async function syncPending(): Promise<number> {
   if (!config) return 0
   const pending = await db.outbox.orderBy('createdAt').toArray()
   let synced = 0
+  const failures: string[] = []
+
   for (const item of pending) {
     try {
       if (item.kind === 'thread-note') {
@@ -129,6 +131,13 @@ export async function syncPending(): Promise<number> {
         await db.outbox.delete(item.key)
         continue
       }
+
+      // An unresolved conflict already describes this exact problem. Retrying
+      // it every cycle would hammer the API and pile up a fresh conflict row
+      // each time; wait for the user to resolve it instead.
+      const openConflict = await db.conflicts.where('day').equals(day.date).filter((conflict) => !conflict.resolvedAt).first()
+      if (openConflict) continue
+
       const year = day.date.slice(0, 4)
       const path = `days/${year}/${day.date}.md`
       const remoteSha = day.remoteSha
@@ -154,12 +163,19 @@ export async function syncPending(): Promise<number> {
       await markDaySynced(day.date, sha)
       synced += 1
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
       await db.outbox.update(item.key, {
         attempts: item.attempts + 1,
-        error: error instanceof Error ? error.message : String(error),
+        error: message,
       })
-      throw error
+      // Keep going -- one stuck item (a conflict, a rate limit) should not
+      // block every other unrelated day from syncing this cycle.
+      failures.push(message)
     }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(failures.length === 1 ? failures[0] : `${failures.length} items failed to sync.`)
   }
   return synced
 }

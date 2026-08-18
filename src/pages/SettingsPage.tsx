@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Check, GitBranch, LoaderCircle, Palette, ShieldCheck, Unplug } from 'lucide-react'
+import { AlertTriangle, Check, GitBranch, LoaderCircle, Palette, ShieldCheck, Unplug } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../db'
+import { db, resolveConflict } from '../db'
 import {
   clearGitHubConfig,
   getGitHubConfig,
@@ -21,6 +21,24 @@ export function SettingsPage() {
   const [error, setError] = useState('')
   const [theme, setTheme] = useState<ThemeId>(() => getTheme())
   const pending = useLiveQuery(() => db.outbox.count(), [], 0)
+  const conflicts = useLiveQuery(
+    async () => {
+      const unresolved = await db.conflicts.filter((conflict) => !conflict.resolvedAt).toArray()
+      return unresolved.sort((a, b) => b.detectedAt.localeCompare(a.detectedAt))
+    },
+    [],
+    [],
+  )
+  const [resolving, setResolving] = useState<string | null>(null)
+
+  async function resolve(conflictId: string, resolution: 'local' | 'remote') {
+    setResolving(conflictId)
+    try {
+      await resolveConflict(conflictId, resolution)
+    } finally {
+      setResolving(null)
+    }
+  }
 
   useEffect(() => {
     if (state !== 'done') return
@@ -66,6 +84,41 @@ export function SettingsPage() {
     <article className="utility-page settings-page">
       <div className="eyebrow">Your data, your repository</div>
       <h1>Settings</h1>
+
+      {conflicts.length > 0 && (
+        <section className="settings-card conflicts-card">
+          <div className="settings-title">
+            <AlertTriangle size={20} />
+            <div>
+              <h2>Sync conflicts</h2>
+              <p>These days changed both here and in the data repository. Pick which copy to keep.</p>
+            </div>
+          </div>
+          {conflicts.map((conflict) => (
+            <div className="conflict-row" key={conflict.id}>
+              <div className="conflict-day">{conflict.day}</div>
+              <div className="settings-actions conflict-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={resolving === conflict.id}
+                  onClick={() => void resolve(conflict.id, 'local')}
+                >
+                  Keep this browser's copy
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={resolving === conflict.id}
+                  onClick={() => void resolve(conflict.id, 'remote')}
+                >
+                  Keep the repository's copy
+                </button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
 
       <section className="settings-card theme-card">
         <div className="settings-title"><Palette size={20} /><div><h2>Appearance</h2><p>Choose a familiar palette. Your theme stays on this device.</p></div></div>

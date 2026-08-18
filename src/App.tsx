@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BookOpenText, Cloud, CloudOff, Search, Settings, Sparkle } from 'lucide-react'
+import { AlertTriangle, BookOpenText, Cloud, CloudOff, Search, Settings, Sparkle } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { HashRouter, Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import { db, initializeDatabase } from './db'
@@ -20,8 +20,10 @@ function AppShell() {
   const navigate = useNavigate()
   const threads = useLiveQuery(() => db.threads.orderBy('updatedAt').reverse().limit(7).toArray(), [], [])
   const pending = useLiveQuery(() => db.outbox.count(), [], 0)
+  const conflicts = useLiveQuery(() => db.conflicts.filter((conflict) => !conflict.resolvedAt).count(), [], 0)
   const [connected, setConnected] = useState(() => Boolean(getGitHubConfig()))
   const [syncing, setSyncing] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
 
   useEffect(() => {
     const refresh = () => setConnected(Boolean(getGitHubConfig()))
@@ -33,14 +35,21 @@ function AppShell() {
     if (!connected || pending === 0 || syncing) return
     const timer = window.setTimeout(() => {
       setSyncing(true)
-      void syncPending().catch(() => undefined).finally(() => setSyncing(false))
+      void syncPending()
+        .then(() => setSyncError(null))
+        .catch((error) => setSyncError(error instanceof Error ? error.message : String(error)))
+        .finally(() => setSyncing(false))
     }, 2200)
     return () => window.clearTimeout(timer)
   }, [connected, pending, syncing])
 
   useEffect(() => {
     const flush = () => {
-      if (document.visibilityState === 'hidden' && connected) void syncPending()
+      if (document.visibilityState === 'hidden' && connected) {
+        void syncPending()
+          .then(() => setSyncError(null))
+          .catch((error) => setSyncError(error instanceof Error ? error.message : String(error)))
+      }
     }
     document.addEventListener('visibilitychange', flush)
     window.addEventListener('online', flush)
@@ -81,9 +90,25 @@ function AppShell() {
           ))}
         </div>
         <div className="sidebar-foot">
-          <Link to="/settings" className="sync-state">
-            {connected ? <Cloud size={15} /> : <CloudOff size={15} />}
-            <span>{syncing ? 'Syncing…' : connected ? pending ? `${pending} pending` : 'Up to date' : 'Local only'}</span>
+          <Link to="/settings" className={`sync-state${conflicts > 0 || syncError ? ' sync-state-alert' : ''}`}>
+            {!connected
+              ? <CloudOff size={15} />
+              : conflicts > 0 || syncError
+                ? <AlertTriangle size={15} />
+                : <Cloud size={15} />}
+            <span>
+              {syncing
+                ? 'Syncing…'
+                : !connected
+                  ? 'Local only'
+                  : conflicts > 0
+                    ? `${conflicts} need${conflicts === 1 ? 's' : ''} attention`
+                    : syncError
+                      ? 'Sync error'
+                      : pending
+                        ? `${pending} pending`
+                        : 'Up to date'}
+            </span>
           </Link>
         </div>
       </aside>
