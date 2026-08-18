@@ -418,6 +418,21 @@ function collectTaskNodes(view: EditorView, day: string): LiveTaskNode[] {
 async function installTaskControls(view: EditorView, day: string): Promise<void> {
   const nodes = collectTaskNodes(view, day)
 
+  // A block that stops being a task (e.g. converted to a question/decision/
+  // idea via the slash command) still carries the classes and DOM controls
+  // this function previously only ever added. installBlockKindControls
+  // permanently skips anything still marked task-block, so without this
+  // cleanup the block would never render its new kind for the rest of the
+  // session.
+  const activeDom = new Set(nodes.map((node) => node.dom))
+  view.dom.querySelectorAll<HTMLElement>('li.task-block').forEach((item) => {
+    if (activeDom.has(item)) return
+    item.classList.remove('task-block', 'task-focused')
+    delete item.dataset.taskId
+    item.querySelector(':scope > .children > .task-inline-meta')?.remove()
+    item.querySelector(':scope > .children > .task-metadata-row')?.remove()
+  })
+
   await Promise.all(nodes.map(async ({ id, dom: item, checked }) => {
     item.classList.add('task-block')
     item.dataset.taskId = id
