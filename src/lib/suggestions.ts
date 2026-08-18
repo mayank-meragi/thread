@@ -1,4 +1,6 @@
-export type BlockConversionKind = 'bullet' | 'task' | 'idea' | 'question' | 'decision'
+import { blockKindDefinitions, type BlockConversionKind, type BlockKindDefinition } from './blockKinds/definitions'
+
+export type { BlockConversionKind }
 
 export interface ThreadSuggestion {
   id: string
@@ -6,21 +8,10 @@ export interface ThreadSuggestion {
   updatedAt: string
 }
 
-export interface SlashCommand {
-  id: BlockConversionKind
-  label: string
-  description: string
-  glyph: string
-  aliases: string[]
-}
-
-export const slashCommands: SlashCommand[] = [
-  { id: 'task', label: 'Task', description: 'Track something to do', glyph: '☐', aliases: ['todo', 'check'] },
-  { id: 'idea', label: 'Idea', description: 'Capture a possibility', glyph: '✦', aliases: ['thought'] },
-  { id: 'question', label: 'Question', description: 'Keep an open question', glyph: '?', aliases: ['ask'] },
-  { id: 'decision', label: 'Decision', description: 'Record a choice', glyph: '◆', aliases: ['decide'] },
-  { id: 'bullet', label: 'Bullet', description: 'Return to a plain block', glyph: '•', aliases: ['text', 'note'] },
-]
+// The slash menu is just a view over the shared block-kind registry -- a new
+// kind registered there appears here with no further changes.
+export type SlashCommand = BlockKindDefinition
+export const slashCommands: SlashCommand[] = blockKindDefinitions
 
 export type SuggestionTrigger =
   | { kind: 'wikilink'; query: string; fromOffset: number; toOffset: number }

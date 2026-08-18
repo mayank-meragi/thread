@@ -7,8 +7,18 @@ import { liftListItem, sinkListItem } from '@milkdown/prose/schema-list'
 import { TextSelection } from '@milkdown/prose/state'
 import type { EditorView } from '@milkdown/prose/view'
 import '@milkdown/crepe/theme/common/style.css'
-import { db, updateTaskMetadata, type TaskPriority, type TaskRecord } from '../db'
-import { activeOutlinePathPlugin, outlinerInvariantPlugin, outlinerKeymap, semanticPrefixPlugin } from '../lib/blockKinds'
+import { db } from '../db'
+import {
+  activeOutlinePathPlugin,
+  clearTaskExtras,
+  detectPrefixKind,
+  getBlockKindDefinition,
+  mountTaskExtras,
+  outlinerInvariantPlugin,
+  outlinerKeymap,
+  prefixedBlockKinds,
+  semanticPrefixPlugin,
+} from '../lib/blockKinds'
 import { inlineSuggestionsPlugin } from '../lib/inlineSuggestions'
 import { parseOutline } from '../lib/outline'
 import type { BlockConversionKind } from '../lib/suggestions'
@@ -120,13 +130,7 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
       const text = item?.querySelector<HTMLElement>(':scope > .children > .content-dom > p:first-child')?.textContent?.trim() ?? ''
       const activeKind: ToolbarBlockKind = item?.querySelector(':scope > .label-wrapper > .label.checked, :scope > .label-wrapper > .label.unchecked')
         ? 'task'
-        : /^!\s+/.test(text)
-          ? 'idea'
-          : /^\?\s+/.test(text)
-            ? 'question'
-            : /^(?:=|\\=)\s+/.test(text)
-              ? 'decision'
-              : 'bullet'
+        : detectPrefixKind(text)?.id ?? 'bullet'
       document.body.classList.toggle('mobile-editor-active', visible)
       setToolbar({ visible, top, activeKind })
     }
@@ -347,13 +351,12 @@ function setCurrentBlockKind(
   const itemPosition = $from.before(itemDepth)
   const paragraph = $from.node(paragraphDepth)
   const paragraphStart = $from.start(paragraphDepth)
-  const existingPrefix = paragraph.textContent.match(/^(?:\?|=|\\=|!)\s+/)?.[0]
-  const desiredPrefix = kind === 'idea' ? '! ' : kind === 'question' ? '? ' : kind === 'decision' ? '= ' : null
-  const existingKind = existingPrefix?.trim().replace('\\=', '=')
-  const desiredKind = desiredPrefix?.trim()
-  if (existingPrefix) transaction = transaction.delete(paragraphStart, paragraphStart + existingPrefix.length)
+  const existingKind = detectPrefixKind(paragraph.textContent)
+  const existingPrefixMatch = existingKind?.prefixPattern.exec(paragraph.textContent)?.[0]
+  const definition = getBlockKindDefinition(kind)
+  if (existingPrefixMatch) transaction = transaction.delete(paragraphStart, paragraphStart + existingPrefixMatch.length)
 
-  if (kind === 'task') {
+  if (definition?.isTask) {
     transaction = transaction.setNodeMarkup(itemPosition, undefined, {
       ...item.attrs,
       checked: item.attrs.checked == null ? false : null,
@@ -362,7 +365,7 @@ function setCurrentBlockKind(
     if (item.attrs.checked != null) {
       transaction = transaction.setNodeMarkup(itemPosition, undefined, { ...item.attrs, checked: null })
     }
-    if (desiredPrefix && existingKind !== desiredKind) transaction = transaction.insertText(desiredPrefix, paragraphStart)
+    if (definition?.prefixText && existingKind?.id !== kind) transaction = transaction.insertText(definition.prefixText, paragraphStart)
   }
 
   view.dispatch(transaction)
@@ -410,105 +413,31 @@ function collectTaskNodes(view: EditorView, day: string, markdown: string): Live
   return domNodes.map((dom, index) => ({ id: taskBlocks[index].id, dom, checked: taskBlocks[index].checked }))
 }
 
+// Task is the only kind today with extra per-block DOM (chips, a due/priority
+// edit row); mountTaskExtras/clearTaskExtras (lib/blockKinds/taskExtras.ts)
+// own that rendering entirely. This function's job is just: figure out which
+// <li> is a task right now and hand it off -- a future kind with its own
+// extra fields plugs in the same way, without touching this tree-walk.
 async function installTaskControls(view: EditorView, day: string, markdown: string): Promise<void> {
   const nodes = collectTaskNodes(view, day, markdown)
 
   // A block that stops being a task (e.g. converted to a question/decision/
   // idea via the slash command) still carries the classes and DOM controls
-  // this function previously only ever added. installBlockKindControls
+  // this function previously only ever added. The shared styling pass
   // permanently skips anything still marked task-block, so without this
   // cleanup the block would never render its new kind for the rest of the
   // session.
   const activeDom = new Set(nodes.map((node) => node.dom))
   view.dom.querySelectorAll<HTMLElement>('li.task-block').forEach((item) => {
-    if (activeDom.has(item)) return
-    item.classList.remove('task-block', 'task-focused')
-    delete item.dataset.taskId
-    item.querySelector(':scope > .children > .task-inline-meta')?.remove()
-    item.querySelector(':scope > .children > .task-metadata-row')?.remove()
+    if (!activeDom.has(item)) clearTaskExtras(item)
   })
 
   await Promise.all(nodes.map(async ({ id, dom: item, checked }) => {
     item.classList.add('task-block')
     item.dataset.taskId = id
-
-    const persisted = await db.tasks.get(id)
-    const task: TaskRecord = persisted ?? {
-      id,
-      blockId: id,
-      day,
-      line: 0,
-      order: 0,
-      text: item.textContent ?? '',
-      checked,
-      updatedAt: '',
-    }
-
-    const children = item.querySelector<HTMLElement>(':scope > .children') ?? item
-    let chips = item.querySelector<HTMLElement>(':scope > .children > .task-inline-meta')
-    if (!chips) {
-      chips = document.createElement('span')
-      chips.className = 'task-inline-meta'
-      chips.contentEditable = 'false'
-      children.append(chips)
-    }
-    renderTaskChips(chips, task)
-
-    let row = item.querySelector<HTMLElement>(':scope > .children > .task-metadata-row')
-    if (!row) {
-      row = document.createElement('div')
-      row.className = 'task-metadata-row'
-      row.contentEditable = 'false'
-      row.innerHTML = '<label><span>Due</span><input class="task-due-input" type="date" aria-label="Task due date"></label><label><span>Priority</span><select class="task-priority-input" aria-label="Task priority"><option value="">Add priority</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>'
-      children.append(row)
-    }
-
-    const dueInput = row.querySelector<HTMLInputElement>('.task-due-input')!
-    const priorityInput = row.querySelector<HTMLSelectElement>('.task-priority-input')!
-    dueInput.value = task.dueDate ?? ''
-    priorityInput.value = task.priority ?? ''
-    dueInput.onchange = () => {
-      void updateTaskMetadata(id, { dueDate: dueInput.value || undefined }).then(async () => {
-        const updated = await db.tasks.get(id)
-        if (updated) renderTaskChips(chips!, updated)
-      })
-    }
-    priorityInput.onchange = () => {
-      void updateTaskMetadata(id, { priority: priorityInput.value as TaskPriority || undefined }).then(async () => {
-        const updated = await db.tasks.get(id)
-        if (updated) renderTaskChips(chips!, updated)
-      })
-    }
+    await mountTaskExtras(item, id, day, checked)
   }))
 }
-
-function renderTaskChips(container: HTMLElement, task: TaskRecord): void {
-  container.replaceChildren()
-  if (task.dueDate) {
-    const due = document.createElement('span')
-    due.className = 'task-meta-chip task-due-chip'
-    due.textContent = formatCompactDate(task.dueDate)
-    container.append(due)
-  }
-  if (task.priority) {
-    const priority = document.createElement('span')
-    priority.className = `task-meta-chip priority-${task.priority}`
-    priority.textContent = task.priority.charAt(0).toUpperCase() + task.priority.slice(1)
-    container.append(priority)
-  }
-  container.hidden = container.childElementCount === 0
-}
-
-function formatCompactDate(date: string): string {
-  return new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-    .format(new Date(`${date}T12:00:00`))
-}
-
-const BLOCK_KINDS = [
-  { className: 'kind-question', pattern: /^\?\s+/, label: 'Question' },
-  { className: 'kind-decision', pattern: /^(?:=|\\=)\s+/, label: 'Decision' },
-  { className: 'kind-idea', pattern: /^!\s+/, label: 'Idea' },
-] as const
 
 // Collapse toggles and question/decision/idea styling both need one pass over
 // every list item; walking the tree twice (once per concern) doubles DOM
@@ -555,12 +484,12 @@ async function installCollapseControls(root: HTMLElement, day: string): Promise<
       }
     }
 
-    item.classList.remove('kind-block', ...BLOCK_KINDS.map((kind) => kind.className))
+    item.classList.remove('kind-block', ...prefixedBlockKinds.map((kind) => kind.className))
     item.removeAttribute('data-kind-label')
     if (item.classList.contains('task-block')) return
     const paragraph = item.querySelector<HTMLElement>(':scope > .children > .content-dom > p:first-child')
     const content = paragraph?.textContent?.trim() ?? ''
-    const kind = BLOCK_KINDS.find((candidate) => candidate.pattern.test(content))
+    const kind = prefixedBlockKinds.find((candidate) => candidate.prefixPattern.test(content))
     if (!kind) return
     item.classList.add('kind-block', kind.className)
     item.dataset.kindLabel = kind.label

@@ -1,3 +1,12 @@
+import { getBlockKindDefinition } from './blockKinds/definitions'
+
+// Reuse the same prefix patterns the editor uses for live-DOM detection, so
+// this markdown-side parser and the editor can never disagree about what
+// counts as a question/decision/idea.
+const questionPrefix = getBlockKindDefinition('question')!.prefixPattern!
+const decisionPrefix = getBlockKindDefinition('decision')!.prefixPattern!
+const ideaPrefix = getBlockKindDefinition('idea')!.prefixPattern!
+
 export interface ParsedMention {
   id: string
   threadId: string
@@ -133,9 +142,9 @@ export function parseOutline(markdown: string, day: string): {
     const answeredQuestion = /^\?\s+\[[xX]\]\s+/.test(syntaxContent)
     const checked = /^\[[xX]\]\s+/.test(syntaxContent) || answeredQuestion
     const task = /^\[[ xX]\]\s+/.test(syntaxContent)
-    const question = /^\?\s+/.test(syntaxContent)
-    const decision = /^=\s+/.test(syntaxContent) || /\bdecision\s*:/i.test(syntaxContent)
-    const idea = /^!\s+/.test(syntaxContent) || /\bidea\s*:/i.test(syntaxContent)
+    const question = questionPrefix.test(syntaxContent)
+    const decision = decisionPrefix.test(syntaxContent) || /\bdecision\s*:/i.test(syntaxContent)
+    const idea = ideaPrefix.test(syntaxContent) || /\bidea\s*:/i.test(syntaxContent)
     const kind: BlockKind = task ? 'task' : question ? 'question' : decision ? 'decision' : idea ? 'idea' : 'thought'
 
     blocks.push({

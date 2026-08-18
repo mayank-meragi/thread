@@ -1,8 +1,7 @@
 import { Plugin, TextSelection, type Command } from '@milkdown/prose/state'
 import { Decoration, DecorationSet } from '@milkdown/prose/view'
 import { $prose, $useKeymap } from '@milkdown/utils'
-
-const SEMANTIC_PREFIX = /^(?:\?|=|\\=|!)\s+/
+import { semanticPrefixRegex as SEMANTIC_PREFIX } from './definitions'
 
 export const semanticPrefixPlugin = $prose(() => new Plugin({
   props: {
