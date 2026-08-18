@@ -9,6 +9,8 @@ import type { EditorView } from '@milkdown/prose/view'
 import '@milkdown/crepe/theme/common/style.css'
 import { db, updateTaskMetadata, type TaskPriority, type TaskRecord } from '../db'
 import { activeOutlinePathPlugin, outlinerInvariantPlugin, outlinerKeymap, semanticPrefixPlugin } from '../lib/blockKinds'
+import { inlineSuggestionsPlugin } from '../lib/inlineSuggestions'
+import type { BlockConversionKind } from '../lib/suggestions'
 import { editorLinksToWiki, wikiLinkInputRule, wikiLinkInteractionPlugin, wikiLinksToEditor } from '../lib/wikilinks'
 import { replaceAll } from '@milkdown/utils'
 import { MobileEditorToolbar, type ToolbarAction, type ToolbarBlockKind } from './MobileEditorToolbar'
@@ -51,6 +53,9 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
     let metadataTimer: number | null = null
     let activationFrame: number | null = null
     const mobileQuery = window.matchMedia('(max-width: 760px)')
+    const markUserMutation = () => {
+      if (active && !disposed) userMutationPending = true
+    }
 
     const crepe = new Crepe({
       root,
@@ -78,6 +83,14 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
       }))
     })
     crepe.editor.use(wikiLinkInputRule)
+    crepe.editor.use(inlineSuggestionsPlugin({
+      getThreads: async () => {
+        const threads = await db.threads.orderBy('updatedAt').reverse().toArray()
+        return threads.map(({ id, title, updatedAt }) => ({ id, title, updatedAt }))
+      },
+      onMutation: markUserMutation,
+      setBlockKind: setCurrentBlockKind,
+    }))
     crepe.editor.use(wikiLinkInteractionPlugin)
     crepe.editor.use(semanticPrefixPlugin)
     crepe.editor.use(activeOutlinePathPlugin)
@@ -87,10 +100,6 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
       if (!active || disposed || !dirty) return
       dirty = false
       onChangeRef.current(latest)
-    }
-
-    const markUserMutation = () => {
-      if (active && !disposed) userMutationPending = true
     }
 
     const syncToolbar = () => {
@@ -309,10 +318,16 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
 
 function setCurrentBlockKind(
   view: EditorView,
-  kind: Exclude<ToolbarAction, 'indent' | 'outdent' | 'wikilink'>,
+  kind: BlockConversionKind,
+  replaceRange?: { from: number; to: number },
 ): void {
   const { state } = view
-  const { $from } = state.selection
+  let transaction = state.tr
+  if (replaceRange) {
+    transaction = transaction.delete(replaceRange.from, replaceRange.to)
+    transaction = transaction.setSelection(TextSelection.near(transaction.doc.resolve(replaceRange.from)))
+  }
+  const { $from } = transaction.selection
   let itemDepth = $from.depth
   while (itemDepth > 0 && $from.node(itemDepth).type.name !== 'list_item') itemDepth -= 1
   if (itemDepth === 0) return
@@ -329,8 +344,6 @@ function setCurrentBlockKind(
   const desiredPrefix = kind === 'idea' ? '! ' : kind === 'question' ? '? ' : kind === 'decision' ? '= ' : null
   const existingKind = existingPrefix?.trim().replace('\\=', '=')
   const desiredKind = desiredPrefix?.trim()
-  let transaction = state.tr
-
   if (existingPrefix) transaction = transaction.delete(paragraphStart, paragraphStart + existingPrefix.length)
 
   if (kind === 'task') {

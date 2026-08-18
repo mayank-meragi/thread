@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, GitBranch, LoaderCircle, ShieldCheck, Unplug } from 'lucide-react'
+import { Check, GitBranch, LoaderCircle, Palette, ShieldCheck, Unplug } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import {
@@ -10,6 +10,7 @@ import {
   validateGitHub,
   type GitHubConfig,
 } from '../lib/github'
+import { applyTheme, getTheme, themes, type ThemeId } from '../lib/theme'
 
 export function SettingsPage() {
   const existing = getGitHubConfig()
@@ -18,6 +19,7 @@ export function SettingsPage() {
   const [token, setToken] = useState(existing?.token ?? '')
   const [state, setState] = useState<'idle' | 'checking' | 'syncing' | 'done'>('idle')
   const [error, setError] = useState('')
+  const [theme, setTheme] = useState<ThemeId>(() => getTheme())
   const pending = useLiveQuery(() => db.outbox.count(), [], 0)
 
   useEffect(() => {
@@ -55,10 +57,43 @@ export function SettingsPage() {
     }
   }
 
+  function chooseTheme(nextTheme: ThemeId) {
+    setTheme(nextTheme)
+    applyTheme(nextTheme)
+  }
+
   return (
     <article className="utility-page settings-page">
       <div className="eyebrow">Your data, your repository</div>
       <h1>Settings</h1>
+
+      <section className="settings-card theme-card">
+        <div className="settings-title"><Palette size={20} /><div><h2>Appearance</h2><p>Choose a familiar palette. Your theme stays on this device.</p></div></div>
+        <div className="theme-groups">
+          {(['Light', 'Dark'] as const).map((mode) => (
+            <div className="theme-group" key={mode}>
+              <div className="theme-group-label">{mode}</div>
+              <div className="theme-options">
+                {themes.filter((item) => item.mode === mode).map((item) => (
+                  <button
+                    type="button"
+                    className="theme-option"
+                    aria-pressed={theme === item.id}
+                    onClick={() => chooseTheme(item.id)}
+                    key={item.id}
+                  >
+                    <span className="theme-swatches" aria-hidden="true">
+                      {item.swatches.map((color) => <span key={color} style={{ background: color }} />)}
+                    </span>
+                    <span className="theme-option-name">{item.name}</span>
+                    <span className="theme-check">{theme === item.id && <Check size={14} />}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section className="settings-card">
         <div className="settings-title"><GitBranch size={20} /><div><h2>GitHub sync</h2><p>Thread works locally first. Connect a private repository for backup and multi-device sync.</p></div></div>

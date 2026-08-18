@@ -2,10 +2,11 @@ import { InputRule } from '@milkdown/prose/inputrules'
 import { linkSchema } from '@milkdown/preset-commonmark'
 import { Plugin, TextSelection } from '@milkdown/prose/state'
 import type { EditorState, Transaction } from '@milkdown/prose/state'
+import { Decoration, DecorationSet } from '@milkdown/prose/view'
 import { $inputRule, $prose } from '@milkdown/utils'
 import { slugifyThread } from './outline'
 
-const WIKI_TITLE = 'thread-wikilink'
+export const WIKI_TITLE = 'thread-wikilink'
 
 export function wikiLinksToEditor(markdown: string): string {
   const unescaped = markdown.replace(/\\(\[|\])/g, '$1')
@@ -38,21 +39,44 @@ interface WikiDraft {
   from: number
   to: number
   title: string
+  hasClosingBrackets: boolean
 }
 
-function findWikiDraft(state: EditorState, cursor: number): WikiDraft | null {
+function findRawWikiDraft(state: EditorState, cursor: number): WikiDraft | null {
   const $cursor = state.doc.resolve(cursor)
   if (!$cursor.parent.isTextblock) return null
   const before = $cursor.parent.textBetween(0, $cursor.parentOffset, undefined, '\ufffc')
   const after = $cursor.parent.textBetween($cursor.parentOffset, $cursor.parent.content.size, undefined, '\ufffc')
   const match = before.match(/\[\[([^]+)$/)
-  if (!match || match[1].includes('[') || match[1].includes(']') || !after.startsWith(']]')) return null
+  if (!match || match[1].includes('[') || match[1].includes(']')) return null
+  const title = match[1].trim()
+  const hasClosingBrackets = after.startsWith(']]')
+  return {
+    from: $cursor.start() + before.length - match[0].length,
+    to: cursor + (hasClosingBrackets ? 2 : 0),
+    title,
+    hasClosingBrackets,
+  }
+}
+
+function findWikiDraft(state: EditorState, cursor: number): WikiDraft | null {
+  const draft = findRawWikiDraft(state, cursor)
+  return draft && slugifyThread(draft.title) ? draft : null
+}
+
+function findWikiDraftBeforeSecondCloser(state: EditorState, cursor: number): WikiDraft | null {
+  const $cursor = state.doc.resolve(cursor)
+  if (!$cursor.parent.isTextblock) return null
+  const before = $cursor.parent.textBetween(0, $cursor.parentOffset, undefined, '\ufffc')
+  const match = before.match(/\[\[([^\x5b\x5d]+)\]$/)
+  if (!match) return null
   const title = match[1].trim()
   if (!slugifyThread(title)) return null
   return {
     from: $cursor.start() + before.length - match[0].length,
-    to: cursor + 2,
+    to: cursor,
     title,
+    hasClosingBrackets: false,
   }
 }
 
@@ -77,22 +101,24 @@ export const wikiLinkInteractionPlugin = $prose((ctx) => {
   const linkType = linkSchema.type(ctx)
   return new Plugin({
     props: {
-      handleTextInput(view, from, to, text) {
-        if (text === '[' && from === to) {
-          const $from = view.state.doc.resolve(from)
-          const previous = $from.parentOffset > 0
-            ? $from.parent.textBetween($from.parentOffset - 1, $from.parentOffset)
-            : ''
-          if (previous === '[') {
-            const transaction = view.state.tr.insertText('[]]', from, to)
-            transaction.setSelection(TextSelection.create(transaction.doc, from + 1))
-            view.dispatch(transaction)
-            return true
-          }
-        }
-
+      decorations(state) {
+        const { selection } = state
+        if (!(selection instanceof TextSelection) || !selection.empty) return DecorationSet.empty
+        const draft = findRawWikiDraft(state, selection.from)
+        if (!draft || draft.hasClosingBrackets) return DecorationSet.empty
+        return DecorationSet.create(state.doc, [
+          Decoration.widget(selection.from, () => {
+            const closer = document.createElement('span')
+            closer.className = 'wiki-draft-closer'
+            closer.textContent = ']]'
+            closer.setAttribute('aria-hidden', 'true')
+            return closer
+          }, { side: 1 }),
+        ])
+      },
+      handleTextInput(view, from, _to, text) {
         if (text === ']') {
-          const draft = findWikiDraft(view.state, from)
+          const draft = findWikiDraftBeforeSecondCloser(view.state, from)
           if (draft) {
             view.dispatch(acceptWikiDraft(view.state, draft, linkType))
             return true
@@ -101,23 +127,6 @@ export const wikiLinkInteractionPlugin = $prose((ctx) => {
         return false
       },
       handleKeyDown(view, event) {
-        if (event.key === '[' && !event.metaKey && !event.ctrlKey && !event.altKey) {
-          const { selection } = view.state
-          if (selection instanceof TextSelection && selection.empty) {
-            const $from = view.state.doc.resolve(selection.from)
-            const previous = $from.parentOffset > 0
-              ? $from.parent.textBetween($from.parentOffset - 1, $from.parentOffset)
-              : ''
-            if (previous === '[') {
-              event.preventDefault()
-              const transaction = view.state.tr.insertText('[]]', selection.from)
-              transaction.setSelection(TextSelection.create(transaction.doc, selection.from + 1))
-              view.dispatch(transaction)
-              return true
-            }
-          }
-        }
-
         if (event.key !== 'ArrowRight' && event.key !== 'Tab') return false
         const { selection } = view.state
         if (!(selection instanceof TextSelection) || !selection.empty) return false
@@ -150,6 +159,16 @@ export const wikiLinkInteractionPlugin = $prose((ctx) => {
           .setStoredMarks([])
         view.dispatch(transaction)
         return true
+      },
+      handleDOMEvents: {
+        blur(view) {
+          const { selection } = view.state
+          if (!(selection instanceof TextSelection) || !selection.empty) return false
+          const draft = findWikiDraft(view.state, selection.from)
+          if (!draft) return false
+          view.dispatch(acceptWikiDraft(view.state, draft, linkType))
+          return false
+        },
       },
     },
   })

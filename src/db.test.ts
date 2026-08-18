@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { db, saveDay, saveThreadNote, toggleTask } from './db'
+import { db, pruneOrphanThreads, saveDay, saveThreadNote, toggleTask } from './db'
 
 const DATE = '2026-08-19'
 
@@ -52,6 +52,41 @@ describe('journal persistence', () => {
       kind: 'thread-note',
       aggregateId: 'browser',
     })
+  })
+
+  it('does not index an unfinished wikilink draft', async () => {
+    await saveDay(DATE, '- Discuss [[Brows')
+
+    expect(await db.threads.count()).toBe(0)
+    expect(await db.mentions.count()).toBe(0)
+  })
+
+  it('removes an automatic thread after its final mention is corrected', async () => {
+    await saveDay(DATE, '- Discuss [[Brower]]')
+    await saveDay(DATE, '- Discuss [[Browser]]')
+
+    expect(await db.threads.get('brower')).toBeUndefined()
+    expect(await db.threads.get('browser')).toMatchObject({ title: 'Browser' })
+  })
+
+  it('preserves an unmentioned thread when it has meaningful thread-only notes', async () => {
+    await saveDay(DATE, '- Discuss [[Browser]]')
+    await saveThreadNote('browser', '- Keep this thread note')
+    await saveDay(DATE, '- Link removed')
+    await pruneOrphanThreads()
+
+    expect(await db.threads.get('browser')).toBeDefined()
+  })
+
+  it('cleans up existing orphan records and blank thread notes', async () => {
+    const now = new Date().toISOString()
+    await db.threads.put({ id: 'thi', title: 'thi', normalizedTitle: 'thi', createdAt: now, updatedAt: now })
+    await db.threadNotes.put({ threadId: 'thi', markdown: '- ', blockCount: 1, updatedAt: now, localRevision: 1 })
+
+    await pruneOrphanThreads()
+
+    expect(await db.threads.get('thi')).toBeUndefined()
+    expect(await db.threadNotes.get('thi')).toBeUndefined()
   })
 
   it('completes a nested task even when its saved line number is stale', async () => {

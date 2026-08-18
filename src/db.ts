@@ -190,6 +190,7 @@ export async function initializeDatabase(today: string): Promise<void> {
   await ensureDay(today)
   const days = await db.days.toArray()
   for (const day of days) await reindexDay(day)
+  await pruneOrphanThreads()
 }
 
 export async function ensureDay(date: string): Promise<void> {
@@ -257,7 +258,7 @@ async function indexAndStoreDay(record: DayRecord, previous?: DayRecord): Promis
   const parsed = extractThreadMentions(record.markdown, record.date)
   const outline = parseOutline(record.markdown, record.date)
   const taskRecords = await buildTaskRecords(outline.blocks, record.date)
-  await db.transaction('rw', [db.days, db.threads, db.mentions, db.blocks, db.occurrences, db.outbox, db.revisions, db.tasks], async () => {
+  await db.transaction('rw', [db.days, db.threads, db.mentions, db.blocks, db.occurrences, db.outbox, db.revisions, db.tasks, db.threadNotes], async () => {
     if (previous && previous.markdown !== record.markdown) {
       await db.revisions.put({
         ...previous,
@@ -267,6 +268,7 @@ async function indexAndStoreDay(record: DayRecord, previous?: DayRecord): Promis
       })
     }
     await db.days.put(record)
+    const previousMentions = await db.mentions.where('day').equals(record.date).toArray()
     await db.mentions.where('day').equals(record.date).delete()
     if (parsed.length) await db.mentions.bulkPut(parsed)
     await db.blocks.where('day').equals(record.date).delete()
@@ -286,6 +288,9 @@ async function indexAndStoreDay(record: DayRecord, previous?: DayRecord): Promis
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
       })
+    }
+    for (const threadId of new Set(previousMentions.map((mention) => mention.threadId))) {
+      await pruneThreadIfOrphan(threadId)
     }
 
     await db.outbox.put({
@@ -302,7 +307,8 @@ async function reindexDay(record: DayRecord): Promise<void> {
   const parsed = extractThreadMentions(record.markdown, record.date)
   const outline = parseOutline(record.markdown, record.date)
   const taskRecords = await buildTaskRecords(outline.blocks, record.date)
-  await db.transaction('rw', [db.threads, db.mentions, db.blocks, db.occurrences, db.tasks], async () => {
+  await db.transaction('rw', [db.threads, db.mentions, db.blocks, db.occurrences, db.tasks, db.threadNotes], async () => {
+    const previousMentions = await db.mentions.where('day').equals(record.date).toArray()
     await db.mentions.where('day').equals(record.date).delete()
     if (parsed.length) await db.mentions.bulkPut(parsed)
     await db.blocks.where('day').equals(record.date).delete()
@@ -322,6 +328,28 @@ async function reindexDay(record: DayRecord): Promise<void> {
         updatedAt: now,
       })
     }
+    for (const threadId of new Set(previousMentions.map((mention) => mention.threadId))) {
+      await pruneThreadIfOrphan(threadId)
+    }
+  })
+}
+
+function hasMeaningfulThreadNote(markdown: string): boolean {
+  return markdown.split('\n').some((line) => cleanMarkdownLine(line).length > 0)
+}
+
+async function pruneThreadIfOrphan(threadId: string): Promise<void> {
+  if (await db.mentions.where('threadId').equals(threadId).count()) return
+  const note = await db.threadNotes.get(threadId)
+  if (note && hasMeaningfulThreadNote(note.markdown)) return
+  await db.threads.delete(threadId)
+  if (note) await db.threadNotes.delete(threadId)
+}
+
+export async function pruneOrphanThreads(): Promise<void> {
+  await db.transaction('rw', [db.threads, db.mentions, db.threadNotes], async () => {
+    const threads = await db.threads.toArray()
+    for (const thread of threads) await pruneThreadIfOrphan(thread.id)
   })
 }
 
