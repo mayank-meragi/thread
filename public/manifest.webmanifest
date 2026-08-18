@@ -1,0 +1,9 @@
+{
+  "name": "Thread",
+  "short_name": "Thread",
+  "description": "Write chronologically. Thread organizes contextually.",
+  "start_url": "/thread/#/",
+  "display": "standalone",
+  "background_color": "#f6f7fb",
+  "theme_color": "#f6f7fb"
+}

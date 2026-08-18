@@ -1,0 +1,424 @@
+import Dexie, { type EntityTable } from 'dexie'
+import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, parseOutline, type BlockKind, type OutlineBlock } from './lib/outline'
+import { parseTaskDate } from './lib/taskDates'
+
+export interface DayRecord {
+  date: string
+  markdown: string
+  blockCount: number
+  updatedAt: string
+  localRevision: number
+  remoteSha?: string
+  lastSyncedAt?: string
+}
+
+export interface ThreadRecord {
+  id: string
+  title: string
+  normalizedTitle: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ThreadNoteRecord {
+  threadId: string
+  markdown: string
+  blockCount: number
+  updatedAt: string
+  localRevision: number
+  remoteSha?: string
+  lastSyncedAt?: string
+}
+
+export interface MentionRecord {
+  id: string
+  threadId: string
+  title: string
+  day: string
+  line: number
+  excerpt: string
+  kind: BlockKind
+  checked: boolean
+}
+
+export interface OutboxRecord {
+  key: string
+  kind: 'day' | 'thread-note'
+  aggregateId: string
+  createdAt: string
+  attempts: number
+  error?: string
+}
+
+export interface ConflictRecord {
+  id: string
+  day: string
+  localMarkdown: string
+  remoteMarkdown: string
+  detectedAt: string
+  resolvedAt?: string
+}
+
+export interface ThreadOccurrenceRecord {
+  id: string
+  threadId: string
+  title: string
+  day: string
+  rootBlockId: string
+  order: number
+}
+
+export interface ViewStateRecord {
+  key: string
+  view: string
+  blockId: string
+  collapsed: boolean
+  updatedAt: string
+}
+
+export interface DayRevisionRecord extends DayRecord {
+  id: string
+  day: string
+  archivedAt: string
+}
+
+export type TaskPriority = 'low' | 'medium' | 'high'
+
+export interface TaskRecord {
+  id: string
+  blockId: string
+  day: string
+  line: number
+  order: number
+  text: string
+  checked: boolean
+  dueDate?: string
+  dueText?: string
+  dueSource?: 'nlp' | 'manual'
+  priority?: TaskPriority
+  completedAt?: string
+  updatedAt: string
+}
+
+class ThreadDatabase extends Dexie {
+  days!: EntityTable<DayRecord, 'date'>
+  threads!: EntityTable<ThreadRecord, 'id'>
+  mentions!: EntityTable<MentionRecord, 'id'>
+  outbox!: EntityTable<OutboxRecord, 'key'>
+  conflicts!: EntityTable<ConflictRecord, 'id'>
+  blocks!: EntityTable<OutlineBlock, 'id'>
+  occurrences!: EntityTable<ThreadOccurrenceRecord, 'id'>
+  viewState!: EntityTable<ViewStateRecord, 'key'>
+  revisions!: EntityTable<DayRevisionRecord, 'id'>
+  tasks!: EntityTable<TaskRecord, 'id'>
+  threadNotes!: EntityTable<ThreadNoteRecord, 'threadId'>
+
+  constructor() {
+    super('thread-v1')
+    this.version(1).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, day, detectedAt, resolvedAt',
+    })
+    this.version(2).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, day, detectedAt, resolvedAt',
+      blocks: 'id, day, parentId, [day+order]',
+      occurrences: 'id, threadId, day, rootBlockId, [threadId+day]',
+      viewState: 'key, view, blockId, collapsed',
+    })
+    this.version(3).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, day, detectedAt, resolvedAt',
+      blocks: 'id, day, parentId, [day+order]',
+      occurrences: 'id, threadId, day, rootBlockId, [threadId+day]',
+      viewState: 'key, view, blockId, collapsed',
+      revisions: 'id, day, archivedAt, [day+localRevision]',
+    })
+    this.version(4).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, kind, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, day, detectedAt, resolvedAt',
+      blocks: 'id, day, parentId, kind, [day+order]',
+      occurrences: 'id, threadId, day, rootBlockId, [threadId+day]',
+      viewState: 'key, view, blockId, collapsed',
+      revisions: 'id, day, archivedAt, [day+localRevision]',
+      tasks: 'id, blockId, day, dueDate, priority, [day+order]',
+    })
+    this.version(5).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, kind, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, day, detectedAt, resolvedAt',
+      blocks: 'id, day, parentId, kind, [day+order]',
+      occurrences: 'id, threadId, day, rootBlockId, [threadId+day]',
+      viewState: 'key, view, blockId, collapsed',
+      revisions: 'id, day, archivedAt, [day+localRevision]',
+      tasks: 'id, blockId, day, dueDate, priority, [day+order]',
+      threadNotes: 'threadId, updatedAt',
+    })
+  }
+}
+
+export const db = new ThreadDatabase()
+
+const DEMO_MARKDOWN = `- Need to improve onboarding
+  - simplify auth flow
+  - talk to [[Rahul]]
+
+- [[Browser]]
+  - Start with **omnibox commands**
+  - investigate Dia extension APIs
+
+- IDEA: workout coach should account for today's activity
+
+- [ ] Prototype omnibox for [[Browser]]
+- DECISION: Start with an extension before building a browser. [[Browser]]`
+
+export async function initializeDatabase(today: string): Promise<void> {
+  await ensureDay(today)
+  const days = await db.days.toArray()
+  for (const day of days) await reindexDay(day)
+}
+
+export async function ensureDay(date: string): Promise<void> {
+  const existing = await db.days.get(date)
+  if (existing) {
+    await reindexDay(existing)
+    return
+  }
+  const hasAnyDay = (await db.days.count()) > 0
+  const now = new Date().toISOString()
+  await indexAndStoreDay({
+    date,
+    markdown: hasAnyDay ? '- ' : DEMO_MARKDOWN,
+    blockCount: hasAnyDay ? 1 : countMarkdownBlocks(DEMO_MARKDOWN),
+    updatedAt: now,
+    localRevision: 1,
+  })
+}
+
+export async function ensureThreadNote(threadId: string): Promise<void> {
+  if (await db.threadNotes.get(threadId)) return
+  await db.threadNotes.put({
+    threadId,
+    markdown: '- ',
+    blockCount: 1,
+    updatedAt: new Date().toISOString(),
+    localRevision: 1,
+  })
+}
+
+const threadNoteSaveQueues = new Map<string, Promise<void>>()
+
+export function saveThreadNote(threadId: string, markdown: string): Promise<void> {
+  const queued = threadNoteSaveQueues.get(threadId) ?? Promise.resolve()
+  const next = queued.catch(() => undefined).then(async () => {
+    const previous = await db.threadNotes.get(threadId)
+    if (previous?.markdown === markdown) return
+    const now = new Date().toISOString()
+    await db.transaction('rw', [db.threadNotes, db.outbox], async () => {
+      await db.threadNotes.put({
+        threadId,
+        markdown,
+        blockCount: countMarkdownBlocks(markdown),
+        updatedAt: now,
+        localRevision: (previous?.localRevision ?? 0) + 1,
+        remoteSha: previous?.remoteSha,
+        lastSyncedAt: previous?.lastSyncedAt,
+      })
+      await db.outbox.put({
+        key: `thread-note:${threadId}`,
+        kind: 'thread-note',
+        aggregateId: threadId,
+        createdAt: now,
+        attempts: 0,
+      })
+    })
+  })
+  threadNoteSaveQueues.set(threadId, next)
+  return next.finally(() => {
+    if (threadNoteSaveQueues.get(threadId) === next) threadNoteSaveQueues.delete(threadId)
+  })
+}
+
+async function indexAndStoreDay(record: DayRecord, previous?: DayRecord): Promise<void> {
+  const parsed = extractThreadMentions(record.markdown, record.date)
+  const outline = parseOutline(record.markdown, record.date)
+  const taskRecords = await buildTaskRecords(outline.blocks, record.date)
+  await db.transaction('rw', [db.days, db.threads, db.mentions, db.blocks, db.occurrences, db.outbox, db.revisions, db.tasks], async () => {
+    if (previous && previous.markdown !== record.markdown) {
+      await db.revisions.put({
+        ...previous,
+        id: `${previous.date}:${previous.localRevision}`,
+        day: previous.date,
+        archivedAt: new Date().toISOString(),
+      })
+    }
+    await db.days.put(record)
+    await db.mentions.where('day').equals(record.date).delete()
+    if (parsed.length) await db.mentions.bulkPut(parsed)
+    await db.blocks.where('day').equals(record.date).delete()
+    await db.occurrences.where('day').equals(record.date).delete()
+    if (outline.blocks.length) await db.blocks.bulkPut(outline.blocks)
+    if (outline.occurrences.length) await db.occurrences.bulkPut(outline.occurrences)
+    await db.tasks.where('day').equals(record.date).delete()
+    if (taskRecords.length) await db.tasks.bulkPut(taskRecords)
+
+    const now = new Date().toISOString()
+    for (const mention of parsed) {
+      const existing = await db.threads.get(mention.threadId)
+      await db.threads.put({
+        id: mention.threadId,
+        title: existing?.title ?? mention.title,
+        normalizedTitle: mention.title.toLocaleLowerCase(),
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      })
+    }
+
+    await db.outbox.put({
+      key: `day:${record.date}`,
+      kind: 'day',
+      aggregateId: record.date,
+      createdAt: now,
+      attempts: 0,
+    })
+  })
+}
+
+async function reindexDay(record: DayRecord): Promise<void> {
+  const parsed = extractThreadMentions(record.markdown, record.date)
+  const outline = parseOutline(record.markdown, record.date)
+  const taskRecords = await buildTaskRecords(outline.blocks, record.date)
+  await db.transaction('rw', [db.threads, db.mentions, db.blocks, db.occurrences, db.tasks], async () => {
+    await db.mentions.where('day').equals(record.date).delete()
+    if (parsed.length) await db.mentions.bulkPut(parsed)
+    await db.blocks.where('day').equals(record.date).delete()
+    await db.occurrences.where('day').equals(record.date).delete()
+    if (outline.blocks.length) await db.blocks.bulkPut(outline.blocks)
+    if (outline.occurrences.length) await db.occurrences.bulkPut(outline.occurrences)
+    await db.tasks.where('day').equals(record.date).delete()
+    if (taskRecords.length) await db.tasks.bulkPut(taskRecords)
+    const now = new Date().toISOString()
+    for (const mention of parsed) {
+      const existing = await db.threads.get(mention.threadId)
+      await db.threads.put({
+        id: mention.threadId,
+        title: existing?.title ?? mention.title,
+        normalizedTitle: mention.title.toLocaleLowerCase(),
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      })
+    }
+  })
+}
+
+async function buildTaskRecords(blocks: OutlineBlock[], day: string): Promise<TaskRecord[]> {
+  const previous = new Map((await db.tasks.where('day').equals(day).toArray()).map((task) => [task.id, task]))
+  const now = new Date().toISOString()
+  return blocks.filter((block) => block.kind === 'task').map((block) => {
+    const existing = previous.get(block.id)
+    const detected = parseTaskDate(block.plainText, day)
+    const manualDue = existing?.dueSource === 'manual'
+    return {
+      id: block.id,
+      blockId: block.id,
+      day,
+      line: block.order,
+      order: block.order,
+      text: block.plainText,
+      checked: block.checked,
+      dueDate: manualDue ? existing.dueDate : detected?.dueDate,
+      dueText: manualDue ? existing.dueText : detected?.matchedText,
+      dueSource: manualDue ? 'manual' : detected ? 'nlp' : undefined,
+      priority: existing?.priority,
+      completedAt: block.checked ? existing?.completedAt ?? now : undefined,
+      updatedAt: now,
+    }
+  })
+}
+
+export async function updateTaskMetadata(
+  id: string,
+  changes: { dueDate?: string; priority?: TaskPriority },
+): Promise<void> {
+  const task = await db.tasks.get(id)
+  if (!task) return
+  await db.tasks.update(id, {
+    ...changes,
+    ...(Object.prototype.hasOwnProperty.call(changes, 'dueDate') ? { dueSource: 'manual', dueText: undefined } : {}),
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+export async function toggleTask(task: TaskRecord): Promise<void> {
+  const day = await db.days.get(task.day)
+  if (!day) return
+  const lines = day.markdown.split('\n')
+  const taskSyntax = /^\s*(?:[-*+]|\d+\.)\s+\[[ xX]\]/
+  const lineIndex = taskSyntax.test(lines[task.line] ?? '')
+    ? task.line
+    : lines.findIndex((line) => taskSyntax.test(line) && cleanMarkdownLine(line) === task.text)
+  if (lineIndex < 0) return
+  const line = lines[lineIndex]
+  lines[lineIndex] = task.checked
+    ? line.replace(/^(\s*(?:[-*+]|\d+\.)\s+)\[[xX]\]/, '$1[ ]')
+    : line.replace(/^(\s*(?:[-*+]|\d+\.)\s+)\[ \]/, '$1[x]')
+  const markdown = lines.join('\n')
+  await saveDay(task.day, markdown)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('thread:day-external-update', { detail: { day: task.day, markdown } }))
+  }
+}
+
+const saveQueues = new Map<string, Promise<void>>()
+
+async function saveDayNow(date: string, markdown: string): Promise<void> {
+  const previous = await db.days.get(date)
+  if (previous?.markdown === markdown) return
+  const now = new Date().toISOString()
+  await indexAndStoreDay({
+    date,
+    markdown,
+    blockCount: countMarkdownBlocks(markdown),
+    updatedAt: now,
+    localRevision: (previous?.localRevision ?? 0) + 1,
+    remoteSha: previous?.remoteSha,
+    lastSyncedAt: previous?.lastSyncedAt,
+  }, previous)
+}
+
+export function saveDay(date: string, markdown: string): Promise<void> {
+  const queued = saveQueues.get(date) ?? Promise.resolve()
+  const next = queued.catch(() => undefined).then(() => saveDayNow(date, markdown))
+  saveQueues.set(date, next)
+  return next.finally(() => {
+    if (saveQueues.get(date) === next) saveQueues.delete(date)
+  })
+}
+
+export async function markDaySynced(date: string, sha: string): Promise<void> {
+  await db.transaction('rw', db.days, db.outbox, async () => {
+    await db.days.update(date, { remoteSha: sha, lastSyncedAt: new Date().toISOString() })
+    await db.outbox.delete(`day:${date}`)
+  })
+}
+
+export async function markThreadNoteSynced(threadId: string, sha: string): Promise<void> {
+  await db.transaction('rw', db.threadNotes, db.outbox, async () => {
+    await db.threadNotes.update(threadId, { remoteSha: sha, lastSyncedAt: new Date().toISOString() })
+    await db.outbox.delete(`thread-note:${threadId}`)
+  })
+}
