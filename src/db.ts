@@ -394,14 +394,17 @@ export async function updateTaskMetadata(
 export async function toggleTask(task: TaskRecord): Promise<void> {
   const day = await db.days.get(task.day)
   if (!day) return
+  // Re-parse the day's current markdown and locate this task by its stable
+  // block id, rather than trusting task.line (which can go stale between
+  // when the TaskRecord was last indexed and when it's clicked) or falling
+  // back to a text match, which silently toggles the wrong task whenever two
+  // tasks share the same wording.
+  const block = parseOutline(day.markdown, task.day).blocks.find((candidate) => candidate.id === task.id)
+  if (!block || block.kind !== 'task') return
   const lines = day.markdown.split('\n')
-  const taskSyntax = /^\s*(?:[-*+]|\d+\.)\s+\[[ xX]\]/
-  const lineIndex = taskSyntax.test(lines[task.line] ?? '')
-    ? task.line
-    : lines.findIndex((line) => taskSyntax.test(line) && cleanMarkdownLine(line) === task.text)
-  if (lineIndex < 0) return
-  const line = lines[lineIndex]
-  lines[lineIndex] = task.checked
+  const line = lines[block.order]
+  if (line === undefined) return
+  lines[block.order] = block.checked
     ? line.replace(/^(\s*(?:[-*+]|\d+\.)\s+)\[[xX]\]/, '$1[ ]')
     : line.replace(/^(\s*(?:[-*+]|\d+\.)\s+)\[ \]/, '$1[x]')
   const markdown = lines.join('\n')
