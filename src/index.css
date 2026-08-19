@@ -221,6 +221,7 @@ a { color: inherit; text-decoration: none; }
 .suggestion-glyph.suggestion-idea { border: 0; background: var(--idea-soft); color: var(--idea); font-family: 'IBM Plex Sans', sans-serif; }
 .suggestion-glyph.suggestion-question { border-radius: 50%; color: var(--question); }
 .suggestion-glyph.suggestion-decision { border: 0; background: var(--decision-soft); color: var(--decision); }
+.suggestion-glyph.suggestion-checklist { border-radius: 50%; color: var(--muted); }
 .suggestion-glyph.suggestion-thread { border: 0; background: var(--thread-soft); color: var(--thread); font-size: 17px; }
 .suggestion-glyph.suggestion-create { border-style: dashed; color: var(--thread); font-size: 15px; }
 .suggestion-copy { min-width: 0; display: grid; gap: 2px; }
@@ -282,6 +283,10 @@ a { color: inherit; text-decoration: none; }
 .thread-editor .ProseMirror li.kind-decision > .label-wrapper > .label.bullet::before { content: ''; }
 .thread-editor .ProseMirror li.kind-idea > .label-wrapper > .label.bullet { border: 0; background: transparent; }
 .thread-editor .ProseMirror li.kind-idea > .label-wrapper > .label.bullet::before { content: '✦'; font: 600 13px/1 'IBM Plex Sans', sans-serif; }
+.thread-editor .ProseMirror li.kind-checklist > .label-wrapper > .label.bullet { border-radius: 50%; cursor: pointer; }
+.thread-editor .ProseMirror li.kind-checklist-checked > .label-wrapper > .label.bullet { background: var(--outline-muted); border-color: var(--outline-muted); }
+.thread-editor .ProseMirror li.kind-checklist-checked > .label-wrapper > .label.bullet::before { content: '✓'; display: block; color: var(--control); font: 600 10px/1 'IBM Plex Mono', monospace; }
+.thread-editor .ProseMirror li.kind-checklist-checked > .children > .content-dom > p:first-child { color: var(--muted); text-decoration: line-through; }
 .thread-editor:focus-within .ProseMirror li.is-active-path > .label-wrapper > .label.bullet,
 .thread-editor:focus-within .ProseMirror li.is-active-path > .label-wrapper > .label.ordered,
 .thread-editor:focus-within .ProseMirror li.is-active-path > .label-wrapper > .label.checked,
@@ -297,6 +302,7 @@ a { color: inherit; text-decoration: none; }
 .thread-editor:focus-within .ProseMirror li.is-active-node.kind-question > .label-wrapper > .label.bullet { color: var(--question); background: var(--question-soft); }
 .thread-editor:focus-within .ProseMirror li.is-active-node.kind-decision > .label-wrapper > .label.bullet { color: var(--decision); background: var(--decision-soft); }
 .thread-editor:focus-within .ProseMirror li.is-active-node.kind-idea > .label-wrapper > .label.bullet { color: var(--idea); background: var(--idea-soft); }
+.thread-editor:focus-within .ProseMirror li.is-active-node.kind-checklist:not(.kind-checklist-checked) > .label-wrapper > .label.bullet { color: var(--thread); background: var(--thread-soft); }
 .thread-editor:focus-within .ProseMirror li.is-active-node > .label-wrapper > .label.checked,
 .thread-editor:focus-within .ProseMirror li.is-active-node > .label-wrapper > .label.unchecked { color: var(--task); }
 .thread-editor .ProseMirror strong { font-weight: 600; color: var(--ink); }

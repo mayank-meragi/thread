@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, Check, GitBranch, LoaderCircle, Palette, ShieldCheck, Unplug } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, resolveConflict } from '../db'
+import { db } from '../db'
 import { isoToday } from '../lib/dates'
 import {
   clearGitHubConfig,
   getGitHubConfig,
   pullDay,
+  resolveDayConflict,
   saveGitHubConfig,
   syncPending,
   validateGitHub,
@@ -32,11 +33,15 @@ export function SettingsPage() {
     [],
   )
   const [resolving, setResolving] = useState<string | null>(null)
+  const [resolveError, setResolveError] = useState('')
 
   async function resolve(conflictId: string, resolution: 'local' | 'remote') {
     setResolving(conflictId)
+    setResolveError('')
     try {
-      await resolveConflict(conflictId, resolution)
+      await resolveDayConflict(conflictId, resolution)
+    } catch (caught) {
+      setResolveError(caught instanceof Error ? caught.message : String(caught))
     } finally {
       setResolving(null)
     }
@@ -108,6 +113,7 @@ export function SettingsPage() {
               <p>These days changed both here and in the data repository. Pick which copy to keep.</p>
             </div>
           </div>
+          {resolveError && <p className="form-error">{resolveError}</p>}
           {conflicts.map((conflict) => (
             <div className="conflict-row" key={conflict.id}>
               <div className="conflict-day">{conflict.day}</div>

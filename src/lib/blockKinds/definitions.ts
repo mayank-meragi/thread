@@ -9,7 +9,15 @@
 // ProseMirror node attribute (and `[ ]`/`[x]` markdown syntax) rather than a
 // text prefix, so it has no prefixPattern/className here and is handled by
 // its own `isTask` branch wherever this list is consumed.
-export type BlockConversionKind = 'bullet' | 'task' | 'idea' | 'question' | 'decision'
+export type BlockConversionKind = 'bullet' | 'task' | 'checklist' | 'idea' | 'question' | 'decision'
+
+// Matches `()`, `( )`, `(x)`, or `(X)` at the start of a block's text --
+// a plain checkbox that (unlike task) carries no due-date/priority metadata
+// and never counts toward task lists, since it's a text prefix rather than
+// the schema-level `checked` attribute. Shared by the prefix-kind detection
+// below and by the click-to-toggle handler in MarkdownEditor.
+export const checklistPrefixPattern = /^\((?:\s|x|X)?\)\s+/
+export const checklistCheckedPattern = /^\((?:x|X)\)/
 
 export interface BlockKindDefinition {
   id: BlockConversionKind
@@ -29,6 +37,7 @@ export interface BlockKindDefinition {
 
 export const blockKindDefinitions: BlockKindDefinition[] = [
   { id: 'task', label: 'Task', description: 'Track something to do', glyph: '☐', aliases: ['todo', 'check'], isTask: true },
+  { id: 'checklist', label: 'Checkbox', description: 'A plain check, not tracked as a task', glyph: '○', aliases: ['checkbox'], className: 'kind-checklist', prefixPattern: checklistPrefixPattern, prefixText: '() ' },
   { id: 'idea', label: 'Idea', description: 'Capture a possibility', glyph: '✦', aliases: ['thought'], className: 'kind-idea', prefixPattern: /^!\s+/, prefixText: '! ' },
   { id: 'question', label: 'Question', description: 'Keep an open question', glyph: '?', aliases: ['ask'], className: 'kind-question', prefixPattern: /^\?\s+/, prefixText: '? ' },
   { id: 'decision', label: 'Decision', description: 'Record a choice', glyph: '◆', aliases: ['decide'], className: 'kind-decision', prefixPattern: /^(?:=|\\=)\s+/, prefixText: '= ' },

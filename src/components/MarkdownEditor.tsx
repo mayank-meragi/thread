@@ -3,6 +3,7 @@ import { Crepe } from '@milkdown/crepe'
 import { editorViewCtx } from '@milkdown/core'
 import { trailingConfig } from '@milkdown/plugin-trailing'
 import { listItemSchema } from '@milkdown/preset-commonmark'
+import type { Node as ProseNode } from '@milkdown/prose/model'
 import { liftListItem, sinkListItem } from '@milkdown/prose/schema-list'
 import { TextSelection } from '@milkdown/prose/state'
 import type { EditorView } from '@milkdown/prose/view'
@@ -10,6 +11,8 @@ import '@milkdown/crepe/theme/common/style.css'
 import { db } from '../db'
 import {
   activeOutlinePathPlugin,
+  checklistCheckedPattern,
+  checklistPrefixPattern,
   clearTaskExtras,
   detectPrefixKind,
   getBlockKindDefinition,
@@ -194,9 +197,55 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
     }
     root.addEventListener('click', openWikiLink, true)
 
+    // Crepe's own label-wrapper pointerdown handler stops propagation
+    // unconditionally (even for non-task bullets), so this has to run in the
+    // capture phase on `root` to see the event first.
+    const toggleChecklistItem = (event: PointerEvent) => {
+      const item = event.target instanceof Element
+        ? event.target.closest<HTMLLIElement>('li.kind-checklist > .label-wrapper > .label.bullet')?.closest<HTMLLIElement>('li.kind-checklist')
+        : null
+      if (!item) return
+      event.preventDefault()
+      event.stopPropagation()
+      markUserMutation()
+      crepe.editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx)
+        let match: { pos: number; paragraph: ProseNode } | null = null
+        view.state.doc.descendants((node, pos) => {
+          if (match || node.type.name !== 'list_item') return true
+          const wrapper = view.nodeDOM(pos)
+          const dom = wrapper instanceof HTMLElement ? wrapper.querySelector<HTMLElement>(':scope > li') ?? wrapper : null
+          if (dom === item && node.firstChild?.type.name === 'paragraph') match = { pos, paragraph: node.firstChild }
+          return true
+        })
+        if (!match) return
+        // TS narrows `match` to `never` here because the reassignment happens
+        // inside the descendants() closure, which its control-flow analysis
+        // doesn't see as affecting this outer scope. An explicit annotation
+        // on a fresh binding sidesteps that -- `never` is assignable to
+        // anything, so this just recovers the real type.
+        const found: { pos: number; paragraph: ProseNode } = match
+        const paragraphStart = found.pos + 2
+        const prefixMatch = found.paragraph.textContent.match(checklistPrefixPattern)?.[0]
+        if (!prefixMatch) return
+        const checked = checklistCheckedPattern.test(prefixMatch)
+        const replacement = checked ? '() ' : '(x) '
+        view.dispatch(view.state.tr.insertText(replacement, paragraphStart, paragraphStart + prefixMatch.length))
+        view.focus()
+      })
+    }
+    root.addEventListener('pointerdown', toggleChecklistItem, true)
+
     const applyExternalUpdate = (event: Event) => {
       const detail = (event as CustomEvent<{ day: string; markdown: string }>).detail
       if (disposed || detail?.day !== day) return
+      // Never replace the document while there's a keystroke not yet folded
+      // into `latest` (userMutationPending) or content computed but not yet
+      // handed off to onChange (dirty). A background update -- most commonly
+      // a remote pull racing with active typing -- must not blow away what
+      // the user is mid-way through typing; it'll be reflected next time an
+      // external update arrives once the user pauses.
+      if (userMutationPending || dirty) return
       latest = detail.markdown
       dirty = false
       userMutationPending = false
@@ -303,6 +352,7 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
       window.visualViewport?.removeEventListener('scroll', syncToolbar)
       mobileQuery.removeEventListener('change', syncToolbar)
       root.removeEventListener('click', openWikiLink, true)
+      root.removeEventListener('pointerdown', toggleChecklistItem, true)
       window.removeEventListener('thread:day-external-update', applyExternalUpdate)
       runToolbarActionRef.current = () => undefined
       document.body.classList.remove('mobile-editor-active')
@@ -484,7 +534,7 @@ async function installCollapseControls(root: HTMLElement, day: string): Promise<
       }
     }
 
-    item.classList.remove('kind-block', ...prefixedBlockKinds.map((kind) => kind.className))
+    item.classList.remove('kind-block', 'kind-checklist-checked', ...prefixedBlockKinds.map((kind) => kind.className))
     item.removeAttribute('data-kind-label')
     if (item.classList.contains('task-block')) return
     const paragraph = item.querySelector<HTMLElement>(':scope > .children > .content-dom > p:first-child')
@@ -493,5 +543,9 @@ async function installCollapseControls(root: HTMLElement, day: string): Promise<
     if (!kind) return
     item.classList.add('kind-block', kind.className)
     item.dataset.kindLabel = kind.label
+    if (kind.id === 'checklist') {
+      const prefix = content.match(checklistPrefixPattern)?.[0] ?? ''
+      item.classList.toggle('kind-checklist-checked', checklistCheckedPattern.test(prefix))
+    }
   })
 }

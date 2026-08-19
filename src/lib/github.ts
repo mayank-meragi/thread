@@ -1,4 +1,4 @@
-import { applyRemoteDay, db, hasOpenDayConflict, markDaySynced, markThreadNoteSynced, recordDayConflict } from '../db'
+import { applyRemoteDay, db, hasOpenDayConflict, markConflictResolved, markDaySynced, markThreadNoteSynced, recordDayConflict } from '../db'
 
 const API = 'https://api.github.com'
 const STORAGE_KEY = 'thread.github'
@@ -208,4 +208,44 @@ export async function pullDay(date: string): Promise<void> {
   if (day && day.markdown !== remote.content) {
     await recordDayConflict(date, day.markdown, remote.content)
   }
+}
+
+// A conflict's recorded remoteMarkdown/remoteSha can already be stale by the
+// time the user resolves it (more commits may have landed since), so this
+// re-fetches the file fresh rather than trusting the snapshot taken when the
+// conflict was first detected.
+//
+// "Keep the repository's copy" is just adopting that fresh fetch locally --
+// applyRemoteDay already does the right thing.
+//
+// "Keep this browser's copy" previously only cleared the conflict's
+// resolvedAt flag and hoped the next ordinary sync cycle would push local
+// content -- but day.remoteSha was still whatever it was before (often
+// undefined, or the old, now-wrong parent), so that next cycle either
+// re-detected the exact same divergence and opened a fresh conflict, or hit
+// a 409 from GitHub for using a stale parent sha. This forces the push here,
+// using the sha just fetched above as the correct current parent, so local
+// content actually overwrites remote instead of the resolution silently
+// doing nothing.
+export async function resolveDayConflict(conflictId: string, resolution: 'local' | 'remote'): Promise<void> {
+  const conflict = await db.conflicts.get(conflictId)
+  if (!conflict) return
+  const config = getGitHubConfig()
+  if (!config) throw new Error('Connect to GitHub before resolving a sync conflict.')
+
+  const year = conflict.day.slice(0, 4)
+  const path = `days/${year}/${conflict.day}.md`
+  const fresh = await getRemoteFile(config, path)
+
+  if (resolution === 'remote') {
+    if (fresh) await applyRemoteDay(conflict.day, fresh.content, fresh.sha)
+  } else {
+    const day = await db.days.get(conflict.day)
+    if (day) {
+      const sha = await putFile(config, path, day.markdown, fresh?.sha)
+      await markDaySynced(conflict.day, sha, day.localRevision)
+    }
+  }
+
+  await markConflictResolved(conflictId)
 }

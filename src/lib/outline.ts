@@ -1,11 +1,12 @@
-import { getBlockKindDefinition } from './blockKinds/definitions'
+import { checklistCheckedPattern, getBlockKindDefinition } from './blockKinds/definitions'
 
 // Reuse the same prefix patterns the editor uses for live-DOM detection, so
 // this markdown-side parser and the editor can never disagree about what
-// counts as a question/decision/idea.
+// counts as a question/decision/idea/checklist.
 const questionPrefix = getBlockKindDefinition('question')!.prefixPattern!
 const decisionPrefix = getBlockKindDefinition('decision')!.prefixPattern!
 const ideaPrefix = getBlockKindDefinition('idea')!.prefixPattern!
+const checklistPrefix = getBlockKindDefinition('checklist')!.prefixPattern!
 
 export interface ParsedMention {
   id: string
@@ -18,7 +19,7 @@ export interface ParsedMention {
   checked: boolean
 }
 
-export type BlockKind = 'thought' | 'task' | 'question' | 'decision' | 'idea'
+export type BlockKind = 'thought' | 'task' | 'checklist' | 'question' | 'decision' | 'idea'
 
 export interface OutlineBlock {
   id: string
@@ -57,6 +58,7 @@ export function cleanMarkdownLine(line: string): string {
     .replace(/\\(\[|\]|=|!|\?)/g, '$1')
     .replace(/^\s*(?:[-*+]\s+|\d+\.\s+)/, '')
     .replace(/^\[[ xX]\]\s*/, '')
+    .replace(/^\((?:\s|x|X)?\)\s+/, '')
     .replace(/^[?!=]\s+(?:\[[ xX]\]\s+)?/, '')
     .replace(/^#{1,6}\s+/, '')
     .replace(/\[\[([^\]]+)\]\]/g, '$1')
@@ -86,12 +88,15 @@ export function extractThreadMentions(markdown: string, day: string): ParsedMent
 
     const excerpt = cleanMarkdownLine(rawLine)
     const answeredQuestion = /^\s*[-*+]\s+\?\s+\[[xX]\]/.test(syntaxLine)
-    const checked = /^\s*[-*+]\s+\[[xX]\]/.test(syntaxLine) || answeredQuestion
+    const checklistMatch = /^\s*[-*+]\s+(\((?:\s|x|X)?\))\s+/.exec(syntaxLine)
+    const checklistChecked = checklistMatch != null && checklistCheckedPattern.test(checklistMatch[1])
+    const checked = /^\s*[-*+]\s+\[[xX]\]/.test(syntaxLine) || answeredQuestion || checklistChecked
     const task = /^\s*[-*+]\s+\[[ xX]\]/.test(syntaxLine)
+    const checklist = checklistMatch != null
     const question = /^\s*[-*+]\s+\?\s+/.test(syntaxLine)
     const decision = /^\s*[-*+]\s+=\s+/.test(syntaxLine) || /\bdecision\s*:/i.test(syntaxLine)
     const idea = /^\s*[-*+]\s+!\s+/.test(syntaxLine) || /\bidea\s*:/i.test(syntaxLine)
-    const kind: BlockKind = task ? 'task' : question ? 'question' : decision ? 'decision' : idea ? 'idea' : 'thought'
+    const kind: BlockKind = task ? 'task' : checklist ? 'checklist' : question ? 'question' : decision ? 'decision' : idea ? 'idea' : 'thought'
 
     Array.from(targets.values()).forEach(({ id: threadId, title }, index) => {
       mentions.push({
@@ -140,12 +145,14 @@ export function parseOutline(markdown: string, day: string): {
     const id = `${day}:${path}`
     const syntaxContent = content.replace(/\\(\[|\]|=|!|\?)/g, '$1')
     const answeredQuestion = /^\?\s+\[[xX]\]\s+/.test(syntaxContent)
-    const checked = /^\[[xX]\]\s+/.test(syntaxContent) || answeredQuestion
+    const checklist = checklistPrefix.test(syntaxContent)
+    const checklistChecked = checklist && checklistCheckedPattern.test(syntaxContent)
+    const checked = /^\[[xX]\]\s+/.test(syntaxContent) || answeredQuestion || checklistChecked
     const task = /^\[[ xX]\]\s+/.test(syntaxContent)
     const question = questionPrefix.test(syntaxContent)
     const decision = decisionPrefix.test(syntaxContent) || /\bdecision\s*:/i.test(syntaxContent)
     const idea = ideaPrefix.test(syntaxContent) || /\bidea\s*:/i.test(syntaxContent)
-    const kind: BlockKind = task ? 'task' : question ? 'question' : decision ? 'decision' : idea ? 'idea' : 'thought'
+    const kind: BlockKind = task ? 'task' : checklist ? 'checklist' : question ? 'question' : decision ? 'decision' : idea ? 'idea' : 'thought'
 
     blocks.push({
       id,

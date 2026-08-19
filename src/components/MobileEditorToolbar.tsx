@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 
 export type ToolbarAction = 'outdent' | 'indent' | 'bullet' | 'task' | 'wikilink' | 'idea' | 'question' | 'decision'
-export type ToolbarBlockKind = 'bullet' | 'task' | 'idea' | 'question' | 'decision'
+export type ToolbarBlockKind = 'bullet' | 'task' | 'checklist' | 'idea' | 'question' | 'decision'
 
 interface MobileEditorToolbarProps {
   visible: boolean

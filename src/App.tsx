@@ -80,10 +80,16 @@ function AppShell() {
   // Sync only ever pushed local changes -- it never checked whether another
   // device had pushed something newer for a day this browser already has.
   // "Up to date" meant only "nothing local is queued to push," which said
-  // nothing about agreement with the remote. Keep Today's file fresh: once on
-  // connect, again whenever the tab regains focus or comes back online, and
-  // periodically while the tab stays open and visible (the common case for a
-  // daily-first app left open all day).
+  // nothing about agreement with the remote. Keep Today's file fresh at
+  // well-defined, low-risk moments only: once on connect, and whenever the
+  // tab regains focus or the network comes back. Those are points where the
+  // user has just returned to the tab and is very unlikely to be mid-
+  // keystroke. A blind periodic timer was tried and removed: it fires at a
+  // moment with no relation to what the user is doing, so it could (and did)
+  // land in the middle of an active typing burst. MarkdownEditor's own guard
+  // against applying an external update while there's unsaved local input is
+  // the real safety net either way -- these triggers just decide when it's
+  // worth asking.
   useEffect(() => {
     if (!connected) return
     const pullToday = () => void pullDay(isoToday())
@@ -93,13 +99,9 @@ function AppShell() {
     }
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('online', pullToday)
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === 'visible') pullToday()
-    }, 90_000)
     return () => {
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('online', pullToday)
-      window.clearInterval(interval)
     }
   }, [connected])
 
