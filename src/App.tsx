@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, BookOpenText, Cloud, CloudOff, Search, Settings, Sparkle } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { HashRouter, Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
@@ -30,6 +30,19 @@ function AppShell() {
     window.addEventListener('thread:github-config', refresh)
     return () => window.removeEventListener('thread:github-config', refresh)
   }, [])
+
+  // Resolving a conflict in Settings doesn't go through this component's own
+  // sync cycle, so a stale "Sync error" badge (from the sync attempt that
+  // originally hit the conflict) would otherwise linger until some unrelated
+  // future edit happened to trigger another sync. Clear it specifically when
+  // the open-conflict count drops -- not just whenever it's zero, since that
+  // would also mask a genuine unrelated error (e.g. auth) that has nothing to
+  // do with conflicts.
+  const previousConflicts = useRef(conflicts)
+  useEffect(() => {
+    if (conflicts < previousConflicts.current) setSyncError(null)
+    previousConflicts.current = conflicts
+  }, [conflicts])
 
   useEffect(() => {
     if (!connected) return

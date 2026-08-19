@@ -1,4 +1,4 @@
-import { applyRemoteDay, db, hasOpenDayConflict, markConflictResolved, markDaySynced, markThreadNoteSynced, recordDayConflict } from '../db'
+import { applyRemoteDay, db, hasOpenDayConflict, markConflictResolved, markDaySynced, markThreadNoteSynced, recordDayConflict, type DayRecord, type ThreadNoteRecord } from '../db'
 
 const API = 'https://api.github.com'
 const STORAGE_KEY = 'thread.github'
@@ -37,6 +37,15 @@ function headers(token: string): HeadersInit {
     'X-GitHub-Api-Version': '2022-11-28',
   }
 }
+
+// Thrown when GitHub rejects a write because the sha we sent doesn't match
+// the file's current sha -- i.e. our locally stored remoteSha is stale,
+// whether because this is the first sync of a day that already has remote
+// content, or because something else (another device, a manual edit, a
+// pull) changed the remote file since we last knew about it. Distinguished
+// from other failures (auth, rate limit, network) so callers can recover
+// instead of just retrying the same doomed request forever.
+export class SyncConflictError extends Error {}
 
 function toBase64(value: string): string {
   const bytes = new TextEncoder().encode(value)
@@ -87,11 +96,77 @@ async function putFile(config: GitHubConfig, path: string, content: string, sha?
     }),
   })
   if (response.status === 409 || response.status === 422) {
-    throw new Error(`Conflict while syncing ${path}. Refresh before retrying.`)
+    throw new SyncConflictError(`${path} changed in the data repository since this browser last knew about it.`)
   }
   if (!response.ok) throw new Error(`Could not sync ${path} (${response.status}).`)
   const result = (await response.json()) as { content: { sha: string } }
   return result.content.sha
+}
+
+// Pushes one day, unconditionally -- whether this is the very first sync of
+// a day that might already have remote content, or a resync of a day whose
+// stored remoteSha has since gone stale (another device pushed, a pull
+// landed, a manual edit on GitHub). Both are the same situation from
+// GitHub's perspective: the sha we send doesn't match what's actually
+// there. Rather than trying to predict that in advance (the previous
+// version proactively checked only when remoteSha was unset, and had no
+// recovery at all for the case where a previously-known sha went stale --
+// exactly the scenario that produced a raw, repeating 409), this always
+// attempts the write and reacts to SyncConflictError uniformly: refetch the
+// real current state and reconcile against it.
+async function pushDay(config: GitHubConfig, day: DayRecord, path: string): Promise<number> {
+  try {
+    const sha = await putFile(config, path, day.markdown, day.remoteSha)
+    await markDaySynced(day.date, sha, day.localRevision)
+    return 1
+  } catch (error) {
+    if (!(error instanceof SyncConflictError)) throw error
+
+    const fresh = await getRemoteFile(config, path)
+    if (!fresh) {
+      // The file existed a moment ago (that's why we got a conflict) but is
+      // gone now -- e.g. deleted upstream between our attempt and this
+      // recovery fetch. A plain create is now correct.
+      const sha = await putFile(config, path, day.markdown, undefined)
+      await markDaySynced(day.date, sha, day.localRevision)
+      return 1
+    }
+    if (fresh.content === day.markdown) {
+      // Remote already matches what we were trying to write (e.g. another
+      // tab in this same browser got there first) -- nothing left to push.
+      await markDaySynced(day.date, fresh.sha, day.localRevision)
+      return 1
+    }
+    await recordDayConflict(day.date, day.markdown, fresh.content)
+    throw new Error(`${path} changed in the data repository. Resolve the conflict to continue syncing.`, { cause: error })
+  }
+}
+
+// Same recovery shape as pushDay, minus conflict recording -- thread notes
+// don't have a resolution UI (ConflictRecord is day-scoped only). A genuine
+// divergence still surfaces a clear error rather than a raw 409, and self-
+// heals if the remote already matches; it just can't offer a "keep mine/
+// keep theirs" choice the way a day sync can.
+async function pushThreadNote(config: GitHubConfig, note: ThreadNoteRecord, path: string): Promise<number> {
+  try {
+    const sha = await putFile(config, path, note.markdown, note.remoteSha)
+    await markThreadNoteSynced(note.threadId, sha, note.localRevision)
+    return 1
+  } catch (error) {
+    if (!(error instanceof SyncConflictError)) throw error
+
+    const fresh = await getRemoteFile(config, path)
+    if (!fresh) {
+      const sha = await putFile(config, path, note.markdown, undefined)
+      await markThreadNoteSynced(note.threadId, sha, note.localRevision)
+      return 1
+    }
+    if (fresh.content === note.markdown) {
+      await markThreadNoteSynced(note.threadId, fresh.sha, note.localRevision)
+      return 1
+    }
+    throw new Error(`${path} already contains different notes. The local copy was kept.`, { cause: error })
+  }
 }
 
 export async function syncPending(): Promise<number> {
@@ -110,19 +185,7 @@ export async function syncPending(): Promise<number> {
           continue
         }
         const path = `threads/${note.threadId}.md`
-        const remoteSha = note.remoteSha
-        if (!remoteSha) {
-          const remote = await getRemoteFile(config, path)
-          if (remote?.content === note.markdown) {
-            await markThreadNoteSynced(note.threadId, remote.sha, note.localRevision)
-            synced += 1
-            continue
-          }
-          if (remote) throw new Error(`${path} already contains different notes. The local copy was kept.`)
-        }
-        const sha = await putFile(config, path, note.markdown, remoteSha)
-        await markThreadNoteSynced(note.threadId, sha, note.localRevision)
-        synced += 1
+        synced += await pushThreadNote(config, note, path)
         continue
       }
 
@@ -139,22 +202,7 @@ export async function syncPending(): Promise<number> {
 
       const year = day.date.slice(0, 4)
       const path = `days/${year}/${day.date}.md`
-      const remoteSha = day.remoteSha
-      if (!remoteSha) {
-        const remote = await getRemoteFile(config, path)
-        if (remote?.content === day.markdown) {
-          await markDaySynced(day.date, remote.sha, day.localRevision)
-          synced += 1
-          continue
-        }
-        if (remote) {
-          await recordDayConflict(day.date, day.markdown, remote.content)
-          throw new Error(`${path} already contains different notes. The local copy was kept.`)
-        }
-      }
-      const sha = await putFile(config, path, day.markdown, remoteSha)
-      await markDaySynced(day.date, sha, day.localRevision)
-      synced += 1
+      synced += await pushDay(config, day, path)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       await db.outbox.update(item.key, {
@@ -241,10 +289,12 @@ export async function resolveDayConflict(conflictId: string, resolution: 'local'
     if (fresh) await applyRemoteDay(conflict.day, fresh.content, fresh.sha)
   } else {
     const day = await db.days.get(conflict.day)
-    if (day) {
-      const sha = await putFile(config, path, day.markdown, fresh?.sha)
-      await markDaySynced(conflict.day, sha, day.localRevision)
-    }
+    // Reuses pushDay's own recovery path rather than a bare putFile: on the
+    // (rare) chance the file changed again in the instant between the fetch
+    // above and this write, that's a genuinely new conflict, and pushDay
+    // records it as one instead of the force-push silently failing or
+    // clobbering something newer.
+    if (day) await pushDay(config, { ...day, remoteSha: fresh?.sha }, path)
   }
 
   await markConflictResolved(conflictId)
