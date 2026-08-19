@@ -1,4 +1,4 @@
-import { Plugin, TextSelection, type Command } from '@milkdown/prose/state'
+import { NodeSelection, Plugin, TextSelection, type Command } from '@milkdown/prose/state'
 import { Decoration, DecorationSet } from '@milkdown/prose/view'
 import { $prose, $useKeymap } from '@milkdown/utils'
 import { semanticPrefixRegex as SEMANTIC_PREFIX } from './definitions'
@@ -109,11 +109,48 @@ const handleOutlinerBackspace: Command = (state, dispatch) => {
   return true
 }
 
+// Mod-a escalates one level per press instead of jumping straight to
+// everything: the current bullet first, then that bullet's parent (with all
+// its children), and so on up to the whole outline -- mirroring how most
+// outliner apps (Notion, Workflowy) scope select-all to where your cursor is.
+const selectHierarchy: Command = (state, dispatch) => {
+  const { doc, selection } = state
+
+  if (selection instanceof NodeSelection && selection.node.type.name === 'list_item') {
+    // $from resolves to the position right before this node, so its depth is
+    // the depth of the node's own parent (the bullet_list it lives in) --
+    // one less than the item's own depth. Each list_item -> bullet_list ->
+    // list_item nesting step is two depth levels, so the parent item (if
+    // any) sits two levels up from this item's own depth.
+    const itemDepth = selection.$from.depth + 1
+    const parentItemDepth = itemDepth - 2
+    if (parentItemDepth >= 1 && selection.$from.node(parentItemDepth).type.name === 'list_item') {
+      dispatch?.(state.tr.setSelection(NodeSelection.create(doc, selection.$from.before(parentItemDepth))))
+      return true
+    }
+    // No more ancestor bullets -- select the entire outline.
+    dispatch?.(state.tr.setSelection(TextSelection.create(doc, 0, doc.content.size)))
+    return true
+  }
+
+  const $anchor = selection.$anchor
+  let itemDepth = $anchor.depth
+  while (itemDepth > 0 && $anchor.node(itemDepth).type.name !== 'list_item') itemDepth -= 1
+  if (itemDepth === 0) return false
+  dispatch?.(state.tr.setSelection(NodeSelection.create(doc, $anchor.before(itemDepth))))
+  return true
+}
+
 export const outlinerKeymap = $useKeymap('threadOutlinerKeymap', {
   OutlinerBackspace: {
     shortcuts: 'Backspace',
     priority: 100,
     command: () => handleOutlinerBackspace,
+  },
+  SelectHierarchy: {
+    shortcuts: 'Mod-a',
+    priority: 100,
+    command: () => selectHierarchy,
   },
 })
 

@@ -259,7 +259,7 @@ a { color: inherit; text-decoration: none; }
 .editor-loading { position: absolute; top: 14px; color: var(--muted); font-size: 13px; }
 .editor-wrap[data-ready='false'] .thread-editor { opacity: 0; }
 .thread-editor { transition: opacity 160ms ease; }
-.thread-editor .milkdown { --crepe-color-primary: var(--thread); --crepe-color-on-primary: var(--on-solid); --crepe-color-surface: var(--paper); --crepe-color-on-surface: var(--ink); --crepe-color-outline: var(--line); --crepe-font-default: 'IBM Plex Sans', sans-serif; --crepe-font-title: 'Newsreader', serif; --crepe-font-code: 'IBM Plex Mono', monospace; }
+.thread-editor .milkdown { --crepe-color-primary: var(--thread); --crepe-color-on-primary: var(--on-solid); --crepe-color-surface: var(--paper); --crepe-color-on-surface: var(--ink); --crepe-color-outline: var(--line); --crepe-color-selected: var(--focus-ring); --crepe-font-default: 'IBM Plex Sans', sans-serif; --crepe-font-title: 'Newsreader', serif; --crepe-font-code: 'IBM Plex Mono', monospace; }
 .thread-editor .ProseMirror { min-height: 470px; padding: 0 !important; color: var(--ink-soft); font-size: 16px; line-height: 1.45; caret-color: var(--thread); }
 .thread-editor .ProseMirror:focus { outline: none; }
 .thread-editor .ProseMirror p { min-height: 23px; margin: 0; }
