@@ -9,6 +9,8 @@ import { TodayPage } from './pages/TodayPage'
 import { ThreadPage } from './pages/ThreadPage'
 import { SearchPage } from './pages/SearchPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { TabStrip } from './components/TabStrip'
+import { TabsProvider, useTabs } from './lib/tabs'
 
 const nav = [
   { to: '/', label: 'Today', icon: BookOpenText, end: true },
@@ -18,6 +20,7 @@ const nav = [
 
 function AppShell() {
   const navigate = useNavigate()
+  const { tabs, mountedIds, activeId } = useTabs()
   const threads = useLiveQuery(() => db.threads.orderBy('updatedAt').reverse().limit(7).toArray(), [], [])
   const pending = useLiveQuery(() => db.outbox.count(), [], 0)
   const conflicts = useLiveQuery(() => db.conflicts.filter((conflict) => !conflict.resolvedAt).count(), [], 0)
@@ -173,12 +176,21 @@ function AppShell() {
       </aside>
 
       <main className="main-content">
-        <Routes>
-          <Route path="/" element={<TodayPage />} />
-          <Route path="/thread/:threadId" element={<ThreadPage />} />
-          <Route path="/search" element={<SearchPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Routes>
+        <TabStrip />
+        {mountedIds.map((id) => {
+          const tab = tabs.find((candidate) => candidate.id === id)
+          if (!tab) return null
+          return (
+            <div key={id} className="tab-panel" hidden={id !== activeId}>
+              <Routes location={tab.path}>
+                <Route path="/" element={<TodayPage />} />
+                <Route path="/thread/:threadId" element={<ThreadPage />} />
+                <Route path="/search" element={<SearchPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+              </Routes>
+            </div>
+          )
+        })}
       </main>
 
       <nav className="mobile-nav">
@@ -197,5 +209,5 @@ export default function App() {
     void initializeDatabase(isoToday())
   }, [])
 
-  return <HashRouter><AppShell /></HashRouter>
+  return <HashRouter><TabsProvider><AppShell /></TabsProvider></HashRouter>
 }

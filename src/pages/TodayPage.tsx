@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, CircleCheck, Link2, Sparkles } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { useSearchParams } from 'react-router-dom'
 import { db, ensureDay, saveDay } from '../db'
 import { formatDay, isoToday, shiftDay } from '../lib/dates'
 import { getGitHubConfig, pullDay } from '../lib/github'
@@ -8,10 +9,41 @@ import { MarkdownEditor } from '../components/MarkdownEditor'
 import { TodayTasks } from '../components/TodayTasks'
 
 export function TodayPage() {
-  const [date, setDate] = useState(isoToday)
+  const [searchParams] = useSearchParams()
+  const paramDate = searchParams.get('date')
+  const paramBlock = searchParams.get('block')
+  const [date, setDate] = useState(() => paramDate || isoToday())
+  // Adjusting state during render (rather than in an effect) when the `date`
+  // query param changes -- e.g. a jump-to-source link landing on this same
+  // mounted tab for a different day -- avoids an extra cascading render pass.
+  const [syncedParamDate, setSyncedParamDate] = useState(paramDate)
+  if (paramDate && paramDate !== syncedParamDate) {
+    setSyncedParamDate(paramDate)
+    setDate(paramDate)
+  }
+  const editorWrapRef = useRef<HTMLDivElement>(null)
+  const highlightedBlockRef = useRef<string | null>(null)
   const day = useLiveQuery(() => db.days.get(date), [date])
   const mentions = useLiveQuery(() => db.mentions.where('day').equals(date).toArray(), [date], [])
   const pending = useLiveQuery(() => db.outbox.get(`day:${date}`), [date])
+
+  const jumpToBlock = useCallback(() => {
+    if (!paramBlock || !editorWrapRef.current || highlightedBlockRef.current === paramBlock) return
+    const target = editorWrapRef.current.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(paramBlock)}"]`)
+    if (!target) return
+    highlightedBlockRef.current = paramBlock
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    target.classList.add('jump-highlight')
+    window.setTimeout(() => target.classList.remove('jump-highlight'), 1600)
+  }, [paramBlock])
+
+  // Handles a jump link landing on a block while the editor is already
+  // mounted and ready (e.g. switching source lines within the same day).
+  // The first jump after a fresh mount is instead driven by MarkdownEditor's
+  // onReady, since the target block's DOM tagging isn't ready before then.
+  useEffect(() => {
+    jumpToBlock()
+  }, [jumpToBlock])
 
   useEffect(() => {
     let cancelled = false
@@ -58,7 +90,9 @@ export function TodayPage() {
           </div>
         </header>
 
-        <MarkdownEditor key={day.date} day={day.date} initialValue={day.markdown} onChange={handleChange} />
+        <div ref={editorWrapRef}>
+          <MarkdownEditor key={day.date} day={day.date} initialValue={day.markdown} onChange={handleChange} onReady={jumpToBlock} />
+        </div>
 
         <footer className="page-foot">
           <span>{day.blockCount} blocks</span>

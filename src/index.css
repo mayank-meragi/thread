@@ -194,6 +194,17 @@ a { color: inherit; text-decoration: none; }
 .sync-state { display: flex; align-items: center; gap: 8px; padding: 9px 11px; color: var(--muted); font-size: 12px; border-radius: 8px; }
 .sync-state-alert { color: var(--warning); background: var(--warning-soft); }
 .main-content { min-height: 100vh; margin-left: 232px; padding: 0 34px; }
+.tab-strip { display: flex; gap: 4px; padding: 16px 0 0; overflow-x: auto; }
+.tab-chip {
+  display: flex; align-items: center; gap: 8px; max-width: 200px; padding: 7px 8px 7px 13px; border: 0; border-radius: 9px 9px 0 0;
+  background: transparent; color: var(--muted); font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.tab-chip:hover { background: var(--control-hover); color: var(--ink); }
+.tab-chip.active { background: var(--paper); color: var(--ink); box-shadow: var(--shadow-soft); }
+.tab-chip-label { overflow: hidden; text-overflow: ellipsis; }
+.tab-chip-close { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 5px; color: var(--muted); }
+.tab-chip-close:hover { background: var(--control-hover); color: var(--ink); }
+.tab-panel[hidden] { display: none; }
 .mobile-nav { display: none; }
 .mobile-editor-toolbar { display: none; }
 .editor-suggestion-menu {
@@ -372,6 +383,7 @@ a { color: inherit; text-decoration: none; }
 .task-check { width: 17px; height: 17px; padding: 0; display: grid; place-items: center; border: 1.5px solid var(--outline-muted); border-radius: 5px; background: var(--paper); color: transparent; cursor: pointer; }
 .task-check:hover { border-color: var(--thread); background: var(--thread-soft); color: var(--thread); }
 .today-task-text { min-width: 0; overflow: hidden; color: var(--ink-soft); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.today-task-text:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .today-task-meta { display: flex; align-items: center; gap: 6px; color: var(--muted); font: 400 9px 'IBM Plex Mono', monospace; }
 .task-group-overdue .today-task-meta time { color: var(--danger); }
 .task-group-empty { padding: 11px 0; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 12px; }
@@ -419,16 +431,35 @@ a { color: inherit; text-decoration: none; }
 .outline-row { min-height: 28px; display: flex; align-items: baseline; gap: 9px; font-size: 14px; line-height: 1.55; }
 .outline-toggle { align-self: flex-start; flex: 0 0 auto; width: 18px; height: 22px; padding: 2px 0 0; border: 0; background: transparent; color: var(--thread); cursor: pointer; transition: transform 140ms ease; }
 .outline-toggle[aria-expanded='true'] { transform: rotate(90deg); }
-.outline-bullet { flex: 0 0 auto; width: 6px; height: 6px; margin: 0 6px; border-radius: 50%; background: var(--outline-muted); }
+.outline-bullet { flex: 0 0 auto; width: 6px; height: 6px; margin: 0 6px; border-radius: 50%; background: var(--outline-muted); display: flex; align-items: center; justify-content: center; }
+.outline-bullet.outline-kind-idea, .outline-bullet.outline-kind-question, .outline-bullet.outline-kind-decision {
+  width: 18px; height: 18px; margin: 0 3px 0 -6px; border-radius: 50%; background: transparent;
+}
+.outline-bullet.outline-kind-idea { color: var(--idea); }
+.outline-bullet.outline-kind-question { color: var(--question); }
+.outline-bullet.outline-kind-decision { color: var(--decision); }
+.outline-check {
+  align-self: flex-start; flex: 0 0 auto; width: 18px; height: 22px; padding: 2px 0 0; border: 0; background: transparent;
+  color: var(--outline-muted); cursor: pointer; display: flex; align-items: center;
+}
+.outline-check:hover { color: var(--task); }
+.outline-text { cursor: pointer; }
+.outline-text:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .collapsed-count { margin-left: 4px; color: var(--muted); font: 400 9px 'IBM Plex Mono', monospace; }
 .completed-block { color: var(--muted); text-decoration: line-through; }
+.thread-editor .ProseMirror li.jump-highlight { animation: jump-highlight 1.6s ease-out; border-radius: 6px; }
+@keyframes jump-highlight {
+  0% { background: var(--thread-soft); }
+  100% { background: transparent; }
+}
 .inline-wikilink { display: inline-flex; align-items: center; gap: 6px; margin: 0 2px; padding: 0 5px; border-radius: 6px; background: var(--thread-soft); color: var(--thread); font-weight: 500; }
 .inline-wikilink .thread-dot { width: 5px; height: 5px; box-shadow: none; }
 .section-label { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
 .section-label span { font-size: 12px; font-weight: 600; }
 .section-label small { color: var(--muted); font: 400 10px 'IBM Plex Mono', monospace; }
 .source-list { display: grid; }
-.source-row { display: grid; grid-template-columns: 20px 1fr; gap: 10px; padding: 11px 0; }
+.source-row { display: grid; grid-template-columns: 20px 1fr; gap: 10px; padding: 11px 8px; margin: 0 -8px; border-radius: 8px; cursor: pointer; }
+.source-row:hover { background: var(--control-hover); }
 .source-icon { color: var(--thread); padding-top: 14px; display: flex; justify-content: center; }
 .source-row small { color: var(--muted); font: 400 9px 'IBM Plex Mono', monospace; text-transform: uppercase; }
 .source-row p { margin: 4px 0 0; font-size: 14px; line-height: 1.5; }

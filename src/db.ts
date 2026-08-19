@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
-import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, parseOutline, type BlockKind, type OutlineBlock } from './lib/outline'
+import { checklistCheckedPattern, checklistPrefixPattern } from './lib/blockKinds/definitions'
+import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, parseOutline, type BlockKind, type OutlineBlock, type ParsedMention } from './lib/outline'
 import { parseTaskDate } from './lib/taskDates'
 
 export interface DayRecord {
@@ -36,6 +37,7 @@ export interface MentionRecord {
   title: string
   day: string
   line: number
+  blockId: string
   excerpt: string
   kind: BlockKind
   checked: boolean
@@ -257,8 +259,8 @@ export function saveThreadNote(threadId: string, markdown: string): Promise<void
 
 async function indexAndStoreDay(record: DayRecord, previous?: DayRecord, options?: { queueOutbox?: boolean }): Promise<void> {
   const queueOutbox = options?.queueOutbox ?? true
-  const parsed = extractThreadMentions(record.markdown, record.date)
   const outline = parseOutline(record.markdown, record.date)
+  const parsed = withBlockIds(extractThreadMentions(record.markdown, record.date), outline.blocks)
   const taskRecords = await buildTaskRecords(outline.blocks, record.date)
   await db.transaction('rw', [db.days, db.threads, db.mentions, db.blocks, db.occurrences, db.outbox, db.revisions, db.tasks, db.threadNotes], async () => {
     if (previous && previous.markdown !== record.markdown) {
@@ -309,8 +311,8 @@ async function indexAndStoreDay(record: DayRecord, previous?: DayRecord, options
 }
 
 async function reindexDay(record: DayRecord): Promise<void> {
-  const parsed = extractThreadMentions(record.markdown, record.date)
   const outline = parseOutline(record.markdown, record.date)
+  const parsed = withBlockIds(extractThreadMentions(record.markdown, record.date), outline.blocks)
   const taskRecords = await buildTaskRecords(outline.blocks, record.date)
   await db.transaction('rw', [db.threads, db.mentions, db.blocks, db.occurrences, db.tasks, db.threadNotes], async () => {
     const previousMentions = await db.mentions.where('day').equals(record.date).toArray()
@@ -356,6 +358,15 @@ export async function pruneOrphanThreads(): Promise<void> {
     const threads = await db.threads.toArray()
     for (const thread of threads) await pruneThreadIfOrphan(thread.id)
   })
+}
+
+// extractThreadMentions's `line` and parseOutline's `order` are both the raw
+// 0-based markdown line number for the same day (both iterate the identical
+// `markdown.split('\n')` array) -- so a block's id can always be found by
+// matching a mention's line against a block's order.
+function withBlockIds(mentions: ParsedMention[], blocks: OutlineBlock[]): MentionRecord[] {
+  const blockIdByOrder = new Map(blocks.map((block) => [block.order, block.id]))
+  return mentions.map((mention) => ({ ...mention, blockId: blockIdByOrder.get(mention.line) ?? '' }))
 }
 
 async function buildTaskRecords(blocks: OutlineBlock[], day: string): Promise<TaskRecord[]> {
@@ -416,6 +427,33 @@ export async function toggleTask(task: TaskRecord): Promise<void> {
   await saveDay(task.day, markdown)
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('thread:day-external-update', { detail: { day: task.day, markdown } }))
+  }
+}
+
+export async function toggleTaskByBlockId(blockId: string): Promise<void> {
+  const task = await db.tasks.get(blockId)
+  if (task) await toggleTask(task)
+}
+
+export async function toggleChecklistBlock(day: string, blockId: string): Promise<void> {
+  const record = await db.days.get(day)
+  if (!record) return
+  const block = parseOutline(record.markdown, day).blocks.find((candidate) => candidate.id === blockId)
+  if (!block || block.kind !== 'checklist') return
+  const lines = record.markdown.split('\n')
+  const line = lines[block.order]
+  if (line === undefined) return
+  const listMarkerMatch = line.match(/^\s*(?:[-*+]|\d+\.)\s+/)
+  if (!listMarkerMatch) return
+  const content = line.slice(listMarkerMatch[0].length)
+  const prefixMatch = content.match(checklistPrefixPattern)?.[0]
+  if (!prefixMatch) return
+  const replacement = checklistCheckedPattern.test(prefixMatch) ? '() ' : '(x) '
+  lines[block.order] = listMarkerMatch[0] + replacement + content.slice(prefixMatch.length)
+  const markdown = lines.join('\n')
+  await saveDay(day, markdown)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('thread:day-external-update', { detail: { day, markdown } }))
   }
 }
 

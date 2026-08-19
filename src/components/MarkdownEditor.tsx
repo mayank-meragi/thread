@@ -33,13 +33,15 @@ interface MarkdownEditorProps {
   day: string
   initialValue: string
   onChange: (markdown: string) => void
+  onReady?: () => void
   ariaLabel?: string
   loadingLabel?: string
 }
 
-export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily journal editor', loadingLabel = 'Opening today’s page…' }: MarkdownEditorProps) {
+export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel = 'Daily journal editor', loadingLabel = 'Opening today’s page…' }: MarkdownEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
+  const onReadyRef = useRef(onReady)
   const runToolbarActionRef = useRef<(action: ToolbarAction) => void>(() => undefined)
   const [ready, setReady] = useState(false)
   const [toolbar, setToolbar] = useState({ visible: false, top: 0, activeKind: 'bullet' as ToolbarBlockKind })
@@ -47,6 +49,10 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
   useEffect(() => {
     onChangeRef.current = onChange
   }, [onChange])
+
+  useEffect(() => {
+    onReadyRef.current = onReady
+  }, [onReady])
 
   useEffect(() => {
     const root = rootRef.current
@@ -302,7 +308,9 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
         // Walk the live document in the same tick the transaction landed, so
         // the DOM node and its identity always come from the same node --
         // never a DOM query zipped against a separately fetched list.
-        void installTaskControls(ctx.get(editorViewCtx), day, canonical)
+        const view = ctx.get(editorViewCtx)
+        void installTaskControls(view, day, canonical)
+        tagBlockIds(view, day, canonical)
       })
       listener.blur(() => {
         if (saveTimer) window.clearTimeout(saveTimer)
@@ -318,7 +326,9 @@ export function MarkdownEditor({ day, initialValue, onChange, ariaLabel = 'Daily
       setReady(true)
       void installCollapseControls(root, day)
       crepe.editor.action((ctx) => {
-        void installTaskControls(ctx.get(editorViewCtx), day, latest)
+        const view = ctx.get(editorViewCtx)
+        tagBlockIds(view, day, latest)
+        void installTaskControls(view, day, latest).then(() => onReadyRef.current?.())
       })
       // Let initialization events drain before accepting editor writes.
       activationFrame = window.requestAnimationFrame(() => {
@@ -461,6 +471,26 @@ function collectTaskNodes(view: EditorView, day: string, markdown: string): Live
   if (domNodes.length !== taskBlocks.length) return []
 
   return domNodes.map((dom, index) => ({ id: taskBlocks[index].id, dom, checked: taskBlocks[index].checked }))
+}
+
+// Same document-order pairing trick as collectTaskNodes, but unfiltered --
+// every list item gets tagged with its stable block id, not just tasks. This
+// is what lets other pages (e.g. TodayPage jumping to a source line) find a
+// specific block's DOM node with a plain `[data-block-id]` selector.
+function tagBlockIds(view: EditorView, day: string, markdown: string): void {
+  const domNodes: HTMLElement[] = []
+  view.state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'list_item') return true
+    const wrapper = view.nodeDOM(pos)
+    const dom = wrapper instanceof HTMLElement ? wrapper.querySelector<HTMLElement>(':scope > li') ?? wrapper : null
+    if (dom instanceof HTMLElement) domNodes.push(dom)
+    return true
+  })
+  const blocks = parseOutline(markdown, day).blocks
+  if (domNodes.length !== blocks.length) return
+  domNodes.forEach((dom, index) => {
+    dom.dataset.blockId = blocks[index].id
+  })
 }
 
 // Task is the only kind today with extra per-block DOM (chips, a due/priority

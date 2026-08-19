@@ -1,8 +1,9 @@
 import { ArrowLeft, CheckCircle2, ChevronRight, Circle, GitBranch, HelpCircle, Lightbulb, Quote } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Link, useParams } from 'react-router-dom'
-import { db, type ThreadOccurrenceRecord, type ViewStateRecord } from '../db'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { db, toggleChecklistBlock, toggleTaskByBlockId, type ThreadOccurrenceRecord, type ViewStateRecord } from '../db'
 import { formatDay } from '../lib/dates'
+import { useTabs } from '../lib/tabs'
 import type { OutlineBlock } from '../lib/outline'
 import { ThreadComposer } from '../components/ThreadComposer'
 
@@ -143,6 +144,8 @@ function ThreadOccurrence({
   view: string
   collapseStates: ViewStateRecord[]
 }) {
+  const navigate = useNavigate()
+  const { openTab } = useTabs()
   const children = new Map<string | null, OutlineBlock[]>()
   const ids = new Set(blocks.map((block) => block.id))
   blocks.forEach((block) => {
@@ -156,6 +159,11 @@ function ThreadOccurrence({
   const renderBranch = (block: OutlineBlock): React.ReactNode => {
     const descendants = children.get(block.id) ?? []
     const isCollapsed = collapsed.get(block.id) === true
+    const onToggleChecked = block.kind === 'task'
+      ? () => void toggleTaskByBlockId(block.id)
+      : block.kind === 'checklist'
+        ? () => void toggleChecklistBlock(occurrence.day, block.id)
+        : null
     return (
       <li key={block.id} className={isCollapsed ? 'is-collapsed' : ''}>
         <div className="outline-row">
@@ -175,8 +183,35 @@ function ThreadOccurrence({
             >
               <ChevronRight size={14} />
             </button>
-          ) : <span className="outline-bullet" />}
-          <span className={block.checked ? 'completed-block' : ''}><WikiText text={block.markdown} /></span>
+          ) : onToggleChecked ? (
+            <button
+              type="button"
+              className="outline-check"
+              aria-label={block.checked ? 'Mark not done' : 'Mark done'}
+              onClick={onToggleChecked}
+            >
+              {block.checked ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+            </button>
+          ) : <span className={`outline-bullet${block.kind !== 'thought' ? ` outline-kind-${block.kind}` : ''}`}>
+            {block.kind === 'idea' && <Lightbulb size={12} />}
+            {block.kind === 'question' && <HelpCircle size={12} />}
+            {block.kind === 'decision' && <Quote size={11} />}
+          </span>}
+          <span
+            role="link"
+            tabIndex={0}
+            className={block.checked ? 'completed-block outline-text' : 'outline-text'}
+            onClick={(event) => {
+              const target = `/?date=${occurrence.day}&block=${block.id}`
+              if (event.metaKey || event.ctrlKey) { openTab(target, { background: true }); return }
+              navigate(target)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') navigate(`/?date=${occurrence.day}&block=${block.id}`)
+            }}
+          >
+            <WikiText text={block.markdown} />
+          </span>
           {isCollapsed && <small className="collapsed-count">{countDescendants(block.id, children)}</small>}
         </div>
         {!isCollapsed && descendants.length > 0 && <ul>{descendants.map(renderBranch)}</ul>}
@@ -201,6 +236,7 @@ function WikiText({ text }: { text: string }) {
   const display = text
     .replace(/\\(\[|\])/g, '$1')
     .replace(/^\[[ xX]\]\s+/, '')
+    .replace(/^\((?:\s|x|X)?\)\s+/, '')
     .replace(/^[?!=]\s+(?:\[[ xX]\]\s+)?/, '')
     .replace(/[*_~`]/g, '')
   const parts = display.split(/(\[\[[^\]]+\]\])/g)
@@ -208,15 +244,24 @@ function WikiText({ text }: { text: string }) {
     const match = part.match(/^\[\[([^\]]+)\]\]$/)
     if (!match) return <span key={index}>{part}</span>
     const id = match[1].trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-    return <Link className="inline-wikilink" to={`/thread/${id}`} key={index}><span className="thread-dot" />{match[1]}</Link>
+    return (
+      <Link
+        className="inline-wikilink"
+        to={`/thread/${id}`}
+        key={index}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <span className="thread-dot" />{match[1]}
+      </Link>
+    )
   })}</>
 }
 
-function SourceRow({ day, excerpt, icon }: { day: string; excerpt: string; icon: React.ReactNode }) {
+function SourceRow({ day, blockId, excerpt, icon }: { day: string; blockId: string; excerpt: string; icon: React.ReactNode }) {
   return (
-    <div className="source-row">
+    <Link className="source-row" to={`/?date=${day}&block=${blockId}`}>
       <div className="source-icon">{icon}</div>
       <div><small>{formatDay(day).short}</small><p>{excerpt}</p></div>
-    </div>
+    </Link>
   )
 }

@@ -1,5 +1,6 @@
 import { CalendarClock, Check } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Link } from 'react-router-dom'
 import { db, toggleTask, type TaskRecord } from '../db'
 
 interface TodayTasksProps {
@@ -50,7 +51,7 @@ function TaskGroup({
           <button type="button" className="task-check" aria-label={`Complete ${task.text}`} onClick={() => void toggleTask(task)}>
             <Check size={12} />
           </button>
-          <span className="today-task-text">{task.text}</span>
+          <Link className="today-task-text" to={`/?date=${task.day}&block=${task.blockId}`}>{task.text}</Link>
           <span className="today-task-meta">
             <time dateTime={task.dueDate}>{formatTaskDate(task.dueDate!)}</time>
             {task.priority && <span className={`priority-chip priority-${task.priority}`}>{capitalize(task.priority)}</span>}
