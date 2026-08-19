@@ -366,11 +366,7 @@ a { color: inherit; text-decoration: none; }
 .task-metadata-row input:hover, .task-metadata-row select:hover,
 .task-metadata-row input:focus, .task-metadata-row select:focus { border-color: var(--line); background: var(--paper-raised); }
 .thread-editor .ProseMirror blockquote { border-left-color: var(--thread); color: var(--muted); }
-.page-foot { margin-top: 26px; padding-top: 15px; display: flex; justify-content: space-between; border-top: 1px solid var(--line); color: var(--muted); font: 400 10px/1 'IBM Plex Mono', monospace; }
-.page-foot .saving, .page-foot .saved { display: flex; align-items: center; gap: 5px; }
-.page-foot .saved { color: var(--task); }
-
-.today-tasks { margin-top: 42px; padding-top: 30px; border-top: 1px solid var(--line); }
+.today-tasks { margin-top: 20px; padding-top: 24px; border-top: 1px solid var(--line); }
 .today-tasks-heading { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; }
 .today-tasks-heading h2 { margin: 6px 0 0; font: 500 27px/1 'Newsreader', serif; letter-spacing: -.02em; }
 .today-tasks-heading > svg { color: var(--outline-muted); }
@@ -387,6 +383,8 @@ a { color: inherit; text-decoration: none; }
 .today-task-meta { display: flex; align-items: center; gap: 6px; color: var(--muted); font: 400 9px 'IBM Plex Mono', monospace; }
 .task-group-overdue .today-task-meta time { color: var(--danger); }
 .task-group-empty { padding: 11px 0; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 12px; }
+.task-check.is-checked { border-color: var(--task); background: var(--task); color: var(--paper); }
+.today-task-text.is-done { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line); }
 
 .context-panel { position: sticky; top: 60px; margin-top: 84px; padding-left: 22px; border-left: 1px solid var(--line); }
 .context-panel::before { content: ''; position: absolute; left: -2px; top: 0; width: 3px; height: 60px; border-radius: 99px; background: linear-gradient(var(--thread), transparent); }

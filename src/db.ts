@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import { checklistCheckedPattern, checklistPrefixPattern } from './lib/blockKinds/definitions'
 import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, parseOutline, type BlockKind, type OutlineBlock, type ParsedMention } from './lib/outline'
-import { parseTaskDate } from './lib/taskDates'
+import { parseTaskDate, type ParsedTaskDate } from './lib/taskDates'
 
 export interface DayRecord {
   date: string
@@ -369,6 +369,15 @@ function withBlockIds(mentions: ParsedMention[], blocks: OutlineBlock[]): Mentio
   return mentions.map((mention) => ({ ...mention, blockId: blockIdByOrder.get(mention.line) ?? '' }))
 }
 
+// The NLP date parser picks up phrases like "today"/"next friday" inline in
+// the task text -- once that's captured as the due date, showing it again in
+// the task label is redundant clutter, so cut just the matched span out.
+function stripMatchedText(text: string, detected: ParsedTaskDate): string {
+  const before = text.slice(0, detected.index)
+  const after = text.slice(detected.index + detected.matchedText.length)
+  return `${before}${after}`.replace(/\s{2,}/g, ' ').trim()
+}
+
 async function buildTaskRecords(blocks: OutlineBlock[], day: string): Promise<TaskRecord[]> {
   const previous = new Map((await db.tasks.where('day').equals(day).toArray()).map((task) => [task.id, task]))
   const now = new Date().toISOString()
@@ -376,13 +385,14 @@ async function buildTaskRecords(blocks: OutlineBlock[], day: string): Promise<Ta
     const existing = previous.get(block.id)
     const detected = parseTaskDate(block.plainText, day)
     const manualDue = existing?.dueSource === 'manual'
+    const text = detected ? stripMatchedText(block.plainText, detected) : block.plainText
     return {
       id: block.id,
       blockId: block.id,
       day,
       line: block.order,
       order: block.order,
-      text: block.plainText,
+      text,
       checked: block.checked,
       dueDate: manualDue ? existing.dueDate : detected?.dueDate,
       dueText: manualDue ? existing.dueText : detected?.matchedText,

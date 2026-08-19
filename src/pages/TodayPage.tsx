@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, CircleCheck, Link2, Sparkles } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Link2, Sparkles } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
 import { db, ensureDay, saveDay } from '../db'
@@ -25,7 +25,6 @@ export function TodayPage() {
   const highlightedBlockRef = useRef<string | null>(null)
   const day = useLiveQuery(() => db.days.get(date), [date])
   const mentions = useLiveQuery(() => db.mentions.where('day').equals(date).toArray(), [date], [])
-  const pending = useLiveQuery(() => db.outbox.get(`day:${date}`), [date])
 
   const jumpToBlock = useCallback(() => {
     if (!paramBlock || !editorWrapRef.current || highlightedBlockRef.current === paramBlock) return
@@ -93,13 +92,6 @@ export function TodayPage() {
         <div ref={editorWrapRef}>
           <MarkdownEditor key={day.date} day={day.date} initialValue={day.markdown} onChange={handleChange} onReady={jumpToBlock} />
         </div>
-
-        <footer className="page-foot">
-          <span>{day.blockCount} blocks</span>
-          <span className={pending ? 'saving' : 'saved'}>
-            <CircleCheck size={13} /> {pending ? 'Saved locally' : 'Synced'}
-          </span>
-        </footer>
 
         {today && <TodayTasks today={date} />}
       </article>
