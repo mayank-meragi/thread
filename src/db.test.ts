@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { db, pruneOrphanThreads, saveDay, saveThreadNote, toggleTask } from './db'
+import { applyRemoteDay, db, markDaySynced, pruneOrphanThreads, saveDay, saveThreadNote, toggleTask } from './db'
 
 const DATE = '2026-08-19'
 
@@ -96,5 +96,43 @@ describe('journal persistence', () => {
     await toggleTask({ ...task, line: 99 })
 
     expect((await db.days.get(DATE))?.markdown).toContain('1. [x] Finish this by Monday')
+  })
+})
+
+describe('sync races', () => {
+  it('keeps a day queued for sync if a newer edit landed while its push was in flight', async () => {
+    await saveDay(DATE, '- This is sy')
+    const pushedRevision = (await db.days.get(DATE))!.localRevision
+
+    // The push for `pushedRevision` is still in flight (e.g. a slow network
+    // request) when the user finishes typing and this newer edit lands.
+    await saveDay(DATE, '- This is sync test')
+
+    // The in-flight push for the earlier, now-stale revision finally
+    // resolves and reports success.
+    await markDaySynced(DATE, 'remote-sha-for-stale-push', pushedRevision)
+
+    // The newer content must not be silently dropped from the sync queue --
+    // it was never actually pushed to the remote.
+    expect(await db.outbox.get(`day:${DATE}`)).toBeDefined()
+    expect((await db.days.get(DATE))?.markdown).toBe('- This is sync test')
+    expect((await db.days.get(DATE))?.remoteSha).toBe('remote-sha-for-stale-push')
+  })
+
+  it('clears the queued sync entry once the synced revision is current', async () => {
+    await saveDay(DATE, '- only version')
+    const revision = (await db.days.get(DATE))!.localRevision
+
+    await markDaySynced(DATE, 'remote-sha', revision)
+
+    expect(await db.outbox.get(`day:${DATE}`)).toBeUndefined()
+  })
+
+  it('applies a pulled remote day locally without re-queuing it for sync', async () => {
+    await applyRemoteDay(DATE, '- written on another device', 'remote-sha')
+
+    expect((await db.days.get(DATE))?.markdown).toBe('- written on another device')
+    expect((await db.days.get(DATE))?.remoteSha).toBe('remote-sha')
+    expect(await db.outbox.get(`day:${DATE}`)).toBeUndefined()
   })
 })

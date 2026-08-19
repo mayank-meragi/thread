@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, CircleCheck, Link2, Sparkles } from 'lucide-
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, ensureDay, saveDay } from '../db'
 import { formatDay, isoToday, shiftDay } from '../lib/dates'
+import { getGitHubConfig, pullDay } from '../lib/github'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { TodayTasks } from '../components/TodayTasks'
 
@@ -13,7 +14,15 @@ export function TodayPage() {
   const pending = useLiveQuery(() => db.outbox.get(`day:${date}`), [date])
 
   useEffect(() => {
-    void ensureDay(date)
+    let cancelled = false
+    // Pull only after the local record is guaranteed to exist -- otherwise a
+    // pull that lands mid-creation could race ensureDay's own write.
+    void ensureDay(date).then(() => {
+      if (!cancelled && getGitHubConfig()) void pullDay(date)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [date])
 
   const handleChange = useCallback(

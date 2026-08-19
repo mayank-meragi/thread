@@ -247,6 +247,7 @@ export function saveThreadNote(threadId: string, markdown: string): Promise<void
         attempts: 0,
       })
     })
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('thread:local-write'))
   })
   threadNoteSaveQueues.set(threadId, next)
   return next.finally(() => {
@@ -254,7 +255,8 @@ export function saveThreadNote(threadId: string, markdown: string): Promise<void
   })
 }
 
-async function indexAndStoreDay(record: DayRecord, previous?: DayRecord): Promise<void> {
+async function indexAndStoreDay(record: DayRecord, previous?: DayRecord, options?: { queueOutbox?: boolean }): Promise<void> {
+  const queueOutbox = options?.queueOutbox ?? true
   const parsed = extractThreadMentions(record.markdown, record.date)
   const outline = parseOutline(record.markdown, record.date)
   const taskRecords = await buildTaskRecords(outline.blocks, record.date)
@@ -293,14 +295,17 @@ async function indexAndStoreDay(record: DayRecord, previous?: DayRecord): Promis
       await pruneThreadIfOrphan(threadId)
     }
 
-    await db.outbox.put({
-      key: `day:${record.date}`,
-      kind: 'day',
-      aggregateId: record.date,
-      createdAt: now,
-      attempts: 0,
-    })
+    if (queueOutbox) {
+      await db.outbox.put({
+        key: `day:${record.date}`,
+        kind: 'day',
+        aggregateId: record.date,
+        createdAt: now,
+        attempts: 0,
+      })
+    }
   })
+  if (queueOutbox && typeof window !== 'undefined') window.dispatchEvent(new Event('thread:local-write'))
 }
 
 async function reindexDay(record: DayRecord): Promise<void> {
@@ -440,18 +445,73 @@ export function saveDay(date: string, markdown: string): Promise<void> {
   })
 }
 
-export async function markDaySynced(date: string, sha: string): Promise<void> {
+// syncedRevision is the day's localRevision at the moment its content was
+// read and pushed. A push can take real network time; if the user kept
+// typing while it was in flight, a newer edit may have already re-queued the
+// outbox entry with fresher content by the time this resolves. Deleting the
+// outbox entry unconditionally would silently drop that newer edit from the
+// sync queue -- it would never reach the remote until something else touched
+// this day again. Only clear the pending marker if nothing changed since.
+export async function markDaySynced(date: string, sha: string, syncedRevision: number): Promise<void> {
   await db.transaction('rw', db.days, db.outbox, async () => {
+    const current = await db.days.get(date)
     await db.days.update(date, { remoteSha: sha, lastSyncedAt: new Date().toISOString() })
-    await db.outbox.delete(`day:${date}`)
+    if (current && current.localRevision === syncedRevision) {
+      await db.outbox.delete(`day:${date}`)
+    }
   })
 }
 
-export async function markThreadNoteSynced(threadId: string, sha: string): Promise<void> {
+export async function markThreadNoteSynced(threadId: string, sha: string, syncedRevision: number): Promise<void> {
   await db.transaction('rw', db.threadNotes, db.outbox, async () => {
+    const current = await db.threadNotes.get(threadId)
     await db.threadNotes.update(threadId, { remoteSha: sha, lastSyncedAt: new Date().toISOString() })
-    await db.outbox.delete(`thread-note:${threadId}`)
+    if (current && current.localRevision === syncedRevision) {
+      await db.outbox.delete(`thread-note:${threadId}`)
+    }
   })
+}
+
+// Records a day conflict, but only if one isn't already open for this day --
+// otherwise a repeated pull/push against the same unresolved divergence would
+// pile up a fresh row every cycle.
+export async function recordDayConflict(date: string, localMarkdown: string, remoteMarkdown: string): Promise<void> {
+  const existing = await db.conflicts.where('day').equals(date).filter((conflict) => !conflict.resolvedAt).first()
+  if (existing) return
+  await db.conflicts.put({
+    id: `${date}:${Date.now()}`,
+    day: date,
+    localMarkdown,
+    remoteMarkdown,
+    detectedAt: new Date().toISOString(),
+  })
+}
+
+export async function hasOpenDayConflict(date: string): Promise<boolean> {
+  const existing = await db.conflicts.where('day').equals(date).filter((conflict) => !conflict.resolvedAt).first()
+  return Boolean(existing)
+}
+
+// Applies a day's content as fetched from the remote repository. Unlike
+// saveDay, this never queues an outbox entry -- there is nothing to push,
+// since the content came from the remote in the first place.
+export async function applyRemoteDay(date: string, markdown: string, sha: string): Promise<void> {
+  const previous = await db.days.get(date)
+  if (previous?.markdown === markdown) {
+    await db.days.update(date, { remoteSha: sha, lastSyncedAt: new Date().toISOString() })
+    return
+  }
+  const now = new Date().toISOString()
+  await indexAndStoreDay({
+    date,
+    markdown,
+    blockCount: countMarkdownBlocks(markdown),
+    updatedAt: now,
+    localRevision: (previous?.localRevision ?? 0) + 1,
+    remoteSha: sha,
+    lastSyncedAt: now,
+  }, previous, { queueOutbox: false })
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('thread:day-external-update', { detail: { day: date, markdown } }))
 }
 
 // While a conflict is unresolved, syncPending skips that day entirely rather

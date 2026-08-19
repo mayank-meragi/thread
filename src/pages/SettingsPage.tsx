@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { AlertTriangle, Check, GitBranch, LoaderCircle, Palette, ShieldCheck, Unplug } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, resolveConflict } from '../db'
+import { isoToday } from '../lib/dates'
 import {
   clearGitHubConfig,
   getGitHubConfig,
+  pullDay,
   saveGitHubConfig,
   syncPending,
   validateGitHub,
@@ -17,7 +19,7 @@ export function SettingsPage() {
   const [repo, setRepo] = useState(existing?.repo ?? '')
   const [branch, setBranch] = useState(existing?.branch ?? 'main')
   const [token, setToken] = useState(existing?.token ?? '')
-  const [state, setState] = useState<'idle' | 'checking' | 'syncing' | 'done'>('idle')
+  const [state, setState] = useState<'idle' | 'checking' | 'syncing' | 'pulling' | 'done'>('idle')
   const [error, setError] = useState('')
   const [theme, setTheme] = useState<ThemeId>(() => getTheme())
   const pending = useLiveQuery(() => db.outbox.count(), [], 0)
@@ -68,6 +70,18 @@ export function SettingsPage() {
     setState('syncing')
     try {
       await syncPending()
+      setState('done')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught))
+      setState('idle')
+    }
+  }
+
+  async function pull() {
+    setError('')
+    setState('pulling')
+    try {
+      await pullDay(isoToday())
       setState('done')
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
@@ -164,6 +178,10 @@ export function SettingsPage() {
           </button>
           {getGitHubConfig() && <>
             <button className="secondary-button" onClick={() => void sync()} disabled={state !== 'idle'}>Sync {pending} changes</button>
+            <button className="secondary-button" onClick={() => void pull()} disabled={state !== 'idle'}>
+              {state === 'pulling' ? <LoaderCircle className="spin" size={16} /> : null}
+              Pull latest for today
+            </button>
             <button className="text-button" onClick={() => { clearGitHubConfig(); setToken('') }}><Unplug size={15} /> Disconnect</button>
           </>}
         </div>
