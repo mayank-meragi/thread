@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findSuggestionTrigger, rankSlashCommands, rankThreadSuggestions } from './suggestions'
+import { findSuggestionTrigger, rankSlashCommands, rankTagSuggestions, rankThreadSuggestions } from './suggestions'
 
 const threads = [
   { id: 'browser-research', title: 'Browser research', updatedAt: '2026-08-18' },
@@ -27,6 +27,14 @@ describe('inline suggestion triggers', () => {
   it('does not treat URL paths as slash commands', () => {
     expect(findSuggestionTrigger('https://example.com/task', '')).toBeNull()
   })
+
+  it('opens tag suggestions for a hashtag draft without matching URL fragments', () => {
+    expect(findSuggestionTrigger('Plan with #proj', '')).toEqual({
+      kind: 'hashtag', query: 'proj', fromOffset: 10, toOffset: 15,
+    })
+    expect(findSuggestionTrigger('#', '')).toEqual({ kind: 'hashtag', query: '', fromOffset: 0, toOffset: 1 })
+    expect(findSuggestionTrigger('https://example.com/#anchor', '')).toBeNull()
+  })
 })
 
 describe('suggestion ranking', () => {
@@ -40,5 +48,14 @@ describe('suggestion ranking', () => {
   it('filters slash commands by names and aliases', () => {
     expect(rankSlashCommands('que')[0].id).toBe('question')
     expect(rankSlashCommands('todo')[0].id).toBe('task')
+  })
+
+  it('ranks existing tags by exact and prefix matches', () => {
+    const tags = [
+      { id: 'project-notes', name: 'project-notes', propertyCount: 0 },
+      { id: 'project', name: 'project', propertyCount: 2 },
+      { id: 'product', name: 'product', propertyCount: 1 },
+    ]
+    expect(rankTagSuggestions(tags, 'project').map((tag) => tag.id)).toEqual(['project', 'project-notes'])
   })
 })

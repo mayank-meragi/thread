@@ -1,4 +1,5 @@
-import { ArrowLeft, CheckCircle2, ChevronRight, Circle, GitBranch, HelpCircle, Lightbulb, Quote } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowLeft, CheckCircle2, ChevronRight, Circle, GitBranch, HelpCircle, Lightbulb, MoreHorizontal, Quote } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { db, toggleChecklistBlock, toggleTaskByBlockId, type ThreadOccurrenceRecord, type ViewStateRecord } from '../db'
@@ -6,8 +7,10 @@ import { formatDay } from '../lib/dates'
 import { useTabs } from '../lib/tabs'
 import type { OutlineBlock } from '../lib/outline'
 import { ThreadComposer } from '../components/ThreadComposer'
+import { BlockInspector } from '../components/BlockInspector'
 
 export function ThreadPage() {
+  const [inspectorBlockId, setInspectorBlockId] = useState<string | null>(null)
   const { threadId = '' } = useParams()
   const thread = useLiveQuery(() => db.threads.get(threadId), [threadId])
   const mentions = useLiveQuery(
@@ -78,6 +81,7 @@ export function ThreadPage() {
               blocks={blocks}
               view={view}
               collapseStates={collapseStates}
+              onInspect={setInspectorBlockId}
             />
           ))}
           {outlines.length === 0 && <div className="section-empty">No source outline is indexed yet</div>}
@@ -117,6 +121,7 @@ export function ThreadPage() {
           {ideas.length === 0 && <div className="section-empty">No related ideas yet</div>}
         </div>
       </ProjectionDisclosure>
+      <BlockInspector blockId={inspectorBlockId} onClose={() => setInspectorBlockId(null)} />
     </article>
   )
 }
@@ -138,11 +143,13 @@ function ThreadOccurrence({
   blocks,
   view,
   collapseStates,
+  onInspect,
 }: {
   occurrence: ThreadOccurrenceRecord
   blocks: OutlineBlock[]
   view: string
   collapseStates: ViewStateRecord[]
+  onInspect: (blockId: string) => void
 }) {
   const navigate = useNavigate()
   const { openTab } = useTabs()
@@ -212,6 +219,7 @@ function ThreadOccurrence({
           >
             <WikiText text={block.markdown} />
           </span>
+          <button type="button" className="outline-property-button" aria-label={`Edit properties for ${block.plainText || 'block'}`} onClick={() => onInspect(block.id)}><MoreHorizontal size={14} /></button>
           {isCollapsed && <small className="collapsed-count">{countDescendants(block.id, children)}</small>}
         </div>
         {!isCollapsed && descendants.length > 0 && <ul>{descendants.map(renderBranch)}</ul>}

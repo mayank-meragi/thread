@@ -8,6 +8,13 @@ export interface ThreadSuggestion {
   updatedAt: string
 }
 
+export interface TagSuggestion {
+  id: string
+  name: string
+  color?: string
+  propertyCount: number
+}
+
 // The slash menu is just a view over the shared block-kind registry -- a new
 // kind registered there appears here with no further changes.
 export type SlashCommand = BlockKindDefinition
@@ -15,6 +22,7 @@ export const slashCommands: SlashCommand[] = blockKindDefinitions
 
 export type SuggestionTrigger =
   | { kind: 'wikilink'; query: string; fromOffset: number; toOffset: number }
+  | { kind: 'hashtag'; query: string; fromOffset: number; toOffset: number }
   | { kind: 'slash'; query: string; fromOffset: number; toOffset: number }
 
 export function findSuggestionTrigger(before: string, after: string): SuggestionTrigger | null {
@@ -25,6 +33,18 @@ export function findSuggestionTrigger(before: string, after: string): Suggestion
       query: wiki[1],
       fromOffset: before.length - wiki[0].length,
       toOffset: before.length + (after.startsWith(']]') ? 2 : 0),
+    }
+  }
+
+
+  const hashtag = before.match(/(?:^|\s)#([\p{L}\p{N}_-]*)$/u)
+  if (hashtag) {
+    const hashOffset = before.lastIndexOf('#')
+    return {
+      kind: 'hashtag',
+      query: hashtag[1],
+      fromOffset: hashOffset,
+      toOffset: before.length,
     }
   }
 
@@ -79,6 +99,15 @@ export function rankThreadSuggestions(
     .sort((a, b) => a.score - b.score || a.index - b.index)
     .slice(0, limit)
     .map((result) => result.thread)
+}
+
+export function rankTagSuggestions(tags: TagSuggestion[], query: string, limit = 7): TagSuggestion[] {
+  return tags
+    .map((tag, index) => ({ tag, index, score: fuzzyScore(tag.name, query) }))
+    .filter((result) => Number.isFinite(result.score))
+    .sort((a, b) => a.score - b.score || a.index - b.index)
+    .slice(0, limit)
+    .map((result) => result.tag)
 }
 
 export function rankSlashCommands(query: string): SlashCommand[] {

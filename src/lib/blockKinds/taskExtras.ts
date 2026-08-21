@@ -8,10 +8,17 @@
 // generically by the editor for whichever <li> resolves to that kind. Nothing
 // about the editor's tree-walk, id-pairing, or cleanup logic needs to change
 // to add one.
-import { db, updateTaskMetadata, type TaskPriority, type TaskRecord } from '../../db'
+import { db, updateTaskMetadata, type TaskPriority, type TaskRecord, type TaskStatus } from '../../db'
+import { setTaskStatus } from '../tasks'
 
 export function renderTaskChips(container: HTMLElement, task: TaskRecord): void {
   container.replaceChildren()
+  if (task.status !== 'not_started' && task.status !== 'done') {
+    const status = document.createElement('span')
+    status.className = `task-meta-chip task-status-chip status-${task.status}`
+    status.textContent = task.status === 'in_progress' ? 'In progress' : task.status.charAt(0).toUpperCase() + task.status.slice(1)
+    container.append(status)
+  }
   if (task.dueDate) {
     const due = document.createElement('span')
     due.className = 'task-meta-chip task-due-chip'
@@ -43,6 +50,10 @@ export async function mountTaskExtras(item: HTMLElement, id: string, day: string
     order: 0,
     text: item.textContent ?? '',
     checked,
+    status: checked ? 'done' : 'not_started',
+    statusSource: 'manual',
+    completedSubtasks: 0,
+    totalSubtasks: 0,
     updatedAt: '',
   }
 
@@ -61,14 +72,22 @@ export async function mountTaskExtras(item: HTMLElement, id: string, day: string
     row = document.createElement('div')
     row.className = 'task-metadata-row'
     row.contentEditable = 'false'
-    row.innerHTML = '<label><span>Due</span><input class="task-due-input" type="date" aria-label="Task due date"></label><label><span>Priority</span><select class="task-priority-input" aria-label="Task priority"><option value="">Add priority</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>'
+    row.innerHTML = '<label><span>Status</span><select class="task-status-input" aria-label="Task status"><option value="not_started">Not started</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option><option value="done">Done</option><option value="canceled">Canceled</option></select></label><label><span>Due</span><input class="task-due-input" type="date" aria-label="Task due date"></label><label><span>Priority</span><select class="task-priority-input" aria-label="Task priority"><option value="">Add priority</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>'
     children.append(row)
   }
 
   const dueInput = row.querySelector<HTMLInputElement>('.task-due-input')!
   const priorityInput = row.querySelector<HTMLSelectElement>('.task-priority-input')!
+  const statusInput = row.querySelector<HTMLSelectElement>('.task-status-input')!
+  statusInput.value = task.status
   dueInput.value = task.dueDate ?? ''
   priorityInput.value = task.priority ?? ''
+  statusInput.onchange = () => {
+    void setTaskStatus(id, statusInput.value as TaskStatus).then(async () => {
+      const updated = await db.tasks.get(id)
+      if (updated) renderTaskChips(chips!, updated)
+    })
+  }
   dueInput.onchange = () => {
     void updateTaskMetadata(id, { dueDate: dueInput.value || undefined }).then(async () => {
       const updated = await db.tasks.get(id)

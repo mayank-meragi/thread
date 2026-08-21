@@ -1,7 +1,8 @@
 import { CalendarClock, Check } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
-import { db, toggleTask, type TaskRecord } from '../db'
+import { db, type TaskRecord } from '../db'
+import { setTaskStatus } from '../lib/tasks'
 
 interface TodayTasksProps {
   today: string
@@ -9,8 +10,8 @@ interface TodayTasksProps {
 
 export function TodayTasks({ today }: TodayTasksProps) {
   const allTasks = useLiveQuery(() => db.tasks.toArray(), [], [])
-  const tasks = allTasks.filter((task) => !task.checked && task.dueDate)
-  const doneToday = sortTasks(allTasks.filter((task) => task.checked && task.completedAt?.slice(0, 10) === today))
+  const tasks = allTasks.filter((task) => task.status !== 'done' && task.status !== 'canceled' && task.dueDate)
+  const doneToday = sortTasks(allTasks.filter((task) => task.status === 'done' && task.completedAt?.slice(0, 10) === today))
 
   const overdue = sortTasks(tasks.filter((task) => task.dueDate! < today))
   const dueToday = sortTasks(tasks.filter((task) => task.dueDate === today), true)
@@ -55,7 +56,7 @@ function TaskGroup({
             type="button"
             className={isDone ? 'task-check is-checked' : 'task-check'}
             aria-label={isDone ? `Mark ${task.text} not done` : `Complete ${task.text}`}
-            onClick={() => void toggleTask(task)}
+            onClick={() => void setTaskStatus(task.id, isDone ? 'not_started' : 'done')}
           >
             <Check size={12} />
           </button>
@@ -65,6 +66,7 @@ function TaskGroup({
               ? task.completedAt && <time dateTime={task.completedAt}>{formatTaskTime(task.completedAt)}</time>
               : <time dateTime={task.dueDate}>{formatTaskDate(task.dueDate!)}</time>}
             {task.priority && <span className={`priority-chip priority-${task.priority}`}>{capitalize(task.priority)}</span>}
+            {task.totalSubtasks > 0 && <span>{task.completedSubtasks}/{task.totalSubtasks}</span>}
           </span>
         </div>
       )) : <div className="task-group-empty">{empty}</div>}

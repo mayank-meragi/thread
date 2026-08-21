@@ -7,16 +7,21 @@ import { slugifyThread } from './outline'
 import {
   findSuggestionTrigger,
   rankSlashCommands,
+  rankTagSuggestions,
   rankThreadSuggestions,
   type BlockConversionKind,
   type SlashCommand,
   type SuggestionTrigger,
+  type TagSuggestion,
   type ThreadSuggestion,
 } from './suggestions'
 import { WIKI_TITLE } from './wikilinks'
+import { slugifyTag } from './hashtags'
+import { TAG_HREF_PREFIX, TAG_TITLE } from './taglinks'
 
 interface InlineSuggestionOptions {
   getThreads: () => Promise<ThreadSuggestion[]>
+  getTags: () => Promise<TagSuggestion[]>
   onMutation: () => void
   setBlockKind: (view: EditorView, kind: BlockConversionKind, replaceRange?: { from: number; to: number }) => void
 }
@@ -28,7 +33,9 @@ type ActiveTrigger = SuggestionTrigger & {
 
 type MenuEntry =
   | { type: 'thread'; id: string; title: string }
-  | { type: 'create'; id: string; title: string }
+  | { type: 'create-thread'; id: string; title: string }
+  | { type: 'tag'; id: string; name: string; color?: string; propertyCount: number }
+  | { type: 'create-tag'; id: string; name: string }
   | { type: 'command'; command: SlashCommand }
 
 function triggerFromState(state: EditorState): ActiveTrigger | null {
@@ -90,6 +97,8 @@ function createMenuController(
   let activeIndex = 0
   let threads: ThreadSuggestion[] = []
   let threadsReady = false
+  let tags: TagSuggestion[] = []
+  let tagsReady = false
   let requestId = 0
   let lastTriggerKey = ''
   let dismissedTriggerKey = ''
@@ -102,13 +111,24 @@ function createMenuController(
       return rankSlashCommands(trigger.query).map((command) => ({ type: 'command', command }))
     }
 
+    if (trigger.kind === 'hashtag') {
+      if (!tagsReady) return []
+      const ranked = rankTagSuggestions(tags, trigger.query)
+      const next: MenuEntry[] = ranked.map((tag) => ({ type: 'tag', ...tag }))
+      const name = trigger.query.trim()
+      const hasExact = ranked.some((tag) => tag.name.toLocaleLowerCase() === name.toLocaleLowerCase())
+      const id = slugifyTag(name)
+      if (name && id && !hasExact) next.push({ type: 'create-tag', id, name })
+      return next
+    }
+
     if (!threadsReady) return []
     const ranked = rankThreadSuggestions(threads, trigger.query)
     const next: MenuEntry[] = ranked.map((thread) => ({ type: 'thread', id: thread.id, title: thread.title }))
     const title = trigger.query.trim()
     const hasExact = ranked.some((thread) => thread.title.toLocaleLowerCase() === title.toLocaleLowerCase())
     const id = slugifyThread(title)
-    if (title && id && !hasExact) next.push({ type: 'create', id, title })
+    if (title && id && !hasExact) next.push({ type: 'create-thread', id, title })
     return next
   }
 
@@ -133,14 +153,14 @@ function createMenuController(
     menu.style.top = `${top}px`
   }
 
-  const accept = (entry: MenuEntry) => {
+  const accept = (entry: MenuEntry, appendSpace = false) => {
     const trigger = activeTrigger
     if (!trigger) return
     options.onMutation()
 
     if (entry.type === 'command') {
       options.setBlockKind(view, entry.command.id, { from: trigger.from, to: trigger.to })
-    } else {
+    } else if (entry.type === 'thread' || entry.type === 'create-thread') {
       const mark = linkType.create({ href: `#/thread/${entry.id}`, title: WIKI_TITLE })
       const transaction = view.state.tr.replaceWith(
         trigger.from,
@@ -149,6 +169,19 @@ function createMenuController(
       )
       transaction.setSelection(TextSelection.create(transaction.doc, trigger.from + entry.title.length))
       transaction.setStoredMarks([])
+      view.dispatch(transaction)
+    } else {
+      const name = entry.name
+      const mark = linkType.create({ href: `${TAG_HREF_PREFIX}${entry.id}`, title: TAG_TITLE })
+      const transaction = view.state.tr.replaceWith(
+        trigger.from,
+        trigger.to,
+        view.state.schema.text(name, [mark]),
+      )
+      const end = trigger.from + name.length
+      transaction.setSelection(TextSelection.create(transaction.doc, end))
+      transaction.setStoredMarks([])
+      if (appendSpace) transaction.insertText(' ', end)
       view.dispatch(transaction)
     }
 
@@ -168,7 +201,7 @@ function createMenuController(
     activeIndex = Math.min(activeIndex, Math.max(0, entries.length - 1))
     const heading = document.createElement('div')
     heading.className = 'suggestion-heading'
-    heading.textContent = activeTrigger.kind === 'wikilink' ? 'Link a thread' : 'Change block'
+    heading.textContent = activeTrigger.kind === 'wikilink' ? 'Link a thread' : activeTrigger.kind === 'hashtag' ? 'Add a tag' : 'Change block'
     menu.append(heading)
 
     if (entries.length === 0) {
@@ -176,8 +209,12 @@ function createMenuController(
       empty.className = 'suggestion-empty'
       empty.textContent = activeTrigger.kind === 'wikilink' && !threadsReady
         ? 'Finding threads…'
+        : activeTrigger.kind === 'hashtag' && !tagsReady
+          ? 'Finding tags…'
         : activeTrigger.kind === 'wikilink'
           ? 'No matching threads'
+          : activeTrigger.kind === 'hashtag'
+            ? 'Type a name to create a tag'
           : 'No matching commands'
       menu.append(empty)
     } else {
@@ -191,22 +228,33 @@ function createMenuController(
 
         const glyph = document.createElement('span')
         glyph.className = `suggestion-glyph suggestion-${entry.type === 'command' ? entry.command.id : entry.type}`
-        glyph.textContent = entry.type === 'command' ? entry.command.glyph : entry.type === 'create' ? '+' : '•'
+        glyph.textContent = entry.type === 'command' ? entry.command.glyph : entry.type === 'create-thread' || entry.type === 'create-tag' ? '+' : entry.type === 'tag' ? '#' : '•'
+        if (entry.type === 'tag' && entry.color) glyph.style.setProperty('--tag-color', entry.color)
 
         const copy = document.createElement('span')
         copy.className = 'suggestion-copy'
         const title = document.createElement('strong')
         title.textContent = entry.type === 'command'
           ? entry.command.label
-          : entry.type === 'create'
+          : entry.type === 'create-thread'
             ? `Create “${entry.title}”`
-            : entry.title
+            : entry.type === 'thread'
+              ? entry.title
+              : entry.type === 'create-tag'
+                ? `Create #${entry.name}`
+                : `#${entry.name}`
         const detail = document.createElement('small')
         detail.textContent = entry.type === 'command'
           ? entry.command.description
-          : entry.type === 'create'
+          : entry.type === 'create-thread'
             ? 'New thread'
-            : 'Existing thread'
+            : entry.type === 'thread'
+              ? 'Existing thread'
+              : entry.type === 'create-tag'
+                ? 'New tag'
+                : entry.propertyCount > 0
+                  ? `${entry.propertyCount} metadata field${entry.propertyCount === 1 ? '' : 's'}`
+                  : 'Existing tag'
         copy.append(title, detail)
 
         const shortcut = document.createElement('span')
@@ -253,6 +301,22 @@ function createMenuController(
     })
   }
 
+  const loadTags = () => {
+    const currentRequest = ++requestId
+    void options.getTags().then((nextTags) => {
+      if (currentRequest !== requestId) return
+      tags = nextTags
+      tagsReady = true
+      if (activeTrigger?.kind === 'hashtag') render()
+    }).catch(() => {
+      if (currentRequest === requestId) {
+        tags = []
+        tagsReady = true
+        if (activeTrigger?.kind === 'hashtag') render()
+      }
+    })
+  }
+
   const sync = () => {
     const trigger = triggerFromState(view.state)
     if (!trigger || triggerKey(trigger) === dismissedTriggerKey || !view.hasFocus()) {
@@ -265,6 +329,7 @@ function createMenuController(
     const key = triggerKey(trigger)
     if (key !== lastTriggerKey) activeIndex = 0
     if (trigger.kind === 'wikilink' && previousKind !== 'wikilink') loadThreads()
+    if (trigger.kind === 'hashtag' && previousKind !== 'hashtag') loadTags()
     activeTrigger = trigger
     previousKind = trigger.kind
     lastTriggerKey = key
@@ -296,7 +361,17 @@ function createMenuController(
       accept(entries[activeIndex])
       return true
     }
-    if ((event.key === 'Enter' || event.key === 'Tab') && activeTrigger.kind === 'wikilink' && !threadsReady) {
+    if (event.key === ' ' && activeTrigger.kind === 'hashtag' && activeTrigger.query.trim()) {
+      const exact = entries.find((entry) => entry.type === 'tag' && entry.name.toLocaleLowerCase() === activeTrigger!.query.toLocaleLowerCase())
+      const create = entries.find((entry) => entry.type === 'create-tag')
+      const entry = exact ?? create
+      if (entry) {
+        event.preventDefault()
+        accept(entry, true)
+        return true
+      }
+    }
+    if ((event.key === 'Enter' || event.key === 'Tab') && ((activeTrigger.kind === 'wikilink' && !threadsReady) || (activeTrigger.kind === 'hashtag' && !tagsReady))) {
       event.preventDefault()
       return true
     }

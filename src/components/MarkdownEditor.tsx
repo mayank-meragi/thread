@@ -26,8 +26,10 @@ import { inlineSuggestionsPlugin } from '../lib/inlineSuggestions'
 import { parseOutline } from '../lib/outline'
 import type { BlockConversionKind } from '../lib/suggestions'
 import { editorLinksToWiki, wikiLinkInputRule, wikiLinkInteractionPlugin, wikiLinksToEditor } from '../lib/wikilinks'
+import { editorLinksToTags, tagLinkInputRule, tagLinksToEditor } from '../lib/taglinks'
 import { replaceAll } from '@milkdown/utils'
 import { MobileEditorToolbar, type ToolbarAction, type ToolbarBlockKind } from './MobileEditorToolbar'
+import { BlockInspector } from './BlockInspector'
 
 interface MarkdownEditorProps {
   day: string
@@ -45,6 +47,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
   const runToolbarActionRef = useRef<(action: ToolbarAction) => void>(() => undefined)
   const [ready, setReady] = useState(false)
   const [toolbar, setToolbar] = useState({ visible: false, top: 0, activeKind: 'bullet' as ToolbarBlockKind })
+  const [inspectorBlockId, setInspectorBlockId] = useState<string | null>(null)
 
   useEffect(() => {
     onChangeRef.current = onChange
@@ -79,7 +82,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
 
     const crepe = new Crepe({
       root,
-      defaultValue: wikiLinksToEditor(initialValue.trim() ? initialValue : '- '),
+      defaultValue: tagLinksToEditor(wikiLinksToEditor(initialValue.trim() ? initialValue : '- ')),
       features: {
         [Crepe.Feature.AI]: false,
         [Crepe.Feature.ImageBlock]: false,
@@ -103,10 +106,15 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       }))
     })
     crepe.editor.use(wikiLinkInputRule)
+    crepe.editor.use(tagLinkInputRule)
     crepe.editor.use(inlineSuggestionsPlugin({
       getThreads: async () => {
         const threads = await db.threads.orderBy('updatedAt').reverse().toArray()
         return threads.map(({ id, title, updatedAt }) => ({ id, title, updatedAt }))
+      },
+      getTags: async () => {
+        const tags = await db.tagDefinitions.orderBy('name').toArray()
+        return tags.map(({ id, name, color, propertyIds }) => ({ id, name, color, propertyCount: propertyIds.length }))
       },
       onMutation: markUserMutation,
       setBlockKind: setCurrentBlockKind,
@@ -255,17 +263,30 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       latest = detail.markdown
       dirty = false
       userMutationPending = false
-      crepe.editor.action(replaceAll(wikiLinksToEditor(detail.markdown.trim() ? detail.markdown : '- ')))
+      crepe.editor.action(replaceAll(tagLinksToEditor(wikiLinksToEditor(detail.markdown.trim() ? detail.markdown : '- '))))
       if (metadataTimer) window.clearTimeout(metadataTimer)
       metadataTimer = window.setTimeout(() => {
         if (disposed) return
         void installCollapseControls(root, day)
         crepe.editor.action((ctx) => {
-          void installTaskControls(ctx.get(editorViewCtx), day, detail.markdown)
+          const view = ctx.get(editorViewCtx)
+          void installTaskControls(view, day, detail.markdown)
+          void installBlockMetadataControls(view, day, setInspectorBlockId)
         })
       }, 120)
     }
     window.addEventListener('thread:day-external-update', applyExternalUpdate)
+
+    const refreshBlockMetadata = (event: Event) => {
+      const detail = (event as CustomEvent<{ day: string }>).detail
+      if (disposed || detail?.day !== day) return
+      crepe.editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx)
+        void installTaskControls(view, day, latest)
+        void installBlockMetadataControls(view, day, setInspectorBlockId)
+      })
+    }
+    window.addEventListener('thread:block-metadata-update', refreshBlockMetadata)
 
     runToolbarActionRef.current = (action) => {
       markUserMutation()
@@ -295,7 +316,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
         // Only an active editor is allowed to write to the journal.
         if (!active || disposed || markdown === previous || !userMutationPending) return
         userMutationPending = false
-        const canonical = editorLinksToWiki(markdown)
+        const canonical = editorLinksToTags(editorLinksToWiki(markdown))
         if (canonical === latest) return
         latest = canonical
         dirty = true
@@ -310,7 +331,9 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
         // never a DOM query zipped against a separately fetched list.
         const view = ctx.get(editorViewCtx)
         void installTaskControls(view, day, canonical)
-        tagBlockIds(view, day, canonical)
+        window.setTimeout(() => {
+          if (!disposed) void installBlockMetadataControls(view, day, setInspectorBlockId)
+        }, 240)
       })
       listener.blur(() => {
         if (saveTimer) window.clearTimeout(saveTimer)
@@ -327,7 +350,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       void installCollapseControls(root, day)
       crepe.editor.action((ctx) => {
         const view = ctx.get(editorViewCtx)
-        tagBlockIds(view, day, latest)
+        void installBlockMetadataControls(view, day, setInspectorBlockId)
         void installTaskControls(view, day, latest).then(() => onReadyRef.current?.())
       })
       // Let initialization events drain before accepting editor writes.
@@ -364,6 +387,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       root.removeEventListener('click', openWikiLink, true)
       root.removeEventListener('pointerdown', toggleChecklistItem, true)
       window.removeEventListener('thread:day-external-update', applyExternalUpdate)
+      window.removeEventListener('thread:block-metadata-update', refreshBlockMetadata)
       runToolbarActionRef.current = () => undefined
       document.body.classList.remove('mobile-editor-active')
       void crepe.destroy()
@@ -373,17 +397,19 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day])
 
-  return (
-    <div className="editor-wrap" data-ready={ready}>
-      {!ready && <div className="editor-loading">{loadingLabel}</div>}
-      <div ref={rootRef} className="thread-editor" aria-label={ariaLabel} />
-      <MobileEditorToolbar
-        visible={toolbar.visible}
-        top={toolbar.top}
-        activeKind={toolbar.activeKind}
-        onAction={(action) => runToolbarActionRef.current(action)}
-      />
-    </div>
+  return (<>
+      <div className="editor-wrap" data-ready={ready}>
+        {!ready && <div className="editor-loading">{loadingLabel}</div>}
+        <div ref={rootRef} className="thread-editor" aria-label={ariaLabel} />
+        <MobileEditorToolbar
+          visible={toolbar.visible}
+          top={toolbar.top}
+          activeKind={toolbar.activeKind}
+          onAction={(action) => runToolbarActionRef.current(action)}
+        />
+      </div>
+      <BlockInspector blockId={inspectorBlockId} onClose={() => setInspectorBlockId(null)} />
+    </>
   )
 }
 
@@ -477,7 +503,7 @@ function collectTaskNodes(view: EditorView, day: string, markdown: string): Live
 // every list item gets tagged with its stable block id, not just tasks. This
 // is what lets other pages (e.g. TodayPage jumping to a source line) find a
 // specific block's DOM node with a plain `[data-block-id]` selector.
-function tagBlockIds(view: EditorView, day: string, markdown: string): void {
+async function installBlockMetadataControls(view: EditorView, day: string, onOpen: (blockId: string) => void): Promise<void> {
   const domNodes: HTMLElement[] = []
   view.state.doc.descendants((node, pos) => {
     if (node.type.name !== 'list_item') return true
@@ -486,10 +512,27 @@ function tagBlockIds(view: EditorView, day: string, markdown: string): void {
     if (dom instanceof HTMLElement) domNodes.push(dom)
     return true
   })
-  const blocks = parseOutline(markdown, day).blocks
+  const blocks = await db.blocks.where('day').equals(day).sortBy('order')
   if (domNodes.length !== blocks.length) return
   domNodes.forEach((dom, index) => {
-    dom.dataset.blockId = blocks[index].id
+    const blockId = blocks[index].id
+    dom.dataset.blockId = blockId
+    let button = dom.querySelector<HTMLButtonElement>(':scope > .block-property-trigger')
+    if (!button) {
+      button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'block-property-trigger'
+      button.contentEditable = 'false'
+      button.textContent = '···'
+      dom.append(button)
+    }
+    button.setAttribute('aria-label', `Edit properties for ${blocks[index].plainText || 'block'}`)
+    button.title = 'Block properties'
+    button.onclick = (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      onOpen(blockId)
+    }
   })
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, BookOpenText, Cloud, CloudOff, Layers, Search, Settings, Sparkle } from 'lucide-react'
+import { AlertTriangle, BookOpenText, Cloud, CloudOff, Layers, ListTodo, Search, Settings, Sparkle } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { HashRouter, Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import { db, initializeDatabase } from './db'
@@ -9,12 +9,14 @@ import { TodayPage } from './pages/TodayPage'
 import { ThreadPage } from './pages/ThreadPage'
 import { SearchPage } from './pages/SearchPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { TasksPage } from './pages/TasksPage'
 import { TabStrip } from './components/TabStrip'
 import { MobileTabSwitcher } from './components/MobileTabSwitcher'
 import { TabsProvider, useTabs } from './lib/tabs'
 
 const nav = [
   { to: '/', label: 'Today', icon: BookOpenText, end: true },
+  { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/search', label: 'Search', icon: Search },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
@@ -187,6 +189,7 @@ function AppShell() {
               <Routes location={tab.path}>
                 <Route path="/" element={<TodayPage />} />
                 <Route path="/thread/:threadId" element={<ThreadPage />} />
+                <Route path="/tasks" element={<TasksPage />} />
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
               </Routes>

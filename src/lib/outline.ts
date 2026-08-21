@@ -62,6 +62,7 @@ export function cleanMarkdownLine(line: string): string {
     .replace(/^[?!=]\s+(?:\[[ xX]\]\s+)?/, '')
     .replace(/^#{1,6}\s+/, '')
     .replace(/\[\[([^\]]+)\]\]/g, '$1')
+    .replace(/#\[([^\]]+)\]/g, '#$1')
     .replace(/[*_~`]/g, '')
     .trim()
 }
@@ -121,7 +122,7 @@ export function countMarkdownBlocks(markdown: string): number {
   return markdown.split('\n').filter((line) => line.trim().length > 0).length
 }
 
-export function parseOutline(markdown: string, day: string): {
+export function parseOutline(markdown: string, day: string, idsByPath?: ReadonlyMap<string, string>): {
   blocks: OutlineBlock[]
   occurrences: ParsedThreadOccurrence[]
 } {
@@ -142,7 +143,7 @@ export function parseOutline(markdown: string, day: string): {
     const sibling = siblingCounts.get(parentKey) ?? 0
     siblingCounts.set(parentKey, sibling + 1)
     const path = parent ? `${parent.path}.${sibling}` : `${sibling}`
-    const id = `${day}:${path}`
+    const id = idsByPath?.get(path) ?? `${day}:${path}`
     const syntaxContent = content.replace(/\\(\[|\]|=|!|\?)/g, '$1')
     const answeredQuestion = /^\?\s+\[[xX]\]\s+/.test(syntaxContent)
     const checklist = checklistPrefix.test(syntaxContent)

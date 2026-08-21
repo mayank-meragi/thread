@@ -6,6 +6,7 @@ export function TabLabel({ tab }: { tab: Tab }) {
   const pathname = tab.path.split('?')[0] || '/'
   if (tab.id === TODAY_TAB_ID) return <>Today</>
   if (pathname === '/search') return <>Search</>
+  if (pathname === '/tasks') return <>Tasks</>
   if (pathname === '/settings') return <>Settings</>
   const threadMatch = pathname.match(/^\/thread\/(.+)$/)
   if (threadMatch) return <ThreadTabLabel threadId={decodeURIComponent(threadMatch[1])} />

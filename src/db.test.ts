@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { applyRemoteDay, db, markDaySynced, pruneOrphanThreads, saveDay, saveThreadNote, toggleTask } from './db'
+import { addBlockTag, applyRemoteDay, createPropertyDefinition, createTag, db, markDaySynced, pruneOrphanThreads, removeBlockTag, saveDay, saveThreadNote, setBlockProperty, toggleTask, updateTagDefinition } from './db'
 
 const DATE = '2026-08-19'
 
@@ -12,6 +12,131 @@ beforeEach(async () => {
 afterAll(() => db.close())
 
 describe('journal persistence', () => {
+  it('preserves stable block identities across moves and edits', async () => {
+    await saveDay(DATE, '- Alpha\n- Beta')
+    const first = await db.blocks.where('day').equals(DATE).sortBy('order')
+    const alphaId = first[0].id
+    const betaId = first[1].id
+
+    await saveDay(DATE, '- Beta\n- Alpha')
+    const moved = await db.blocks.where('day').equals(DATE).sortBy('order')
+    expect(moved.map((block) => block.id)).toEqual([betaId, alphaId])
+
+    await saveDay(DATE, '- Beta\n- Alpha revised')
+    const edited = await db.blocks.where('day').equals(DATE).sortBy('order')
+    expect(edited[1].id).toBe(alphaId)
+  })
+
+  it('persists typed block properties and tags in the day metadata projection', async () => {
+    await saveDay(DATE, '- A block with context')
+    const block = (await db.blocks.where('day').equals(DATE).first())!
+    const property = await createPropertyDefinition({ name: 'Effort', type: 'number' })
+    const tag = await createTag('project')
+
+    await setBlockProperty(block.id, property.id, 3)
+    await addBlockTag(block.id, tag.id)
+
+    expect(await db.blockProperties.get(`${block.id}:${property.id}`)).toMatchObject({ value: 3, source: 'explicit' })
+    expect(await db.blockTags.get(`${block.id}:${tag.id}`)).toMatchObject({ tagId: tag.id })
+    expect((await db.days.get(DATE))?.metadata?.blocks[block.id]).toMatchObject({
+      properties: { [property.id]: 3 },
+      tags: [tag.id],
+    })
+    expect(await db.outbox.get(`day:${DATE}`)).toBeDefined()
+  })
+
+  it('creates and synchronizes tags typed with hashtag syntax', async () => {
+    await saveDay(DATE, '- Plan the launch #project')
+    expect(await db.tagDefinitions.count()).toBe(0)
+
+    await saveDay(DATE, '- Plan the launch #[project]')
+    let block = (await db.blocks.where('day').equals(DATE).first())!
+    const project = (await db.tagDefinitions.where('name').equals('project').first())!
+
+    expect(await db.blockTags.get(`${block.id}:${project.id}`)).toMatchObject({ source: 'inline' })
+
+    await saveDay(DATE, '- Plan the launch')
+    block = (await db.blocks.where('day').equals(DATE).first())!
+    expect(await db.blockTags.get(`${block.id}:${project.id}`)).toBeUndefined()
+  })
+
+  it('applies schema defaults through a typed hashtag', async () => {
+    const stage = await createPropertyDefinition({ name: 'Stage', type: 'text' })
+    const project = await createTag('project')
+    await updateTagDefinition(project.id, { propertyIds: [stage.id], propertyDefaults: { [stage.id]: 'Planning' } })
+
+    await saveDay(DATE, '- Shape the brief #[project]')
+    const block = (await db.blocks.where('day').equals(DATE).first())!
+
+    expect(await db.blockProperties.get(`${block.id}:${stage.id}`)).toMatchObject({
+      value: 'Planning',
+      source: 'automation',
+      sourceTagId: project.id,
+    })
+  })
+
+  it('keeps an explicitly applied tag after its hashtag text is removed', async () => {
+    await saveDay(DATE, '- Durable association #[project]')
+    let block = (await db.blocks.where('day').equals(DATE).first())!
+    const project = (await db.tagDefinitions.where('name').equals('project').first())!
+    await addBlockTag(block.id, project.id)
+
+    await saveDay(DATE, '- Durable association')
+    block = (await db.blocks.where('day').equals(DATE).first())!
+
+    expect(await db.blockTags.get(`${block.id}:${project.id}`)).toMatchObject({ source: 'explicit' })
+  })
+
+  it('applies schema defaults when a tag is added to a block', async () => {
+    await saveDay(DATE, '- A project block')
+    const block = (await db.blocks.where('day').equals(DATE).first())!
+    const stage = await createPropertyDefinition({ name: 'Stage', type: 'text' })
+    const project = await createTag('project')
+    await updateTagDefinition(project.id, {
+      propertyIds: [stage.id],
+      propertyDefaults: { [stage.id]: 'Planning' },
+      requiredPropertyIds: [stage.id],
+    })
+
+    await addBlockTag(block.id, project.id)
+
+    expect(await db.blockProperties.get(`${block.id}:${stage.id}`)).toMatchObject({
+      value: 'Planning',
+      source: 'automation',
+      sourceTagId: project.id,
+    })
+  })
+
+  it('backfills existing tag applications and preserves explicit overrides', async () => {
+    await saveDay(DATE, '- Existing tagged block')
+    const block = (await db.blocks.where('day').equals(DATE).first())!
+    const stage = await createPropertyDefinition({ name: 'Stage', type: 'text' })
+    const project = await createTag('project')
+    await addBlockTag(block.id, project.id)
+
+    await updateTagDefinition(project.id, { propertyIds: [stage.id], propertyDefaults: { [stage.id]: 'Planning' } })
+    expect(await db.blockProperties.get(`${block.id}:${stage.id}`)).toMatchObject({ value: 'Planning', source: 'automation' })
+
+    await setBlockProperty(block.id, stage.id, 'Shipping')
+    await updateTagDefinition(project.id, { propertyIds: [stage.id], propertyDefaults: { [stage.id]: 'Done' } })
+    await removeBlockTag(block.id, project.id)
+
+    expect(await db.blockProperties.get(`${block.id}:${stage.id}`)).toMatchObject({ value: 'Shipping', source: 'explicit' })
+  })
+
+  it('removes schema-owned defaults when a field leaves the schema', async () => {
+    await saveDay(DATE, '- Disposable default')
+    const block = (await db.blocks.where('day').equals(DATE).first())!
+    const effort = await createPropertyDefinition({ name: 'Effort', type: 'number' })
+    const project = await createTag('project')
+    await updateTagDefinition(project.id, { propertyIds: [effort.id], propertyDefaults: { [effort.id]: 3 } })
+    await addBlockTag(block.id, project.id)
+
+    await updateTagDefinition(project.id, { propertyIds: [], propertyDefaults: {} })
+
+    expect(await db.blockProperties.get(`${block.id}:${effort.id}`)).toBeUndefined()
+  })
+
   it('archives the previous value before replacing a day', async () => {
     await saveDay(DATE, '- original note')
     await saveDay(DATE, '- changed note')

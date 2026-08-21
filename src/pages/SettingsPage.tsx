@@ -14,6 +14,7 @@ import {
   type GitHubConfig,
 } from '../lib/github'
 import { applyTheme, getTheme, themes, type ThemeId } from '../lib/theme'
+import { MetadataSchemas } from '../components/MetadataSchemas'
 
 export function SettingsPage() {
   const existing = getGitHubConfig()
@@ -139,6 +140,8 @@ export function SettingsPage() {
           ))}
         </section>
       )}
+
+      <MetadataSchemas />
 
       <section className="settings-card theme-card">
         <div className="settings-title"><Palette size={20} /><div><h2>Appearance</h2><p>Choose a familiar palette. Your theme stays on this device.</p></div></div>

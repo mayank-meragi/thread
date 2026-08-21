@@ -1,4 +1,5 @@
 import { applyRemoteDay, db, hasOpenDayConflict, markConflictResolved, markDaySynced, markThreadNoteSynced, recordDayConflict, type DayRecord, type ThreadNoteRecord } from '../db'
+import { emptyDayMetadata, parseDayDocument, serializeDayDocument } from './dayDocument'
 
 const API = 'https://api.github.com'
 const STORAGE_KEY = 'thread.github'
@@ -115,8 +116,9 @@ async function putFile(config: GitHubConfig, path: string, content: string, sha?
 // attempts the write and reacts to SyncConflictError uniformly: refetch the
 // real current state and reconcile against it.
 async function pushDay(config: GitHubConfig, day: DayRecord, path: string): Promise<number> {
+  const content = serializeDayDocument(day.markdown, day.metadata ?? emptyDayMetadata())
   try {
-    const sha = await putFile(config, path, day.markdown, day.remoteSha)
+    const sha = await putFile(config, path, content, day.remoteSha)
     await markDaySynced(day.date, sha, day.localRevision)
     return 1
   } catch (error) {
@@ -127,17 +129,21 @@ async function pushDay(config: GitHubConfig, day: DayRecord, path: string): Prom
       // The file existed a moment ago (that's why we got a conflict) but is
       // gone now -- e.g. deleted upstream between our attempt and this
       // recovery fetch. A plain create is now correct.
-      const sha = await putFile(config, path, day.markdown, undefined)
+      const sha = await putFile(config, path, content, undefined)
       await markDaySynced(day.date, sha, day.localRevision)
       return 1
     }
-    if (fresh.content === day.markdown) {
+    const freshDocument = parseDayDocument(fresh.content)
+    const hasUserMetadata = Object.values(day.metadata?.blocks ?? {}).some(
+      (block) => Boolean(Object.keys(block.properties ?? {}).length || block.tags?.length),
+    )
+    if (fresh.content === content || (!hasUserMetadata && freshDocument.markdown === day.markdown)) {
       // Remote already matches what we were trying to write (e.g. another
       // tab in this same browser got there first) -- nothing left to push.
       await markDaySynced(day.date, fresh.sha, day.localRevision)
       return 1
     }
-    await recordDayConflict(day.date, day.markdown, fresh.content)
+    await recordDayConflict(day.date, day.markdown, freshDocument.markdown)
     throw new Error(`${path} changed in the data repository. Resolve the conflict to continue syncing.`, { cause: error })
   }
 }
@@ -253,8 +259,9 @@ export async function pullDay(date: string): Promise<void> {
     await applyRemoteDay(date, remote.content, remote.sha)
     return
   }
-  if (day && day.markdown !== remote.content) {
-    await recordDayConflict(date, day.markdown, remote.content)
+  const localContent = day ? serializeDayDocument(day.markdown, day.metadata ?? emptyDayMetadata()) : null
+  if (day && localContent !== remote.content) {
+    await recordDayConflict(date, localContent!, remote.content)
   }
 }
 
