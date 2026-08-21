@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, BookOpenText, Cloud, CloudOff, Search, Settings, Sparkle } from 'lucide-react'
+import { AlertTriangle, BookOpenText, Cloud, CloudOff, Layers, Search, Settings, Sparkle } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { HashRouter, Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import { db, initializeDatabase } from './db'
@@ -10,6 +10,7 @@ import { ThreadPage } from './pages/ThreadPage'
 import { SearchPage } from './pages/SearchPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { TabStrip } from './components/TabStrip'
+import { MobileTabSwitcher } from './components/MobileTabSwitcher'
 import { TabsProvider, useTabs } from './lib/tabs'
 
 const nav = [
@@ -27,6 +28,7 @@ function AppShell() {
   const [connected, setConnected] = useState(() => Boolean(getGitHubConfig()))
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false)
 
   useEffect(() => {
     const refresh = () => setConnected(Boolean(getGitHubConfig()))
@@ -199,7 +201,17 @@ function AppShell() {
             <Icon size={19} /><span>{label}</span>
           </NavLink>
         ))}
+        <button
+          type="button"
+          className={tabSwitcherOpen ? 'active' : ''}
+          aria-label="Open tabs"
+          onClick={() => setTabSwitcherOpen(true)}
+        >
+          <Layers size={19} /><span>{tabs.length > 1 ? `Tabs (${tabs.length})` : 'Tabs'}</span>
+        </button>
       </nav>
+
+      <MobileTabSwitcher open={tabSwitcherOpen} onClose={() => setTabSwitcherOpen(false)} />
     </div>
   )
 }

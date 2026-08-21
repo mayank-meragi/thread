@@ -11,6 +11,16 @@ export function shiftDay(date: string, amount: number): string {
   return new Date(value.getTime() - offset).toISOString().slice(0, 10)
 }
 
+export function daysBetween(from: string, to: string): string[] {
+  const dates: string[] = []
+  let cursor = from
+  while (cursor <= to) {
+    dates.push(cursor)
+    cursor = shiftDay(cursor, 1)
+  }
+  return dates
+}
+
 export function formatDay(date: string): { weekday: string; full: string; short: string } {
   const value = new Date(`${date}T12:00:00`)
   return {

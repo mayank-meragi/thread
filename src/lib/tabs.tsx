@@ -130,7 +130,91 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('click', onClick, true)
   }, [openTab])
 
-  return <TabsContext.Provider value={value}>{children}</TabsContext.Provider>
+  // Touch has no Cmd/Ctrl-click equivalent for "open in background" -- a
+  // long-press on a link stands in for it, mirroring how mobile browsers
+  // handle the same gesture.
+  const [longPressMenu, setLongPressMenu] = useState<{ href: string; x: number; y: number } | null>(null)
+  useEffect(() => {
+    let pressTimer: number | null = null
+    let startX = 0
+    let startY = 0
+    let firedLongPress = false
+
+    const clearTimer = () => {
+      if (pressTimer != null) {
+        window.clearTimeout(pressTimer)
+        pressTimer = null
+      }
+    }
+    const onTouchStart = (event: TouchEvent) => {
+      const target = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[href^="#/"]') : null
+      if (!target) return
+      const touch = event.touches[0]
+      startX = touch.clientX
+      startY = touch.clientY
+      firedLongPress = false
+      clearTimer()
+      const href = target.getAttribute('href')!
+      pressTimer = window.setTimeout(() => {
+        firedLongPress = true
+        setLongPressMenu({ href, x: startX, y: startY })
+      }, 550)
+    }
+    const onTouchMove = (event: TouchEvent) => {
+      if (pressTimer == null) return
+      const touch = event.touches[0]
+      if (Math.hypot(touch.clientX - startX, touch.clientY - startY) > 10) clearTimer()
+    }
+    const onTouchEnd = (event: TouchEvent) => {
+      clearTimer()
+      if (!firedLongPress) return
+      // The finger was still down when the menu opened -- the browser's own
+      // click that follows this touch would otherwise navigate right out
+      // from under it.
+      const target = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[href^="#/"]') : null
+      if (!target) return
+      const suppressClick = (clickEvent: Event) => {
+        clickEvent.preventDefault()
+        clickEvent.stopPropagation()
+        target.removeEventListener('click', suppressClick, true)
+      }
+      target.addEventListener('click', suppressClick, true)
+    }
+    document.addEventListener('touchstart', onTouchStart, { passive: true })
+    document.addEventListener('touchmove', onTouchMove, { passive: true })
+    document.addEventListener('touchend', onTouchEnd)
+    return () => {
+      document.removeEventListener('touchstart', onTouchStart)
+      document.removeEventListener('touchmove', onTouchMove)
+      document.removeEventListener('touchend', onTouchEnd)
+      clearTimer()
+    }
+  }, [])
+
+  return (
+    <TabsContext.Provider value={value}>
+      {children}
+      {longPressMenu && (
+        <div className="link-context-backdrop" onClick={() => setLongPressMenu(null)} onTouchStart={() => setLongPressMenu(null)}>
+          <div
+            className="link-context-menu"
+            style={{ left: Math.min(longPressMenu.x, window.innerWidth - 190), top: longPressMenu.y }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                openTab(longPressMenu.href.slice(1), { background: true })
+                setLongPressMenu(null)
+              }}
+            >
+              Open in New Tab
+            </button>
+          </div>
+        </div>
+      )}
+    </TabsContext.Provider>
+  )
 }
 
 export function useTabs(): TabsContextValue {
