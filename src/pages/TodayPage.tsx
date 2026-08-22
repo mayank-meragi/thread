@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Link2, Sparkles } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
 import { db, ensureDay, saveDay } from '../db'
@@ -198,59 +197,35 @@ export function TodayPage() {
   const label = formatDay(activeDate)
   const isViewingToday = activeDate === today
 
-  const mentions = useLiveQuery(() => db.mentions.where('day').equals(activeDate).toArray(), [activeDate], [])
-
   return (
-    <div className="today-grid">
-      <article className="journal-page" ref={journalPageRef}>
-        <header className="day-toolbar">
-          <div className="day-toolbar-label">{isViewingToday ? 'Today' : label.weekday}, {label.full}</div>
-          <div className="day-actions" aria-label="Change day">
-            <DatePicker selected={activeDate} onSelect={(date) => jumpTo(date, 'smooth')} />
-            {!isViewingToday && (
-              <button className="today-button" type="button" onClick={() => jumpTo(today, 'smooth')}>Today</button>
-            )}
-          </div>
-        </header>
-
-        <div className="day-sections">
-          {[...dates].reverse().map((date) => (
-            <DaySection
-              key={date}
-              date={date}
-              isToday={date === today}
-              registerSection={registerSection}
-              onActive={setActiveDate}
-              onChange={handleSaveChange}
-              paramBlock={date === blockTargetDate ? paramBlock : null}
-              captureRequested={captureRequested}
-            />
-          ))}
+    <article className="journal-page" ref={journalPageRef}>
+      <header className="day-toolbar">
+        <div className="day-toolbar-label">{isViewingToday ? 'Today' : label.weekday}, {label.full}</div>
+        <div className="day-actions" aria-label="Change day">
+          <DatePicker selected={activeDate} onSelect={(date) => jumpTo(date, 'smooth')} />
+          {!isViewingToday && (
+            <button className="today-button" type="button" onClick={() => jumpTo(today, 'smooth')}>Today</button>
+          )}
         </div>
+      </header>
 
-        <div ref={bottomSentinelRef} className="day-load-sentinel" />
-      </article>
+      <div className="day-sections">
+        {[...dates].reverse().map((date) => (
+          <DaySection
+            key={date}
+            date={date}
+            isToday={date === today}
+            registerSection={registerSection}
+            onActive={setActiveDate}
+            onChange={handleSaveChange}
+            paramBlock={date === blockTargetDate ? paramBlock : null}
+            captureRequested={captureRequested}
+          />
+        ))}
+      </div>
 
-      <aside className="context-panel">
-        <div className="context-kicker"><Sparkles size={14} /> Thread is listening</div>
-        <h2>Context from {isViewingToday ? 'today' : label.short}</h2>
-        <p className="context-copy">Links become living views without moving anything you wrote.</p>
-        <div className="context-stats">
-          <div><strong>{new Set(mentions.map((item) => item.threadId)).size}</strong><span>threads</span></div>
-          <div><strong>{mentions.filter((item) => item.kind === 'task' && !item.checked).length}</strong><span>open tasks</span></div>
-        </div>
-        <div className="context-list">
-          {Array.from(new Map(mentions.map((item) => [item.threadId, item])).values()).map((mention) => (
-            <a key={mention.threadId} href={`#/thread/${mention.threadId}`}>
-              <span className="thread-dot" />
-              <span><b>{mention.title}</b><small>{mention.excerpt}</small></span>
-              <Link2 size={14} />
-            </a>
-          ))}
-          {mentions.length === 0 && <p className="empty-hint">Type <code>[[a name]]</code> to start a thread.</p>}
-        </div>
-      </aside>
-    </div>
+      <div ref={bottomSentinelRef} className="day-load-sentinel" />
+    </article>
   )
 }
 

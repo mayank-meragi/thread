@@ -29,3 +29,8 @@ export function formatDay(date: string): { weekday: string; full: string; short:
     short: new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(value),
   }
 }
+
+export function formatShortDate(date: string): string {
+  const value = new Date(`${date}T12:00:00`)
+  return new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(value)
+}

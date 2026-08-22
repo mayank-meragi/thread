@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, BookOpenText, ChevronLeft, ChevronRight, Cloud, CloudOff, ListTodo, Plus, Search, Settings, Sparkle } from 'lucide-react'
+import { AlertTriangle, BookOpenText, Cloud, CloudOff, ListTodo, Plus, Search, Settings, Sparkle } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { HashRouter, Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import { db, initializeDatabase } from './db'
-import { isoToday } from './lib/dates'
+import { formatShortDate, isoToday } from './lib/dates'
 import { getGitHubConfig, pullDay, syncPending } from './lib/github'
+import { useThreadSummary } from './lib/threadSummary'
 import { TodayPage } from './pages/TodayPage'
 import { ThreadPage } from './pages/ThreadPage'
 import { SearchPage } from './pages/SearchPage'
@@ -22,8 +23,6 @@ const nav = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
-const SIDEBAR_STORAGE_KEY = 'thread.sidebar-collapsed'
-
 function AppShell() {
   const navigate = useNavigate()
   const { tabs, mountedIds, activeId } = useTabs()
@@ -35,10 +34,13 @@ function AppShell() {
   const [syncError, setSyncError] = useState<string | null>(null)
   const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false)
   const [commandOpen, setCommandOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true')
   const closeCommand = useCallback(() => setCommandOpen(false), [])
   const openTabSwitcher = useCallback(() => setTabSwitcherOpen(true), [])
   const closeTabSwitcher = useCallback(() => setTabSwitcherOpen(false), [])
+
+  const activeTab = tabs.find((tab) => tab.id === activeId)
+  const activeThreadId = activeTab?.path.match(/^\/thread\/([^/?]+)/)?.[1] ?? null
+  const { thread: activeThread, openTasks, decisionsCount, direction } = useThreadSummary(activeThreadId)
 
   const runSync = useCallback(() => {
     if (!getGitHubConfig()) return
@@ -150,73 +152,87 @@ function AppShell() {
     return () => window.removeEventListener('keydown', openGlobalActions)
   }, [navigate])
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed((current) => {
-      const next = !current
-      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next))
-      return next
-    })
-  }
-
   return (
-    <div className={`app-shell${sidebarCollapsed ? ' sidebar-is-collapsed' : ''}`}>
-      <aside className="sidebar" aria-label="Application sidebar">
-        <div className="sidebar-head">
-          <Link to="/" className="brand" aria-label="Thread, open Today"><span className="brand-mark"><Sparkle size={16} /></span><span>Thread</span></Link>
-          <button type="button" className="sidebar-toggle" aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!sidebarCollapsed} onClick={toggleSidebar}>
-            {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          </button>
-        </div>
-        <div className="sidebar-label destination-label">Destinations</div>
-        <nav className="main-nav" aria-label="Primary destinations">
+    <div className="app-shell">
+      <aside className="icon-rail" aria-label="Application navigation">
+        <Link to="/" className="rail-brand" aria-label="Thread, open Today"><Sparkle size={16} /></Link>
+        <nav className="rail-nav" aria-label="Primary destinations">
           {nav.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end} aria-label={label} title={sidebarCollapsed ? label : undefined} className={({ isActive }) => isActive ? 'active' : ''}>
-              <Icon size={17} /><span>{label}</span>
+            <NavLink key={to} to={to} end={end} aria-label={label} title={label} className={({ isActive }) => isActive ? 'active' : ''}>
+              <Icon size={18} />
             </NavLink>
           ))}
         </nav>
-        <div className="sidebar-section">
-          <div className="sidebar-label">Recent threads</div>
-          {threads.map((thread) => (
-            <NavLink className="thread-link" key={thread.id} to={`/thread/${thread.id}`} title={sidebarCollapsed ? thread.title : undefined} aria-label={thread.title}>
-              <span className="thread-dot" /> <span>{thread.title}</span>
-            </NavLink>
-          ))}
-        </div>
-        <div className="sidebar-foot">
-          <button type="button" className="sidebar-create" aria-label="Create or go" onClick={() => setCommandOpen(true)} aria-keyshortcuts="Meta+Shift+P Control+Shift+P">
-            <Plus size={16} /><span>Create or go</span><kbd>⌘⇧P</kbd>
+        <div className="rail-foot">
+          <button type="button" className="rail-create" aria-label="Create or go" title="Create or go (⌘⇧P)" onClick={() => setCommandOpen(true)} aria-keyshortcuts="Meta+Shift+P Control+Shift+P">
+            <Plus size={18} />
           </button>
-          <SyncStatus connected={connected} syncing={syncing} pending={pending} conflicts={conflicts} error={syncError} onSync={runSync} />
+          <RailSyncIndicator connected={connected} syncing={syncing} pending={pending} conflicts={conflicts} error={syncError} onSync={runSync} />
         </div>
       </aside>
 
-      <main className="main-content">
+      <header className="mobile-topbar">
+        <Link to="/" className="rail-brand" aria-label="Thread, open Today"><Sparkle size={16} /></Link>
+        <span className="mobile-topbar-date">{formatShortDate(isoToday())}</span>
+        <RailSyncIndicator connected={connected} syncing={syncing} pending={pending} conflicts={conflicts} error={syncError} onSync={runSync} />
+        <Link to="/search" className="mobile-topbar-search" aria-label="Search"><Search size={16} /></Link>
+      </header>
+
+      <div className="content-shell">
         <TabStrip />
-        {activeId ? mountedIds.map((id) => {
-          const tab = tabs.find((candidate) => candidate.id === id)
-          if (!tab) return null
-          return (
-            <div key={id} className="tab-panel" hidden={id !== activeId}>
-              <Routes location={tab.path}>
-                <Route path="/" element={<TodayPage />} />
-                <Route path="/thread/:threadId" element={<ThreadPage />} />
-                <Route path="/tasks" element={<TasksPage />} />
-                <Route path="/search" element={<SearchPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-              </Routes>
+        <div className="content-row">
+          <main className="main-content">
+            {activeId ? mountedIds.map((id) => {
+              const tab = tabs.find((candidate) => candidate.id === id)
+              if (!tab) return null
+              return (
+                <div key={id} className="tab-panel" hidden={id !== activeId}>
+                  <Routes location={tab.path}>
+                    <Route path="/" element={<TodayPage />} />
+                    <Route path="/thread/:threadId" element={<ThreadPage />} />
+                    <Route path="/tasks" element={<TasksPage />} />
+                    <Route path="/search" element={<SearchPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                  </Routes>
+                </div>
+              )
+            }) : (
+              <div className="destination-panel">
+                <Routes>
+                  <Route path="/tasks" element={<TasksPage />} />
+                  <Route path="/search" element={<SearchPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                </Routes>
+              </div>
+            )}
+          </main>
+
+          <aside className="right-rail" aria-label="Recent threads and current thread context">
+            <div className="right-rail-section">
+              <div className="sidebar-label">Recent threads</div>
+              <div className="right-rail-threads">
+                {threads.map((thread) => (
+                  <NavLink className="thread-link" key={thread.id} to={`/thread/${thread.id}`} aria-label={thread.title}>
+                    <span className="thread-dot" /> <span>{thread.title}</span>
+                  </NavLink>
+                ))}
+                {threads.length === 0 && <p className="empty-hint">Type <code>[[a name]]</code> to start a thread.</p>}
+              </div>
             </div>
-          )
-        }) : (
-          <div className="destination-panel">
-            <Routes>
-              <Route path="/tasks" element={<TasksPage />} />
-              <Route path="/search" element={<SearchPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-            </Routes>
-          </div>
-        )}
-      </main>
+            {activeThread && (
+              <div className="right-rail-section right-rail-current">
+                <div className="sidebar-label">This thread</div>
+                <h2>{activeThread.title}</h2>
+                {direction && <p className="context-copy">{direction}</p>}
+                <div className="context-stats">
+                  <div><strong>{openTasks}</strong><span>open tasks</span></div>
+                  <div><strong>{decisionsCount}</strong><span>decisions</span></div>
+                </div>
+              </div>
+            )}
+          </aside>
+        </div>
+      </div>
 
       <nav className="mobile-nav" aria-label="Mobile primary destinations">
         <NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}><BookOpenText size={19} /><span>Today</span></NavLink>
@@ -240,7 +256,7 @@ function AppShell() {
   )
 }
 
-function SyncStatus({
+function RailSyncIndicator({
   connected,
   syncing,
   pending,
@@ -256,19 +272,19 @@ function SyncStatus({
   onSync: () => void
 }) {
   if (!connected) {
-    return <Link to="/settings?focus=sync" className="sync-state" aria-label="Local only. Notes are saved on this device. Connect GitHub sync."><CloudOff size={16} /><span><strong>Local only</strong><small>Saved on this device</small></span><em>Connect</em></Link>
+    return <Link to="/settings?focus=sync" className="rail-sync" aria-label="Local only. Notes are saved on this device. Connect GitHub sync." title="Local only"><CloudOff size={16} /></Link>
   }
   if (conflicts > 0 || error) {
     const detail = conflicts > 0 ? `${conflicts} ${conflicts === 1 ? 'conflict' : 'conflicts'} to resolve` : 'Sync could not finish'
-    return <Link to="/settings?focus=sync" className="sync-state sync-state-alert" aria-label={`Needs attention. ${detail}. Open sync settings.`}><AlertTriangle size={16} /><span><strong>Needs attention</strong><small>{detail}</small></span><em>Review</em></Link>
+    return <Link to="/settings?focus=sync" className="rail-sync rail-sync-alert" aria-label={`Needs attention. ${detail}. Open sync settings.`} title="Needs attention"><AlertTriangle size={16} /></Link>
   }
   if (syncing) {
-    return <div className="sync-state sync-state-busy" role="status" aria-live="polite"><Cloud size={16} /><span><strong>Syncing</strong><small>Sending local changes</small></span></div>
+    return <div className="rail-sync rail-sync-busy" role="status" aria-live="polite" title="Syncing" aria-label="Syncing"><Cloud size={16} /></div>
   }
   if (pending > 0) {
-    return <button type="button" className="sync-state sync-state-pending" onClick={onSync} aria-label={`Pending. ${pending} ${pending === 1 ? 'change' : 'changes'} waiting. Sync now.`}><Cloud size={16} /><span><strong>Pending</strong><small>{pending} {pending === 1 ? 'change' : 'changes'} waiting</small></span><em>Sync now</em></button>
+    return <button type="button" className="rail-sync rail-sync-pending" onClick={onSync} aria-label={`Pending. ${pending} ${pending === 1 ? 'change' : 'changes'} waiting. Sync now.`} title="Pending changes"><Cloud size={16} /></button>
   }
-  return <Link to="/settings?focus=sync" className="sync-state" aria-label="Up to date. Local changes are backed up to GitHub. Open sync settings."><Cloud size={16} /><span><strong>Up to date</strong><small>Backed up to GitHub</small></span></Link>
+  return <Link to="/settings?focus=sync" className="rail-sync" aria-label="Up to date. Local changes are backed up to GitHub. Open sync settings." title="Up to date"><Cloud size={16} /></Link>
 }
 
 export default function App() {
