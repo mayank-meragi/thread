@@ -8,14 +8,19 @@ describe('working tab routes', () => {
     expect(isWorkingPath('/thread/browser')).toBe(true)
   })
 
-  it('keeps primary destinations out of working tabs', () => {
-    expect(isWorkingPath('/tasks')).toBe(false)
-    expect(isWorkingPath('/search?q=browser')).toBe(false)
-    expect(isWorkingPath('/settings')).toBe(false)
+  it('treats the primary destinations as working tabs too', () => {
+    expect(isWorkingPath('/tasks')).toBe(true)
+    expect(isWorkingPath('/search?q=browser')).toBe(true)
+    expect(isWorkingPath('/settings')).toBe(true)
   })
 
-  it('uses one Today tab and one tab per thread', () => {
+  it('rejects paths outside the known routes', () => {
+    expect(isWorkingPath('/unknown')).toBe(false)
+  })
+
+  it('uses one Today tab and one tab per thread or destination', () => {
     expect(tabIdForPath('/?date=2026-08-20')).toBe(TODAY_TAB_ID)
     expect(tabIdForPath('/thread/browser?block=one')).toBe('/thread/browser')
+    expect(tabIdForPath('/settings?focus=sync')).toBe('/settings')
   })
 })
