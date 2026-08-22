@@ -87,7 +87,7 @@ export function TasksPage() {
         <div className="tasks-hero-mark"><ListTodo size={23} /><span>{counts.active}</span><small>active</small></div>
       </header>
 
-      <QuickAdd />
+      <QuickAdd autoFocus={params.get('create') === '1'} />
 
       <div className="task-vitals" aria-label="Task summary">
         <div><span>{counts.inProgress}</span><small>in progress</small></div>
@@ -138,7 +138,7 @@ export function TasksPage() {
   )
 }
 
-function QuickAdd() {
+function QuickAdd({ autoFocus = false }: { autoFocus?: boolean }) {
   const [text, setText] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [priority, setPriority] = useState<TaskPriority | ''>('')
@@ -150,7 +150,7 @@ function QuickAdd() {
     void createTask({ text, dueDate: dueDate || undefined, priority: priority || undefined }).then(() => { setText(''); setDueDate(''); setPriority('') }).finally(() => setBusy(false))
   }}>
     <Plus size={18} />
-    <input className="task-quick-title" value={text} onChange={(event) => setText(event.target.value)} placeholder="Add a task to today’s journal" aria-label="New task title" />
+    <input autoFocus={autoFocus} className="task-quick-title" value={text} onChange={(event) => setText(event.target.value)} placeholder="Add a task to today’s journal" aria-label="New task title" />
     <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} aria-label="New task due date" />
     <select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority | '')} aria-label="New task priority"><option value="">Priority</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
     <button type="submit" disabled={!text.trim() || busy}>{busy ? 'Adding…' : 'Add task'}</button>

@@ -38,9 +38,10 @@ interface MarkdownEditorProps {
   onReady?: () => void
   ariaLabel?: string
   loadingLabel?: string
+  autoFocus?: boolean
 }
 
-export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel = 'Daily journal editor', loadingLabel = 'Opening today’s page…' }: MarkdownEditorProps) {
+export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel = 'Daily journal editor', loadingLabel = 'Opening today’s page…', autoFocus = false }: MarkdownEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
   const onReadyRef = useRef(onReady)
@@ -56,6 +57,11 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
   useEffect(() => {
     onReadyRef.current = onReady
   }, [onReady])
+
+  useEffect(() => {
+    if (!ready || !autoFocus) return
+    rootRef.current?.querySelector<HTMLElement>('.ProseMirror')?.focus()
+  }, [autoFocus, ready])
 
   useEffect(() => {
     const root = rootRef.current

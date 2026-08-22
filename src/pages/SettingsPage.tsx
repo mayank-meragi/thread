@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Check, GitBranch, LoaderCircle, Palette, ShieldCheck, Unplug } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { useSearchParams } from 'react-router-dom'
 import { db } from '../db'
 import { isoToday } from '../lib/dates'
 import {
@@ -17,6 +18,9 @@ import { applyTheme, getTheme, themes, type ThemeId } from '../lib/theme'
 import { MetadataSchemas } from '../components/MetadataSchemas'
 
 export function SettingsPage() {
+  const [searchParams] = useSearchParams()
+  const focusSync = searchParams.get('focus') === 'sync'
+  const syncHeadingRef = useRef<HTMLHeadingElement>(null)
   const existing = getGitHubConfig()
   const [repo, setRepo] = useState(existing?.repo ?? '')
   const [branch, setBranch] = useState(existing?.branch ?? 'main')
@@ -53,6 +57,12 @@ export function SettingsPage() {
     const timer = window.setTimeout(() => setState('idle'), 1800)
     return () => window.clearTimeout(timer)
   }, [state])
+
+  useEffect(() => {
+    if (!focusSync) return
+    syncHeadingRef.current?.scrollIntoView({ block: 'start' })
+    syncHeadingRef.current?.focus({ preventScroll: true })
+  }, [focusSync])
 
   async function connect() {
     setError('')
@@ -171,8 +181,8 @@ export function SettingsPage() {
         </div>
       </section>
 
-      <section className="settings-card">
-        <div className="settings-title"><GitBranch size={20} /><div><h2>GitHub sync</h2><p>Thread works locally first. Connect a private repository for backup and multi-device sync.</p></div></div>
+      <section className="settings-card" id="sync-settings">
+        <div className="settings-title"><GitBranch size={20} /><div><h2 ref={syncHeadingRef} tabIndex={-1}>GitHub sync</h2><p>Thread works locally first. Connect a private repository for backup and multi-device sync.</p></div></div>
         <div className="field-grid">
           <label><span>Data repository</span><input value={repo} onChange={(event) => setRepo(event.target.value)} placeholder="you/thread-data" /></label>
           <label><span>Branch</span><input value={branch} onChange={(event) => setBranch(event.target.value)} /></label>

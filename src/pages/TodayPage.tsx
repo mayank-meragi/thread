@@ -16,6 +16,7 @@ export function TodayPage() {
   const [searchParams] = useSearchParams()
   const paramDate = searchParams.get('date')
   const paramBlock = searchParams.get('block')
+  const captureRequested = searchParams.get('capture') === '1'
   const blockTargetDate = paramDate || isoToday()
 
   const [dates, setDates] = useState<string[]>(() => {
@@ -222,6 +223,7 @@ export function TodayPage() {
               onActive={setActiveDate}
               onChange={handleSaveChange}
               paramBlock={date === blockTargetDate ? paramBlock : null}
+              captureRequested={captureRequested}
             />
           ))}
         </div>
@@ -259,9 +261,10 @@ interface DaySectionProps {
   onActive: (date: string) => void
   onChange: (date: string, markdown: string) => void
   paramBlock: string | null
+  captureRequested: boolean
 }
 
-function DaySection({ date, isToday, registerSection, onActive, onChange, paramBlock }: DaySectionProps) {
+function DaySection({ date, isToday, registerSection, onActive, onChange, paramBlock, captureRequested }: DaySectionProps) {
   const day = useLiveQuery(() => db.days.get(date), [date])
   const editorWrapRef = useRef<HTMLDivElement>(null)
   const [hasBeenVisible, setHasBeenVisible] = useState(false)
@@ -334,7 +337,7 @@ function DaySection({ date, isToday, registerSection, onActive, onChange, paramB
       </header>
 
       <div ref={editorWrapRef}>
-        <MarkdownEditor key={date} day={date} initialValue={day.markdown} onChange={handleChange} onReady={jumpToBlock} />
+        <MarkdownEditor key={date} day={date} initialValue={day.markdown} onChange={handleChange} onReady={jumpToBlock} autoFocus={isToday && captureRequested} />
       </div>
 
       {isToday && <TodayTasks today={date} />}

@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
-import { TODAY_TAB_ID, type Tab } from '../lib/tabs'
+import type { Tab } from '../lib/tabs'
+import { TODAY_TAB_ID } from '../lib/tabsModel'
 
 export function TabLabel({ tab }: { tab: Tab }) {
   const pathname = tab.path.split('?')[0] || '/'

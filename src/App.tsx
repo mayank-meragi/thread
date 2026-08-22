@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, BookOpenText, Cloud, CloudOff, Layers, ListTodo, Search, Settings, Sparkle } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AlertTriangle, BookOpenText, ChevronLeft, ChevronRight, Cloud, CloudOff, ListTodo, Plus, Search, Settings, Sparkle } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { HashRouter, Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import { db, initializeDatabase } from './db'
@@ -12,6 +12,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { TasksPage } from './pages/TasksPage'
 import { TabStrip } from './components/TabStrip'
 import { MobileTabSwitcher } from './components/MobileTabSwitcher'
+import { GlobalCommandMenu } from './components/GlobalCommandMenu'
 import { TabsProvider, useTabs } from './lib/tabs'
 
 const nav = [
@@ -20,6 +21,8 @@ const nav = [
   { to: '/search', label: 'Search', icon: Search },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
+
+const SIDEBAR_STORAGE_KEY = 'thread.sidebar-collapsed'
 
 function AppShell() {
   const navigate = useNavigate()
@@ -31,6 +34,20 @@ function AppShell() {
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false)
+  const [commandOpen, setCommandOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true')
+  const closeCommand = useCallback(() => setCommandOpen(false), [])
+  const openTabSwitcher = useCallback(() => setTabSwitcherOpen(true), [])
+  const closeTabSwitcher = useCallback(() => setTabSwitcherOpen(false), [])
+
+  const runSync = useCallback(() => {
+    if (!getGitHubConfig()) return
+    setSyncing(true)
+    void syncPending()
+      .then(() => setSyncError(null))
+      .catch((error) => setSyncError(error instanceof Error ? error.message : String(error)))
+      .finally(() => setSyncing(false))
+  }, [])
 
   useEffect(() => {
     const refresh = () => setConnected(Boolean(getGitHubConfig()))
@@ -54,13 +71,6 @@ function AppShell() {
   useEffect(() => {
     if (!connected) return
     let timer: number | null = null
-    const runSync = () => {
-      setSyncing(true)
-      void syncPending()
-        .then(() => setSyncError(null))
-        .catch((error) => setSyncError(error instanceof Error ? error.message : String(error)))
-        .finally(() => setSyncing(false))
-    }
     // Debounced off the last local write, not off the outbox's item *count*.
     // A day's outbox entry is upserted under one fixed key, so its count
     // doesn't change across a typing burst -- keying the debounce to a value
@@ -79,7 +89,7 @@ function AppShell() {
       window.removeEventListener('thread:local-write', scheduleSync)
       if (timer) window.clearTimeout(timer)
     }
-  }, [connected])
+  }, [connected, runSync])
 
   useEffect(() => {
     const flush = () => {
@@ -126,23 +136,41 @@ function AppShell() {
   }, [connected])
 
   useEffect(() => {
-    const openSearch = (event: KeyboardEvent) => {
+    const openGlobalActions = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'k') {
         event.preventDefault()
         navigate('/search')
       }
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLocaleLowerCase() === 'p') {
+        event.preventDefault()
+        setCommandOpen(true)
+      }
     }
-    window.addEventListener('keydown', openSearch)
-    return () => window.removeEventListener('keydown', openSearch)
+    window.addEventListener('keydown', openGlobalActions)
+    return () => window.removeEventListener('keydown', openGlobalActions)
   }, [navigate])
 
+  const toggleSidebar = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next))
+      return next
+    })
+  }
+
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <Link to="/" className="brand"><span className="brand-mark"><Sparkle size={16} /></span><span>Thread</span></Link>
-        <nav className="main-nav">
+    <div className={`app-shell${sidebarCollapsed ? ' sidebar-is-collapsed' : ''}`}>
+      <aside className="sidebar" aria-label="Application sidebar">
+        <div className="sidebar-head">
+          <Link to="/" className="brand" aria-label="Thread, open Today"><span className="brand-mark"><Sparkle size={16} /></span><span>Thread</span></Link>
+          <button type="button" className="sidebar-toggle" aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!sidebarCollapsed} onClick={toggleSidebar}>
+            {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+        </div>
+        <div className="sidebar-label destination-label">Destinations</div>
+        <nav className="main-nav" aria-label="Primary destinations">
           {nav.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end} className={({ isActive }) => isActive ? 'active' : ''}>
+            <NavLink key={to} to={to} end={end} aria-label={label} title={sidebarCollapsed ? label : undefined} className={({ isActive }) => isActive ? 'active' : ''}>
               <Icon size={17} /><span>{label}</span>
             </NavLink>
           ))}
@@ -150,38 +178,22 @@ function AppShell() {
         <div className="sidebar-section">
           <div className="sidebar-label">Recent threads</div>
           {threads.map((thread) => (
-            <NavLink className="thread-link" key={thread.id} to={`/thread/${thread.id}`}>
+            <NavLink className="thread-link" key={thread.id} to={`/thread/${thread.id}`} title={sidebarCollapsed ? thread.title : undefined} aria-label={thread.title}>
               <span className="thread-dot" /> <span>{thread.title}</span>
             </NavLink>
           ))}
         </div>
         <div className="sidebar-foot">
-          <Link to="/settings" className={`sync-state${conflicts > 0 || syncError ? ' sync-state-alert' : ''}`}>
-            {!connected
-              ? <CloudOff size={15} />
-              : conflicts > 0 || syncError
-                ? <AlertTriangle size={15} />
-                : <Cloud size={15} />}
-            <span>
-              {syncing
-                ? 'Syncing…'
-                : !connected
-                  ? 'Local only'
-                  : conflicts > 0
-                    ? `${conflicts} need${conflicts === 1 ? 's' : ''} attention`
-                    : syncError
-                      ? 'Sync error'
-                      : pending
-                        ? `${pending} pending`
-                        : 'Up to date'}
-            </span>
-          </Link>
+          <button type="button" className="sidebar-create" aria-label="Create or go" onClick={() => setCommandOpen(true)} aria-keyshortcuts="Meta+Shift+P Control+Shift+P">
+            <Plus size={16} /><span>Create or go</span><kbd>⌘⇧P</kbd>
+          </button>
+          <SyncStatus connected={connected} syncing={syncing} pending={pending} conflicts={conflicts} error={syncError} onSync={runSync} />
         </div>
       </aside>
 
       <main className="main-content">
         <TabStrip />
-        {mountedIds.map((id) => {
+        {activeId ? mountedIds.map((id) => {
           const tab = tabs.find((candidate) => candidate.id === id)
           if (!tab) return null
           return (
@@ -195,28 +207,68 @@ function AppShell() {
               </Routes>
             </div>
           )
-        })}
+        }) : (
+          <div className="destination-panel">
+            <Routes>
+              <Route path="/tasks" element={<TasksPage />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Routes>
+          </div>
+        )}
       </main>
 
-      <nav className="mobile-nav">
-        {nav.map(({ to, label, icon: Icon, end }) => (
-          <NavLink key={to} to={to} end={end} className={({ isActive }) => isActive ? 'active' : ''}>
-            <Icon size={19} /><span>{label}</span>
-          </NavLink>
-        ))}
+      <nav className="mobile-nav" aria-label="Mobile primary destinations">
+        <NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}><BookOpenText size={19} /><span>Today</span></NavLink>
+        <NavLink to="/tasks" className={({ isActive }) => isActive ? 'active' : ''}><ListTodo size={19} /><span>Tasks</span></NavLink>
         <button
           type="button"
-          className={tabSwitcherOpen ? 'active' : ''}
-          aria-label="Open tabs"
-          onClick={() => setTabSwitcherOpen(true)}
+          className="mobile-create"
+          aria-label="Create or go"
+          aria-keyshortcuts="Meta+Shift+P Control+Shift+P"
+          onClick={() => setCommandOpen(true)}
         >
-          <Layers size={19} /><span>{tabs.length > 1 ? `Tabs (${tabs.length})` : 'Tabs'}</span>
+          <span className="mobile-create-mark"><Plus size={19} /></span><span>Create</span>
         </button>
+        <NavLink to="/search" className={({ isActive }) => isActive ? 'active' : ''}><Search size={19} /><span>Search</span></NavLink>
+        <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''}><Settings size={19} /><span>Settings</span></NavLink>
       </nav>
 
-      <MobileTabSwitcher open={tabSwitcherOpen} onClose={() => setTabSwitcherOpen(false)} />
+      <GlobalCommandMenu open={commandOpen} tabCount={tabs.length} onClose={closeCommand} onOpenTabs={openTabSwitcher} />
+      <MobileTabSwitcher open={tabSwitcherOpen} onClose={closeTabSwitcher} />
     </div>
   )
+}
+
+function SyncStatus({
+  connected,
+  syncing,
+  pending,
+  conflicts,
+  error,
+  onSync,
+}: {
+  connected: boolean
+  syncing: boolean
+  pending: number
+  conflicts: number
+  error: string | null
+  onSync: () => void
+}) {
+  if (!connected) {
+    return <Link to="/settings?focus=sync" className="sync-state" aria-label="Local only. Notes are saved on this device. Connect GitHub sync."><CloudOff size={16} /><span><strong>Local only</strong><small>Saved on this device</small></span><em>Connect</em></Link>
+  }
+  if (conflicts > 0 || error) {
+    const detail = conflicts > 0 ? `${conflicts} ${conflicts === 1 ? 'conflict' : 'conflicts'} to resolve` : 'Sync could not finish'
+    return <Link to="/settings?focus=sync" className="sync-state sync-state-alert" aria-label={`Needs attention. ${detail}. Open sync settings.`}><AlertTriangle size={16} /><span><strong>Needs attention</strong><small>{detail}</small></span><em>Review</em></Link>
+  }
+  if (syncing) {
+    return <div className="sync-state sync-state-busy" role="status" aria-live="polite"><Cloud size={16} /><span><strong>Syncing</strong><small>Sending local changes</small></span></div>
+  }
+  if (pending > 0) {
+    return <button type="button" className="sync-state sync-state-pending" onClick={onSync} aria-label={`Pending. ${pending} ${pending === 1 ? 'change' : 'changes'} waiting. Sync now.`}><Cloud size={16} /><span><strong>Pending</strong><small>{pending} {pending === 1 ? 'change' : 'changes'} waiting</small></span><em>Sync now</em></button>
+  }
+  return <Link to="/settings?focus=sync" className="sync-state" aria-label="Up to date. Local changes are backed up to GitHub. Open sync settings."><Cloud size={16} /><span><strong>Up to date</strong><small>Backed up to GitHub</small></span></Link>
 }
 
 export default function App() {

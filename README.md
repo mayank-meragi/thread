@@ -31,4 +31,8 @@ npm run lint
 npm run build
 ```
 
+Product workflows, measurable UX budgets, and release criteria are documented in
+[`docs/ux-foundation.md`](docs/ux-foundation.md) and
+[`docs/ux-regression-checklist.md`](docs/ux-regression-checklist.md).
+
 Pushing `main` deploys the production build through the GitHub Pages workflow.

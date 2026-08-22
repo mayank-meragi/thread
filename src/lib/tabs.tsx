@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { isWorkingPath, tabIdForPath, TODAY_TAB_ID } from './tabsModel'
 
 export interface Tab {
   id: string
@@ -19,17 +20,9 @@ interface TabsContextValue {
 const TabsContext = createContext<TabsContextValue | null>(null)
 
 const MAX_MOUNTED = 6
-export const TODAY_TAB_ID = 'today'
-
-// One tab per distinct page -- except Today, which is a singleton (the app
-// only ever has one "current day" view; jumping to a different day's source
-// line updates that one tab's remembered path instead of spawning another).
-function tabIdForPath(path: string): string {
-  const pathname = path.split('?')[0] || '/'
-  return pathname === '/' ? TODAY_TAB_ID : pathname
-}
 
 function makeInitialTabs(initialPath: string): Tab[] {
+  if (!isWorkingPath(initialPath)) return [{ id: TODAY_TAB_ID, path: '/', closable: false }]
   const id = tabIdForPath(initialPath)
   const today: Tab = { id: TODAY_TAB_ID, path: id === TODAY_TAB_ID ? initialPath : '/', closable: false }
   if (id === TODAY_TAB_ID) return [today]
@@ -41,7 +34,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const currentPath = `${location.pathname}${location.search}`
   const [tabs, setTabs] = useState<Tab[]>(() => makeInitialTabs(currentPath))
-  const [activeId, setActiveId] = useState(() => tabIdForPath(currentPath))
+  const [activeId, setActiveId] = useState(() => isWorkingPath(currentPath) ? tabIdForPath(currentPath) : '')
   const [mountedIds, setMountedIds] = useState<string[]>(() => makeInitialTabs(currentPath).map((tab) => tab.id))
   const [syncedPath, setSyncedPath] = useState(currentPath)
   const tabsRef = useRef(tabs)
@@ -57,23 +50,31 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   // extra cascading-render pass: https://react.dev/learn/you-might-not-need-an-effect
   if (currentPath !== syncedPath) {
     setSyncedPath(currentPath)
-    const id = tabIdForPath(currentPath)
-    setTabs((prev) => {
-      const existing = prev.find((tab) => tab.id === id)
-      if (existing) {
-        if (existing.path === currentPath) return prev
-        return prev.map((tab) => (tab.id === id ? { ...tab, path: currentPath } : tab))
-      }
-      return [...prev, { id, path: currentPath, closable: id !== TODAY_TAB_ID }]
-    })
-    setActiveId(id)
-    setMountedIds((prev) => {
-      const next = [...prev.filter((existingId) => existingId !== id), id]
-      return next.length > MAX_MOUNTED ? next.slice(next.length - MAX_MOUNTED) : next
-    })
+    if (!isWorkingPath(currentPath)) {
+      setActiveId('')
+    } else {
+      const id = tabIdForPath(currentPath)
+      setTabs((prev) => {
+        const existing = prev.find((tab) => tab.id === id)
+        if (existing) {
+          if (existing.path === currentPath) return prev
+          return prev.map((tab) => (tab.id === id ? { ...tab, path: currentPath } : tab))
+        }
+        return [...prev, { id, path: currentPath, closable: id !== TODAY_TAB_ID }]
+      })
+      setActiveId(id)
+      setMountedIds((prev) => {
+        const next = [...prev.filter((existingId) => existingId !== id), id]
+        return next.length > MAX_MOUNTED ? next.slice(next.length - MAX_MOUNTED) : next
+      })
+    }
   }
 
   const openTab = useCallback((path: string, options?: { background?: boolean }) => {
+    if (!isWorkingPath(path)) {
+      if (!options?.background) navigate(path)
+      return
+    }
     const id = tabIdForPath(path)
     if (!options?.background) {
       navigate(path)
