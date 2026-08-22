@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { db, toggleChecklistBlock, toggleTaskByBlockId, type ThreadOccurrenceRecord, type ViewStateRecord } from '../db'
 import { formatDay } from '../lib/dates'
-import { useTabs } from '../lib/tabs'
+import { useOpenTab } from '../lib/tabsApi'
 import type { OutlineBlock } from '../lib/outline'
 import { ThreadComposer } from '../components/ThreadComposer'
 import { BlockInspector } from '../components/BlockInspector'
@@ -152,7 +152,7 @@ function ThreadOccurrence({
   onInspect: (blockId: string) => void
 }) {
   const navigate = useNavigate()
-  const { openTab } = useTabs()
+  const openTab = useOpenTab()
   const children = new Map<string | null, OutlineBlock[]>()
   const ids = new Set(blocks.map((block) => block.id))
   blocks.forEach((block) => {

@@ -1,15 +1,13 @@
 import { useEffect, useRef } from 'react'
-import { BookOpenText, Layers, ListPlus, Search, X } from 'lucide-react'
+import { BookOpenText, ListPlus, Search, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 interface GlobalCommandMenuProps {
   open: boolean
-  tabCount: number
   onClose: () => void
-  onOpenTabs: () => void
 }
 
-export function GlobalCommandMenu({ open, tabCount, onClose, onOpenTabs }: GlobalCommandMenuProps) {
+export function GlobalCommandMenu({ open, onClose }: GlobalCommandMenuProps) {
   const navigate = useNavigate()
   const firstActionRef = useRef<HTMLButtonElement>(null)
   const sheetRef = useRef<HTMLElement>(null)
@@ -60,10 +58,6 @@ export function GlobalCommandMenu({ open, tabCount, onClose, onOpenTabs }: Globa
           <button type="button" onClick={() => go('/search')}>
             <span className="command-icon"><Search size={18} /></span>
             <span><strong>Find anything</strong><small>Search notes and threads</small></span>
-          </button>
-          <button type="button" onClick={() => { onClose(); onOpenTabs() }}>
-            <span className="command-icon"><Layers size={18} /></span>
-            <span><strong>Working tabs</strong><small>Switch or close {tabCount} open {tabCount === 1 ? 'tab' : 'tabs'}</small></span>
           </button>
         </div>
         <footer><kbd>⌘ ⇧ P</kbd><span>opens this menu</span></footer>

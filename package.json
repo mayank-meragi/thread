@@ -20,6 +20,8 @@
     "chrono-node": "^2.10.1",
     "dexie": "latest",
     "dexie-react-hooks": "latest",
+    "dockview": "^8.2.0",
+    "dockview-react": "^8.2.0",
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",

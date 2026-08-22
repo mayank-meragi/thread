@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap');
+@import 'dockview-react/dist/styles/dockview.css';
 
 :root {
   font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
@@ -199,31 +200,32 @@ a { color: inherit; text-decoration: none; }
 .rail-sync-pending { color: var(--thread); }
 .rail-sync-busy { cursor: progress; }
 .mobile-topbar { display: none; }
-/* The tab bar and the center/right panes are each their own bounded, rounded
-   "frame" floating on the canvas background -- only .icon-rail is flush with
-   the viewport edge. .content-shell owns the outer gutter and is the single
-   fixed-height flex column both frames live in, so neither has to know about
-   the other's size to stay aligned. */
+/* The tabbed area (dockview) and the right rail are each their own bounded,
+   rounded "frame" floating on the canvas background -- only .icon-rail is
+   flush with the viewport edge. .content-shell owns the outer gutter and is
+   the single fixed-height flex column both frames live in, so neither has to
+   know about the other's size to stay aligned. Dockview owns its own tab bar
+   + panel body as one flush-topped unit (rounded only at the bottom, so the
+   tab row still touches the very top edge); .tab-chip* below reskins its
+   per-tab renderer to match the app's look instead of dockview's default. */
 .content-shell { flex: 1 1 auto; min-width: 0; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
-.tab-strip-shell { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-bottom: 1px solid var(--line); overflow: hidden; }
-.tab-strip-label { flex: 0 0 auto; color: var(--muted); font: 500 8px/1 'IBM Plex Mono', monospace; letter-spacing: .1em; text-transform: uppercase; }
-.tab-strip { min-width: 0; display: flex; gap: 4px; overflow-x: auto; }
+.content-row { flex: 1 1 auto; min-height: 0; display: flex; gap: 14px; padding: 0 14px 14px; }
+.dockview-shell { flex: 1 1 auto; min-width: 0; min-height: 0; border-radius: 0 0 14px 14px; overflow: hidden; box-shadow: var(--shadow-soft); }
+.dockview-shell .dv-tabs-and-actions-container { background: var(--paper); border-bottom: 1px solid var(--line); padding: 0 16px; }
+.dockview-shell .dv-tab { padding: 0; margin: 6px 0; }
+.dockview-shell .dv-groupview, .dockview-shell .dv-content-container { background: var(--paper); }
 .tab-chip {
-  max-width: 200px; display: flex; align-items: center; border-radius: 9px; background: transparent; color: var(--muted); white-space: nowrap;
+  max-width: 200px; height: 100%; display: flex; align-items: center; border-radius: 9px; background: transparent; color: var(--muted); white-space: nowrap;
 }
 .tab-chip:hover { background: var(--control-hover); color: var(--ink); }
 .tab-chip.active { background: var(--control); color: var(--ink); }
-.tab-chip-main { min-width: 0; flex: 1; padding: 7px 5px 7px 12px; border: 0; background: transparent; color: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
+.tab-chip-main { min-width: 0; flex: 1; height: 100%; padding: 0 5px 0 12px; border: 0; background: transparent; color: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
 .tab-chip-label { overflow: hidden; text-overflow: ellipsis; }
 .tab-chip-close { width: 22px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
 .tab-chip-close:hover { background: var(--control-hover); color: var(--ink); }
-.content-row { flex: 1 1 auto; min-height: 0; display: flex; gap: 14px; padding: 14px; }
-.main-content { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; border-radius: 14px; background: var(--paper); box-shadow: var(--shadow-soft); }
-.tab-panel { height: 100%; }
-.tab-panel[hidden] { display: none; }
 .right-rail {
   flex: 0 0 280px; min-height: 0; overflow-y: auto; padding: 24px;
-  border-radius: 14px; background: var(--paper); box-shadow: var(--shadow-soft);
+  border-radius: 0 0 14px 14px; background: var(--paper); box-shadow: var(--shadow-soft);
 }
 .right-rail-section + .right-rail-section { margin-top: 32px; padding-top: 28px; border-top: 1px solid var(--line); }
 .right-rail-threads { display: grid; gap: 5px; margin-top: 8px; }
@@ -246,23 +248,6 @@ a { color: inherit; text-decoration: none; }
 .command-actions small { color: var(--muted); font-size: 10px; }
 .command-sheet > footer { display: flex; align-items: center; justify-content: flex-end; gap: 7px; margin-top: 15px; padding-top: 12px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 9px; }
 .command-sheet > footer kbd { padding: 3px 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--control); font: 500 8px 'IBM Plex Mono', monospace; }
-
-.tab-switcher-overlay {
-  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
-  padding: max(16px, env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
-  background: var(--canvas);
-}
-.tab-switcher-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
-.tab-switcher-header h2 { margin: 7px 0 3px; font: 500 27px/1 'Newsreader', serif; }
-.tab-switcher-header small { color: var(--muted); font-size: 10px; }
-.tab-switcher-done { padding: 8px 14px; border: 0; border-radius: 10px; background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 600; box-shadow: var(--shadow-soft); }
-.tab-switcher-grid { display: grid; grid-template-columns: 1fr; gap: 10px; overflow-y: auto; }
-.tab-switcher-card { position: relative; display: flex; align-items: center; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); box-shadow: var(--shadow-soft); }
-.tab-switcher-card.active { border-color: var(--thread); }
-.tab-switcher-card-body { flex: 1; min-width: 0; padding: 16px 44px 16px 16px; border: 0; background: transparent; color: var(--ink); font-size: 14px; font-weight: 500; text-align: left; }
-.tab-switcher-card-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tab-switcher-card-close { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 8px; color: var(--muted); }
-.tab-switcher-card-close:hover { background: var(--control-hover); color: var(--ink); }
 
 .link-context-backdrop { position: fixed; inset: 0; z-index: 60; }
 .link-context-menu {
@@ -897,13 +882,13 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 }
 
 @media (max-width: 760px) {
-  .app-shell { flex-direction: column; }
+  .app-shell { flex-direction: column; height: 100dvh; min-height: 0; }
   .icon-rail, .right-rail { display: none; }
-  .content-shell { height: auto; }
-  .content-row { display: block; padding: 0; }
-  .main-content { overflow: visible; min-height: 0; border-radius: 0; box-shadow: none; background: transparent; }
-  .tab-panel { height: auto; }
-  .tab-strip-shell { position: sticky; top: calc(48px + env(safe-area-inset-top)); z-index: 10; border-radius: 0; box-shadow: none; padding: 12px 16px 0; background: var(--canvas); }
+  .content-row { padding: 0; gap: 0; }
+  .dockview-shell { border-radius: 0; box-shadow: none; }
+  .dockview-shell .dv-tabs-and-actions-container,
+  .dockview-shell .dv-groupview,
+  .dockview-shell .dv-content-container { background: transparent; }
   .mobile-topbar {
     display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 15;
     min-height: 48px; padding: env(safe-area-inset-top) 16px 0; background: var(--canvas); border-bottom: 1px solid var(--line);
@@ -913,7 +898,6 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .mobile-topbar .rail-sync { width: 32px; height: 32px; }
   .mobile-topbar-search { width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 8px; color: var(--muted); }
   .mobile-topbar-search:hover { background: var(--control-hover); color: var(--ink); }
-  .day-toolbar { top: calc(98px + env(safe-area-inset-top)); }
   .mobile-nav { position: fixed; z-index: 20; inset: auto 16px calc(10px + env(safe-area-inset-bottom)) 16px; display: grid; grid-template-columns: repeat(5, 1fr); padding: 5px; border: 1px solid var(--glass-border); border-radius: 16px; background: var(--nav-glass); box-shadow: var(--shadow); backdrop-filter: blur(18px); }
   .mobile-nav a, .mobile-nav button { min-height: 47px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 0; border-radius: 11px; background: transparent; color: var(--muted); font-size: 9px; cursor: pointer; }
   .mobile-nav a.active, .mobile-nav button.active { color: var(--ink); background: var(--paper); box-shadow: var(--shadow-soft); }

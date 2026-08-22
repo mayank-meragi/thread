@@ -1,20 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, BookOpenText, Cloud, CloudOff, ListTodo, Plus, Search, Settings, Sparkle } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { HashRouter, Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
+import { HashRouter, Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { db, initializeDatabase } from './db'
 import { formatShortDate, isoToday } from './lib/dates'
 import { getGitHubConfig, pullDay, syncPending } from './lib/github'
 import { useThreadSummary } from './lib/threadSummary'
-import { TodayPage } from './pages/TodayPage'
-import { ThreadPage } from './pages/ThreadPage'
-import { SearchPage } from './pages/SearchPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { TasksPage } from './pages/TasksPage'
-import { TabStrip } from './components/TabStrip'
-import { MobileTabSwitcher } from './components/MobileTabSwitcher'
+import { DockviewTabs } from './components/tabs/DockviewTabs'
 import { GlobalCommandMenu } from './components/GlobalCommandMenu'
-import { TabsProvider, useTabs } from './lib/tabs'
 
 const nav = [
   { to: '/', label: 'Today', icon: BookOpenText, end: true },
@@ -25,21 +18,17 @@ const nav = [
 
 function AppShell() {
   const navigate = useNavigate()
-  const { tabs, mountedIds, activeId } = useTabs()
+  const location = useLocation()
   const threads = useLiveQuery(() => db.threads.orderBy('updatedAt').reverse().limit(7).toArray(), [], [])
   const pending = useLiveQuery(() => db.outbox.count(), [], 0)
   const conflicts = useLiveQuery(() => db.conflicts.filter((conflict) => !conflict.resolvedAt).count(), [], 0)
   const [connected, setConnected] = useState(() => Boolean(getGitHubConfig()))
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
-  const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false)
   const [commandOpen, setCommandOpen] = useState(false)
   const closeCommand = useCallback(() => setCommandOpen(false), [])
-  const openTabSwitcher = useCallback(() => setTabSwitcherOpen(true), [])
-  const closeTabSwitcher = useCallback(() => setTabSwitcherOpen(false), [])
 
-  const activeTab = tabs.find((tab) => tab.id === activeId)
-  const activeThreadId = activeTab?.path.match(/^\/thread\/([^/?]+)/)?.[1] ?? null
+  const activeThreadId = location.pathname.match(/^\/thread\/([^/?]+)/)?.[1] ?? null
   const { thread: activeThread, openTasks, decisionsCount, direction } = useThreadSummary(activeThreadId)
 
   const runSync = useCallback(() => {
@@ -179,33 +168,8 @@ function AppShell() {
       </header>
 
       <div className="content-shell">
-        <TabStrip />
         <div className="content-row">
-          <main className="main-content">
-            {activeId ? mountedIds.map((id) => {
-              const tab = tabs.find((candidate) => candidate.id === id)
-              if (!tab) return null
-              return (
-                <div key={id} className="tab-panel" hidden={id !== activeId}>
-                  <Routes location={tab.path}>
-                    <Route path="/" element={<TodayPage />} />
-                    <Route path="/thread/:threadId" element={<ThreadPage />} />
-                    <Route path="/tasks" element={<TasksPage />} />
-                    <Route path="/search" element={<SearchPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                  </Routes>
-                </div>
-              )
-            }) : (
-              <div className="destination-panel">
-                <Routes>
-                  <Route path="/tasks" element={<TasksPage />} />
-                  <Route path="/search" element={<SearchPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                </Routes>
-              </div>
-            )}
-          </main>
+          <DockviewTabs />
 
           <aside className="right-rail" aria-label="Recent threads and current thread context">
             <div className="right-rail-section">
@@ -250,8 +214,7 @@ function AppShell() {
         <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''}><Settings size={19} /><span>Settings</span></NavLink>
       </nav>
 
-      <GlobalCommandMenu open={commandOpen} tabCount={tabs.length} onClose={closeCommand} onOpenTabs={openTabSwitcher} />
-      <MobileTabSwitcher open={tabSwitcherOpen} onClose={closeTabSwitcher} />
+      <GlobalCommandMenu open={commandOpen} onClose={closeCommand} />
     </div>
   )
 }
@@ -292,5 +255,5 @@ export default function App() {
     void initializeDatabase(isoToday())
   }, [])
 
-  return <HashRouter><TabsProvider><AppShell /></TabsProvider></HashRouter>
+  return <HashRouter><AppShell /></HashRouter>
 }

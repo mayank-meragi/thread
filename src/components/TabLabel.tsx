@@ -1,11 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
-import type { Tab } from '../lib/tabs'
-import { TODAY_TAB_ID } from '../lib/tabsModel'
 
-export function TabLabel({ tab }: { tab: Tab }) {
-  const pathname = tab.path.split('?')[0] || '/'
-  if (tab.id === TODAY_TAB_ID) return <>Today</>
+export function TabLabel({ path }: { path: string }) {
+  const pathname = path.split('?')[0] || '/'
+  if (pathname === '/') return <>Today</>
   if (pathname === '/search') return <>Search</>
   if (pathname === '/tasks') return <>Tasks</>
   if (pathname === '/settings') return <>Settings</>
