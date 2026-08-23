@@ -308,7 +308,6 @@ export function DockviewTabs() {
         components={components}
         tabComponents={tabComponents}
         rightHeaderActionsComponent={GroupActions}
-        defaultRenderer="always"
         disableFloatingGroups
         theme={dvTheme}
         onReady={onReady}
