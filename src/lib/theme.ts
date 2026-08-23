@@ -27,6 +27,12 @@ export const themes = [
 
 export type ThemeId = (typeof themes)[number]['id']
 
+const DARK_THEME_IDS: ReadonlySet<string> = new Set(['dracula', 'nord'])
+
+export function isDarkTheme(id: string): boolean {
+  return DARK_THEME_IDS.has(id)
+}
+
 const STORAGE_KEY = 'thread.theme'
 const DEFAULT_THEME: ThemeId = 'github-light'
 

@@ -1,13 +1,14 @@
 import { useEffect, useRef } from 'react'
-import { BookOpenText, ListPlus, Search, X } from 'lucide-react'
+import { BookOpenText, ListPlus, PanelRight, Search, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 interface GlobalCommandMenuProps {
   open: boolean
   onClose: () => void
+  onTogglePanel?: () => void
 }
 
-export function GlobalCommandMenu({ open, onClose }: GlobalCommandMenuProps) {
+export function GlobalCommandMenu({ open, onClose, onTogglePanel }: GlobalCommandMenuProps) {
   const navigate = useNavigate()
   const firstActionRef = useRef<HTMLButtonElement>(null)
   const sheetRef = useRef<HTMLElement>(null)
@@ -59,6 +60,15 @@ export function GlobalCommandMenu({ open, onClose }: GlobalCommandMenuProps) {
             <span className="command-icon"><Search size={18} /></span>
             <span><strong>Find anything</strong><small>Search notes and threads</small></span>
           </button>
+          {onTogglePanel && (
+            <button
+              type="button"
+              onClick={() => { onTogglePanel(); onClose() }}
+            >
+              <span className="command-icon"><PanelRight size={18} /></span>
+              <span><strong>Toggle context panel</strong><small>Show or hide the right rail (⌘\)</small></span>
+            </button>
+          )}
         </div>
         <footer><kbd>⌘ ⇧ P</kbd><span>opens this menu</span></footer>
       </section>

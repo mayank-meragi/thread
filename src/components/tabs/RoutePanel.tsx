@@ -12,12 +12,14 @@ export interface RoutePanelParams {
 
 export function RoutePanel({ params }: IDockviewPanelProps<RoutePanelParams>) {
   return (
-    <Routes location={params.path}>
-      <Route path="/" element={<TodayPage />} />
-      <Route path="/thread/:threadId" element={<ThreadPage />} />
-      <Route path="/tasks" element={<TasksPage />} />
-      <Route path="/search" element={<SearchPage />} />
-      <Route path="/settings" element={<SettingsPage />} />
-    </Routes>
+    <div className="route-panel">
+      <Routes location={params.path}>
+        <Route path="/" element={<TodayPage />} />
+        <Route path="/thread/:threadId" element={<ThreadPage />} />
+        <Route path="/tasks" element={<TasksPage />} />
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+      </Routes>
+    </div>
   )
 }
