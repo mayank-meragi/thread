@@ -33,6 +33,8 @@ npm run build
 
 Product workflows, measurable UX budgets, and release criteria are documented in
 [`docs/ux-foundation.md`](docs/ux-foundation.md) and
-[`docs/ux-regression-checklist.md`](docs/ux-regression-checklist.md).
+[`docs/ux-regression-checklist.md`](docs/ux-regression-checklist.md). The token layer and shared
+CSS/React primitives behind the UI are documented in
+[`docs/design-system.md`](docs/design-system.md).
 
 Pushing `main` deploys the production build through the GitHub Pages workflow.

@@ -93,19 +93,24 @@
   --paper-raised: #fffaf0;
   --ink: #073642;
   --ink-soft: #31545c;
-  --muted: #657b83;
-  --thread: #268bd2;
+  /* --muted/--thread/--task/--danger darkened from the original Solarized
+     values during the Phase 5 contrast audit: at their original lightness
+     none of the four cleared 4.5:1 against --paper/--canvas/their own -soft
+     background (see docs/design-system.md's contrast table). --question
+     tracks --thread since both were the same blue. */
+  --muted: #586b72;
+  --thread: #2074af;
   --thread-soft: #d8eef3;
   --thread-hover: #c2e3eb;
   --decision: #cb4b16;
   --decision-soft: #f6dfd2;
-  --question: #268bd2;
+  --question: #2074af;
   --question-soft: #d8eef3;
   --idea: #6c71c4;
   --idea-soft: #e5e1ef;
-  --task: #708800;
+  --task: #576900;
   --task-soft: #e6e7c9;
-  --danger: #dc322f;
+  --danger: #b9221f;
   --danger-soft: #f5d9d1;
   --warning: #b58900;
   --warning-soft: #eee5bd;
@@ -117,8 +122,8 @@
   --sidebar: #e9e2cf;
   --control: #f3ecd9;
   --control-hover: #e8e0cd;
-  --focus-ring: rgba(38, 139, 210, .25);
-  --accent-line: rgba(38, 139, 210, .58);
+  --focus-ring: rgba(32, 116, 175, .25);
+  --accent-line: rgba(32, 116, 175, .58);
   --glass-border: rgba(255, 250, 240, .72);
   --nav-glass: rgba(238, 232, 213, .92);
   --toolbar-glass: rgba(253, 246, 227, .94);
@@ -148,7 +153,10 @@
   --task: #50fa7b;
   --task-soft: #304b3b;
   --danger: #ff5555;
-  --danger-soft: #50343c;
+  /* --danger-soft darkened from the original value during the Phase 5
+     contrast audit: at the original lightness --danger against it was
+     3.52:1, short of 4.5:1 — see docs/design-system.md's contrast table. */
+  --danger-soft: #372429;
   --warning: #f1fa8c;
   --warning-soft: #4b4c38;
   --outline-muted: #6e7188;
@@ -189,9 +197,13 @@
   --idea: #b48ead;
   --idea-soft: #493f4f;
   --task: #a3be8c;
-  --task-soft: #3e4d40;
+  /* --task-soft/--danger-soft darkened from their original values during the
+     Phase 5 contrast audit: at their original lightness --task/--danger
+     against their own -soft background fell short of (task) or badly failed
+     (danger) 4.5:1 — see docs/design-system.md's contrast table. */
+  --task-soft: #354237;
   --danger: #bf616a;
-  --danger-soft: #513b42;
+  --danger-soft: #161012;
   --warning: #ebcb8b;
   --warning-soft: #514b3d;
   --outline-muted: #697484;
