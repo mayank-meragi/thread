@@ -18,7 +18,7 @@ export function ContextTab({ api, containerApi }: IDockviewPanelHeaderProps) {
         className="tab-chip-main"
         onClick={() => api.setActive()}
       >
-        <span className="tab-chip-label">CONTEXT</span>
+        <span className="tab-chip-label">Context</span>
       </button>
     </div>
   )

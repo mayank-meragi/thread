@@ -279,16 +279,16 @@ a { color: inherit; text-decoration: none; }
 .dockview-shell { flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; }
 .dockview-shell .dv-content-container { min-height: 0; }
 .route-panel { height: 100%; min-height: 0; overflow: auto; }
-.dockview-shell .dv-tabs-and-actions-container {
+.dockview-theme-thread .dv-tabs-and-actions-container {
   padding: 0; border-bottom: 0;
   box-shadow: inset 0 -1px 0 var(--line);
 }
-.dockview-shell .dv-groupview:not(.dv-groupview-edge) .dv-right-actions-container { display: none; }
-.dockview-shell .dv-tab {
+.dockview-theme-thread .dv-groupview:not(.dv-groupview-edge) .dv-right-actions-container { display: none; }
+.dockview-theme-thread .dv-tab {
   padding: 0; margin: 0;
   display: flex; align-items: center; cursor: grab;
 }
-.dockview-shell .dv-tab.dv-dragged { cursor: grabbing; }
+.dockview-theme-thread .dv-tab.dv-dragged { cursor: grabbing; }
 .tab-chip {
   max-width: 180px; height: 100%;
   display: flex; align-items: center; border-right: 1px solid var(--line); background: transparent; color: var(--muted); white-space: nowrap;
@@ -1004,9 +1004,9 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
     border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer;
   }
   .title-bar-search-icon:hover { background: var(--control-hover); color: var(--ink); }
-  .dockview-shell .dv-tabs-and-actions-container,
-  .dockview-shell .dv-groupview,
-  .dockview-shell .dv-content-container { background: transparent; }
+  .dockview-theme-thread .dv-tabs-and-actions-container,
+  .dockview-theme-thread .dv-groupview,
+  .dockview-theme-thread .dv-content-container { background: transparent; }
   .mobile-nav { position: fixed; z-index: 20; inset: auto 16px calc(10px + env(safe-area-inset-bottom)) 16px; display: grid; grid-template-columns: repeat(5, 1fr); padding: 5px; border: 1px solid var(--glass-border); border-radius: 16px; background: var(--nav-glass); box-shadow: var(--shadow); backdrop-filter: blur(18px); }
   .mobile-nav a, .mobile-nav button { min-height: 47px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 0; border-radius: 11px; background: transparent; color: var(--muted); font-size: 9px; cursor: pointer; }
   .mobile-nav a.active, .mobile-nav button.active { color: var(--ink); background: var(--paper); box-shadow: var(--shadow-soft); }
