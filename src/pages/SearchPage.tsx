@@ -4,17 +4,14 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
 import { db } from '../db'
 import { formatDay } from '../lib/dates'
-import { cleanMarkdownLine } from '../lib/outline'
+import { searchDays } from '../lib/search'
 
 export function SearchPage() {
   const [query, setQuery] = useState('')
   const days = useLiveQuery(() => db.days.orderBy('date').reverse().toArray(), [], [])
   const threads = useLiveQuery(() => db.threads.orderBy('updatedAt').reverse().toArray(), [], [])
   const normalized = query.trim().toLocaleLowerCase()
-  const results = useMemo(
-    () => normalized ? days.filter((day) => day.markdown.toLocaleLowerCase().includes(normalized)) : [],
-    [days, normalized],
-  )
+  const results = useMemo(() => searchDays(days, normalized), [days, normalized])
 
   return (
     <article className="utility-page">
@@ -38,7 +35,7 @@ export function SearchPage() {
         {results.map((day) => (
           <div className="search-result" key={day.date}>
             <small>{formatDay(day.date).weekday}, {formatDay(day.date).full}</small>
-            <p>{cleanMarkdownLine(day.markdown.split('\n').find((line) => line.toLocaleLowerCase().includes(normalized)) ?? '')}</p>
+            <p>{day.matchLine}</p>
           </div>
         ))}
         {results.length === 0 && <p className="empty-hint">No notes match “{query}”.</p>}

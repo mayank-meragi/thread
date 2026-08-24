@@ -6,7 +6,7 @@ import { isoToday } from './lib/dates'
 import { OPEN_CHAT_EVENT, TOGGLE_RAIL_EVENT } from './lib/dockviewActions'
 import { isUserActivityBarHidden, toggleActivityBarHidden } from './lib/activityBar'
 import { DockviewTabs } from './components/tabs/DockviewTabs'
-import { GlobalCommandMenu } from './components/GlobalCommandMenu'
+import { Omnibox } from './components/Omnibox'
 import { ActivityBar } from './components/shell/ActivityBar'
 import { TitleBar } from './components/shell/TitleBar'
 import { useGitHubSync } from './hooks/useGitHubSync'
@@ -14,10 +14,11 @@ import { useGitHubSync } from './hooks/useGitHubSync'
 function AppShell() {
   const navigate = useNavigate()
   const sync = useGitHubSync()
-  const [commandOpen, setCommandOpen] = useState(false)
+  const [omnibox, setOmnibox] = useState<{ open: boolean; mode: 'command' | 'search' }>({ open: false, mode: 'command' })
   const [activityBarHidden, setActivityBarHidden] = useState(() => isUserActivityBarHidden())
-  const closeCommand = useCallback(() => setCommandOpen(false), [])
-  const openCommand = useCallback(() => setCommandOpen(true), [])
+  const closeOmnibox = useCallback(() => setOmnibox((state) => ({ ...state, open: false })), [])
+  const openCommand = useCallback(() => setOmnibox({ open: true, mode: 'command' }), [])
+  const openOmniboxSearch = useCallback(() => setOmnibox({ open: true, mode: 'search' }), [])
   const toggleRail = useCallback(() => {
     window.dispatchEvent(new Event(TOGGLE_RAIL_EVENT))
   }, [])
@@ -36,7 +37,11 @@ function AppShell() {
       }
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLocaleLowerCase() === 'p') {
         event.preventDefault()
-        setCommandOpen(true)
+        openCommand()
+      }
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLocaleLowerCase() === 'o') {
+        event.preventDefault()
+        openOmniboxSearch()
       }
       if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key === '\\') {
         event.preventDefault()
@@ -45,7 +50,7 @@ function AppShell() {
     }
     window.addEventListener('keydown', openGlobalActions)
     return () => window.removeEventListener('keydown', openGlobalActions)
-  }, [navigate, toggleRail])
+  }, [navigate, toggleRail, openCommand, openOmniboxSearch])
 
   const syncProps = {
     connected: sync.connected,
@@ -91,7 +96,7 @@ function AppShell() {
         <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''}><Settings size={19} /><span>Settings</span></NavLink>
       </nav>
 
-      <GlobalCommandMenu open={commandOpen} onClose={closeCommand} onTogglePanel={toggleRail} />
+      <Omnibox open={omnibox.open} initialMode={omnibox.mode} onClose={closeOmnibox} onTogglePanel={toggleRail} />
     </div>
   )
 }
