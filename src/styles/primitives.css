@@ -1,3 +1,199 @@
 /* Shared primitives — menu/popover, layer/backdrop/sheet/dialog, field, and
-   banner recipes. Populated in Phase 2 of the design system migration; existing
-   feature CSS is migrated onto these classes incrementally in Phase 3. */
+   banner recipes. Existing feature CSS composes onto these classes
+   incrementally in Phase 3; this file only defines the shapes. */
+
+/* ---------------------------------------------------------------------- */
+/* Menu / popover — replaces the ad hoc popover panels in PersonaSwitcher,
+   link-context-menu, DatePicker, TaskStatusControl, IconPicker, and the
+   editor suggestion menu. */
+.menu-panel {
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-2);
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.menu-item:hover,
+.menu-item:focus-visible { background: var(--control-hover); }
+.menu-item.active { background: var(--control); font-weight: 600; }
+.menu-item[disabled],
+.menu-item[aria-disabled='true'] { opacity: var(--disabled-opacity); cursor: default; }
+.menu-item[disabled]:hover,
+.menu-item[aria-disabled='true']:hover { background: transparent; }
+.menu-divider { height: 1px; margin: 4px 8px; background: var(--line-soft); }
+
+/* ---------------------------------------------------------------------- */
+/* Layer / backdrop / sheet / dialog — replaces GlobalCommandMenu,
+   TabSwitcher, BlockInspector, TaskDetails modal chrome. */
+.layer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--scrim);
+}
+.layer-backdrop.layer-backdrop-blur { backdrop-filter: blur(3px); }
+.layer-backdrop.layer-backdrop-center { display: grid; place-items: center; padding: 20px; }
+.layer-backdrop.layer-backdrop-end { display: flex; justify-content: flex-end; }
+
+/* Centered modal, e.g. command palette / tab switcher */
+.dialog {
+  width: min(560px, 100%);
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-2);
+}
+
+/* Edge-anchored panel, e.g. block inspector / task details */
+.sheet {
+  position: relative;
+  width: min(410px, 100vw);
+  height: 100%;
+  padding: 25px 25px 30px;
+  overflow-y: auto;
+  border-left: 1px solid var(--line);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-3);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Field — single input/select/textarea recipe with focus/error/hint states. */
+.field { display: grid; gap: 6px; }
+.field-label { color: var(--muted); font-size: var(--text-meta); font-weight: 500; }
+.field-control {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  outline: 0;
+  background: var(--control);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+textarea.field-control { min-height: 80px; padding: 9px 11px; resize: vertical; }
+.field-control:focus,
+.field-control:focus-visible {
+  border-color: var(--thread);
+  box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
+}
+.field-control:disabled { opacity: var(--disabled-opacity); cursor: default; }
+.field.field-error .field-control { border-color: var(--danger); }
+.field-hint { color: var(--muted); font-size: var(--text-meta); }
+.field-hint.field-hint-error { color: var(--danger); }
+
+/* ---------------------------------------------------------------------- */
+/* Banner — replaces .form-error, .inspector-error, .chat-message-error. */
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-meta);
+  line-height: 1.4;
+}
+.banner-info { background: var(--thread-soft); color: var(--thread); }
+.banner-warning { background: var(--warning-soft); color: var(--warning); }
+.banner-error { background: var(--danger-soft); color: var(--danger); }
+.banner-success { background: var(--task-soft); color: var(--task); }
+
+/* ---------------------------------------------------------------------- */
+/* Motion primitive shared by the .spin utility class, Spinner.tsx, and any
+   other in-place loading indicator (e.g. the in-progress task status icon). */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }
+.loading-block { display: grid; place-items: center; padding: 24px; color: var(--muted); }
+
+/* ---------------------------------------------------------------------- */
+/* Button — variants + sizes for Button.tsx. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.btn:disabled,
+.btn[aria-disabled='true'] { opacity: var(--disabled-opacity); cursor: default; }
+.btn-sm { min-height: 32px; padding: 0 10px; font-size: var(--text-meta); border-radius: var(--radius-sm); }
+.btn-lg { min-height: 48px; padding: 0 18px; }
+
+.btn-solid { background: var(--ink); border-color: var(--ink); color: var(--on-solid); }
+.btn-solid:hover:not(:disabled) { background: var(--ink-soft); border-color: var(--ink-soft); }
+
+.btn-accent { background: var(--thread); border-color: var(--thread); color: var(--on-solid); }
+.btn-accent:hover:not(:disabled) { background: var(--thread); border-color: var(--thread); filter: brightness(1.08); }
+
+.btn-outline { background: var(--paper); border-color: var(--line); color: var(--ink); }
+.btn-outline:hover:not(:disabled) { background: var(--control-hover); }
+
+.btn-ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.btn-ghost:hover:not(:disabled) { background: var(--control-hover); color: var(--ink); }
+
+.btn-danger { background: transparent; border-color: var(--line); color: var(--danger); }
+.btn-danger:hover:not(:disabled) { background: var(--danger-soft); border-color: var(--danger); }
+
+.btn-loading { color: transparent !important; pointer-events: none; position: relative; }
+.btn-loading .btn-spinner { position: absolute; color: inherit; }
+
+/* ---------------------------------------------------------------------- */
+/* Chip — semantic accents for Chip.tsx; consolidates priority-chip /
+   tab-chip* ad hoc patterns. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--control);
+  color: var(--muted);
+  font-size: var(--text-meta);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.chip-interactive { cursor: pointer; }
+.chip-interactive:hover { background: var(--control-hover); }
+.chip-remove { display: grid; place-items: center; margin: 0 -3px 0 1px; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; }
+
+.chip-thread { border-color: color-mix(in srgb, var(--thread) 40%, var(--line)); background: var(--thread-soft); color: var(--thread); }
+.chip-task { border-color: color-mix(in srgb, var(--task) 40%, var(--line)); background: var(--task-soft); color: var(--task); }
+.chip-idea { border-color: color-mix(in srgb, var(--idea) 40%, var(--line)); background: var(--idea-soft); color: var(--idea); }
+.chip-question { border-color: color-mix(in srgb, var(--question) 40%, var(--line)); background: var(--question-soft); color: var(--question); }
+.chip-decision { border-color: color-mix(in srgb, var(--decision) 40%, var(--line)); background: var(--decision-soft); color: var(--decision); }
+.chip-danger { border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); background: var(--danger-soft); color: var(--danger); }
+
+/* ---------------------------------------------------------------------- */
+/* EmptyState — icon/title/hint slots for EmptyState.tsx. */
+.empty-state { display: grid; justify-items: center; gap: 8px; padding: 40px 20px; text-align: center; color: var(--muted); }
+.empty-state-icon { color: var(--outline-muted); }
+.empty-state-title { margin: 4px 0 0; color: var(--ink); font: 500 18px/1.2 var(--font-display); }
+.empty-state-hint { margin: 0; font-size: var(--text-sm); line-height: 1.5; }

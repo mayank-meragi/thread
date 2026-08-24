@@ -887,10 +887,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .database-stat { display: grid; flex: 0 0 auto; text-align: right; }
 .database-stat strong { font: 500 25px 'Newsreader', serif; }
 .database-stat span { color: var(--muted); font-size: 9px; }
-.spin { animation: spin 1s linear infinite; }
 .page-loading { padding: 80px 40px; color: var(--muted); font-size: 13px; }
-
-@keyframes spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 1100px) {
   .task-filter-bar { flex-wrap: wrap; }
