@@ -9,7 +9,7 @@ export const themes = [
     id: 'solarized-light',
     name: 'Solarized Light',
     mode: 'Light',
-    swatches: ['#fdf6e3', '#eee8d5', '#268bd2', '#073642'],
+    swatches: ['#fdf6e3', '#eee8d5', '#2074af', '#073642'],
   },
   {
     id: 'dracula',
