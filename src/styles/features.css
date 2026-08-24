@@ -211,7 +211,7 @@
 .command-sheet > footer { display: flex; align-items: center; justify-content: flex-end; gap: 7px; margin-top: 15px; padding-top: 12px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: var(--text-meta); }
 .command-sheet > footer kbd { padding: 3px 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--control); font: 500 8px 'IBM Plex Mono', monospace; }
 
-/* .tab-switcher-backdrop composes .layer-backdrop.layer-backdrop-center.layer-backdrop-blur; this only raises stacking above other layers. */
+/* .tab-switcher-backdrop composes .layer-backdrop.layer-backdrop-center (no blur); this only raises stacking above other layers. */
 .tab-switcher-backdrop { z-index: 1000; }
 /* .tab-switcher composes .dialog (border/radius/background/shadow); this only adjusts width/padding. */
 .tab-switcher { width: min(680px, 100%); padding: 16px; }

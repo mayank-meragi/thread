@@ -32,7 +32,7 @@ export function TabSwitcher({ tabs, selected, onHighlight, onCommit, onCancel }:
 
   return (
     <div
-      className="layer-backdrop layer-backdrop-center layer-backdrop-blur tab-switcher-backdrop"
+      className="layer-backdrop layer-backdrop-center tab-switcher-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onCancel()
       }}
