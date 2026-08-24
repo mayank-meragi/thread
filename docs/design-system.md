@@ -8,9 +8,9 @@ Read it before adding a new theme, a new popover/modal/banner, or new small type
 
 `src/main.tsx` imports four stylesheets in this order:
 
-1. **`tokens.css`** — the default `:root` plus the three named theme blocks (`solarized-light`,
-   `dracula`, `nord`), and theme-independent tokens (typography, spacing, radius, state) that don't
-   vary per theme.
+1. **`tokens.css`** — the default `:root` plus the named theme blocks (`solarized-light`,
+   `dracula`, `nord`, `catppuccin-mocha`), and theme-independent tokens (typography, spacing, radius,
+   state) that don't vary per theme.
 2. **`base.css`** — global element resets (box-sizing, `sr-only`, focus-visible, forced-colors).
 3. **`primitives.css`** — shared CSS classes (`.menu-panel`, `.dialog`/`.sheet`, `.field`, `.banner`,
    `.btn`, `.chip`, `.empty-state`, `.spin`) that bespoke widgets compose onto.
@@ -177,6 +177,27 @@ Final measured ratios, all passing:
 | danger / danger-soft (banner) | `#bf616a` | `#161012` | 4.60:1 | 4.5:1 |
 | task / task-soft (banner) | `#a3be8c` | `#354237` | 5.19:1 | 4.5:1 |
 | thread / canvas (focus/UI) | `#88c0d0` | `#242933` | 7.29:1 | 3.0:1 |
+
+### catppuccin-mocha
+
+| Pair | Foreground | Background | Ratio | Target |
+| --- | --- | --- | --- | --- |
+| ink / paper (body text) | `#cdd6f4` | `#1e1e2e` | 11.35:1 | 4.5:1 |
+| ink-soft / paper | `#bac2de` | `#1e1e2e` | 9.27:1 | 4.5:1 |
+| muted / paper (metadata) | `#9399b2` | `#1e1e2e` | 5.81:1 | 4.5:1 |
+| muted / canvas (metadata) | `#9399b2` | `#181825` | 6.22:1 | 4.5:1 |
+| ink / control (form text) | `#cdd6f4` | `#313244` | 8.70:1 | 4.5:1 |
+| thread / paper (links) | `#89b4fa` | `#1e1e2e` | 7.79:1 | 4.5:1 |
+| on-solid / thread (button text) | `#181825` | `#89b4fa` | 8.34:1 | 4.5:1 |
+| danger / danger-soft (banner) | `#f38ba8` | `#3a232b` | 6.23:1 | 4.5:1 |
+| task / task-soft (banner) | `#a6e3a1` | `#263524` | 8.73:1 | 4.5:1 |
+| thread / canvas (focus/UI) | `#89b4fa` | `#181825` | 8.34:1 | 3.0:1 |
+
+Every pair cleared its target on first measurement using the official Catppuccin Mocha accent
+colors directly (`--thread`/blue, `--decision`/peach, `--question`/sapphire, `--idea`/mauve,
+`--task`/green, `--danger`/red, `--warning`/yellow); the `-soft` backgrounds were mixed dark enough
+(≈18% tint of the accent over `--paper`) from the start that no token value needed correction, unlike
+the three pairs fixed above.
 
 This is a spot-check of the highest-traffic pairs (body text, metadata, links, primary buttons,
 error/success banners, focus/UI color), not exhaustive of every color combination in `features.css`.

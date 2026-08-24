@@ -23,11 +23,17 @@ export const themes = [
     mode: 'Dark',
     swatches: ['#2e3440', '#4c566a', '#88c0d0', '#eceff4'],
   },
+  {
+    id: 'catppuccin-mocha',
+    name: 'Catppuccin Mocha',
+    mode: 'Dark',
+    swatches: ['#1e1e2e', '#45475a', '#89b4fa', '#cdd6f4'],
+  },
 ] as const
 
 export type ThemeId = (typeof themes)[number]['id']
 
-const DARK_THEME_IDS: ReadonlySet<string> = new Set(['dracula', 'nord'])
+const DARK_THEME_IDS: ReadonlySet<string> = new Set(['dracula', 'nord', 'catppuccin-mocha'])
 
 export function isDarkTheme(id: string): boolean {
   return DARK_THEME_IDS.has(id)
