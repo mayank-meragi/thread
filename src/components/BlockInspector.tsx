@@ -232,7 +232,7 @@ function PropertyField({
   return (
     <div className="inspector-property">
       <label><span>{definition.name}{schema && <small className="property-schema-source">#{schema.tag.name}{schema.required ? ' · required' : ''}</small>}</span>{control}</label>
-      {value !== undefined && <button type="button" className="property-remove" aria-label={`Remove ${definition.name}`} onClick={() => void save('')}><Trash2 size={13} /></button>}
+      {value !== undefined && <button type="button" className="tap-target-sm property-remove" aria-label={`Remove ${definition.name}`} onClick={() => void save('')}><Trash2 size={13} /></button>}
     </div>
   )
 }

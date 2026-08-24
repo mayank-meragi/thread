@@ -31,7 +31,7 @@ export function ChatTab({ api, containerApi }: IDockviewPanelHeaderProps) {
       </button>
       <button
         type="button"
-        className="tab-chip-close"
+        className="tap-target-sm tab-chip-close"
         aria-label="Close chat panel"
         onClick={(event) => {
           event.stopPropagation()

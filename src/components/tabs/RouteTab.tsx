@@ -60,7 +60,7 @@ export function RouteTab({ params, api, containerApi }: IDockviewPanelHeaderProp
       {closable && (
         <button
           type="button"
-          className="tab-chip-close"
+          className="tap-target-sm tab-chip-close"
           aria-label="Close tab"
           onClick={(event) => {
             event.stopPropagation()

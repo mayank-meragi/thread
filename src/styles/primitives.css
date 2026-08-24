@@ -197,3 +197,20 @@ textarea.field-control { min-height: 80px; padding: 9px 11px; resize: vertical; 
 .empty-state-icon { color: var(--outline-muted); }
 .empty-state-title { margin: 4px 0 0; color: var(--ink); font: 500 18px/1.2 var(--font-display); }
 .empty-state-hint { margin: 0; font-size: var(--text-sm); line-height: 1.5; }
+
+/* ---------------------------------------------------------------------- */
+/* Touch-target hit-area expansion (Phase 3 audit) — for isolated icon-only
+   controls visually under the 44px minimum. Visual size is untouched; a
+   centered pseudo-element grows the hit-testable area only. Not applied to
+   controls packed tightly against other interactive siblings, where a 44px
+   hit area would overlap a neighbor's tap target. */
+.tap-target-sm { position: relative; }
+.tap-target-sm::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(44px, 100%);
+  height: max(44px, 100%);
+  transform: translate(-50%, -50%);
+}

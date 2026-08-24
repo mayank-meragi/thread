@@ -65,7 +65,7 @@ export function TitleBar({ activityBarHidden, onToggleActivityBar, onOpenCommand
         <div className="title-bar-toggles">
           <button
             type="button"
-            className="title-bar-toggle"
+            className="tap-target-sm title-bar-toggle"
             aria-label={activityBarHidden ? 'Show activity bar' : 'Hide activity bar'}
             aria-pressed={!activityBarHidden}
             title={activityBarHidden ? 'Show activity bar' : 'Hide activity bar'}
@@ -75,7 +75,7 @@ export function TitleBar({ activityBarHidden, onToggleActivityBar, onOpenCommand
           </button>
           <button
             type="button"
-            className="title-bar-toggle"
+            className="tap-target-sm title-bar-toggle"
             aria-label={railHidden ? 'Show context panel' : 'Hide context panel'}
             aria-pressed={!railHidden}
             aria-keyshortcuts="Meta+\\ Control+\\"
