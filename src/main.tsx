@@ -1,7 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
-import './index.css'
+import './styles/tokens.css'
+import './styles/base.css'
+import './styles/primitives.css'
+import './styles/features.css'
 import { initializeTheme } from './lib/theme'
 
 initializeTheme()

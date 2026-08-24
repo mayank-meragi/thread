@@ -1,0 +1,216 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap');
+@import 'dockview-react/dist/styles/dockview.css';
+
+:root {
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--canvas);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --canvas: #f6f8fa;
+  --paper: #ffffff;
+  --paper-raised: #ffffff;
+  --ink: #1f2328;
+  --ink-soft: #3f4650;
+  --muted: #656d76;
+  --thread: #0969da;
+  --thread-soft: #ddf4ff;
+  --thread-hover: #b6e3ff;
+  --decision: #9a6700;
+  --decision-soft: #fff8c5;
+  --question: #0969da;
+  --question-soft: #ddf4ff;
+  --idea: #8250df;
+  --idea-soft: #fbefff;
+  --task: #1a7f37;
+  --task-soft: #dafbe1;
+  --danger: #cf222e;
+  --danger-soft: #ffebe9;
+  --warning: #9a6700;
+  --warning-soft: #fff8c5;
+  --outline-muted: #afb8c1;
+  --outline-active: #54aeff;
+  --outline-guide: #d8dee4;
+  --line: #d0d7de;
+  --line-soft: #eaeef2;
+  --sidebar: #f6f8fa;
+  --control: #f6f8fa;
+  --control-hover: #eef1f4;
+  --on-solid: #ffffff;
+  --focus-ring: rgba(9, 105, 218, .25);
+  --accent-line: rgba(9, 105, 218, .58);
+  --glass-border: rgba(255, 255, 255, .72);
+  --nav-glass: rgba(246, 248, 250, .92);
+  --toolbar-glass: rgba(255, 255, 255, .94);
+  --shadow: 0 16px 50px rgba(31, 35, 40, .08);
+  --shadow-soft: 0 8px 30px rgba(31, 35, 40, .06);
+
+  /* Typography roles */
+  --font-display: 'Newsreader', serif;
+  --font-ui: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --text-meta: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-body: 16px;
+
+  /* Spacing scale */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 48px;
+
+  /* Radius scale */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* Elevation — shadow-1/soft alias the existing shadow tokens; shadow-2 replaces
+     the repeated 0 18px 48px rgba(15,20,35,.2) declaration found across menus/
+     sheets; shadow-3 is the largest tier, tinted per theme below. */
+  --shadow-1: var(--shadow-soft);
+  --shadow-2: 0 18px 48px rgba(15, 20, 35, .2);
+  --shadow-3: 0 26px 80px rgba(15, 20, 35, .2);
+
+  /* Divider — derived from the active theme's ink/line, so it needs no per-theme override */
+  --divider-strong: color-mix(in srgb, var(--ink) 12%, var(--line));
+
+  /* State */
+  --disabled-opacity: .45;
+  --scrim: rgba(18, 24, 32, .2);
+  --scrim-strong: rgba(18, 24, 32, .26);
+  --focus-ring-width: 2px;
+}
+
+:root[data-theme='solarized-light'] {
+  --canvas: #eee8d5;
+  --paper: #fdf6e3;
+  --paper-raised: #fffaf0;
+  --ink: #073642;
+  --ink-soft: #31545c;
+  --muted: #657b83;
+  --thread: #268bd2;
+  --thread-soft: #d8eef3;
+  --thread-hover: #c2e3eb;
+  --decision: #cb4b16;
+  --decision-soft: #f6dfd2;
+  --question: #268bd2;
+  --question-soft: #d8eef3;
+  --idea: #6c71c4;
+  --idea-soft: #e5e1ef;
+  --task: #708800;
+  --task-soft: #e6e7c9;
+  --danger: #dc322f;
+  --danger-soft: #f5d9d1;
+  --warning: #b58900;
+  --warning-soft: #eee5bd;
+  --outline-muted: #a8a892;
+  --outline-active: #2aa198;
+  --outline-guide: #d8cfb5;
+  --line: #d8cfb5;
+  --line-soft: #e7dec8;
+  --sidebar: #e9e2cf;
+  --control: #f3ecd9;
+  --control-hover: #e8e0cd;
+  --focus-ring: rgba(38, 139, 210, .25);
+  --accent-line: rgba(38, 139, 210, .58);
+  --glass-border: rgba(255, 250, 240, .72);
+  --nav-glass: rgba(238, 232, 213, .92);
+  --toolbar-glass: rgba(253, 246, 227, .94);
+  --shadow: 0 16px 50px rgba(88, 74, 45, .11);
+  --shadow-soft: 0 8px 30px rgba(88, 74, 45, .08);
+  --shadow-1: var(--shadow-soft);
+  --shadow-2: 0 18px 48px rgba(88, 74, 45, .22);
+  --shadow-3: 0 26px 80px rgba(88, 74, 45, .24);
+}
+
+:root[data-theme='dracula'] {
+  --canvas: #191a21;
+  --paper: #282a36;
+  --paper-raised: #303241;
+  --ink: #f8f8f2;
+  --ink-soft: #e1e2dc;
+  --muted: #a9adc1;
+  --thread: #bd93f9;
+  --thread-soft: #44395c;
+  --thread-hover: #55446f;
+  --decision: #ffb86c;
+  --decision-soft: #4d4038;
+  --question: #8be9fd;
+  --question-soft: #344c59;
+  --idea: #bd93f9;
+  --idea-soft: #44395c;
+  --task: #50fa7b;
+  --task-soft: #304b3b;
+  --danger: #ff5555;
+  --danger-soft: #50343c;
+  --warning: #f1fa8c;
+  --warning-soft: #4b4c38;
+  --outline-muted: #6e7188;
+  --outline-active: #bd93f9;
+  --outline-guide: #44475a;
+  --line: #44475a;
+  --line-soft: #383a49;
+  --sidebar: #21222c;
+  --control: #343746;
+  --control-hover: #3e4152;
+  --on-solid: #191a21;
+  --focus-ring: rgba(189, 147, 249, .3);
+  --accent-line: rgba(189, 147, 249, .7);
+  --glass-border: rgba(98, 101, 122, .65);
+  --nav-glass: rgba(33, 34, 44, .93);
+  --toolbar-glass: rgba(40, 42, 54, .95);
+  --shadow: 0 18px 55px rgba(0, 0, 0, .28);
+  --shadow-soft: 0 9px 32px rgba(0, 0, 0, .2);
+  --shadow-1: var(--shadow-soft);
+  --shadow-2: 0 18px 48px rgba(0, 0, 0, .34);
+  --shadow-3: 0 26px 80px rgba(0, 0, 0, .38);
+}
+
+:root[data-theme='nord'] {
+  --canvas: #242933;
+  --paper: #2e3440;
+  --paper-raised: #353c49;
+  --ink: #eceff4;
+  --ink-soft: #d8dee9;
+  --muted: #a7b0c0;
+  --thread: #88c0d0;
+  --thread-soft: #364b57;
+  --thread-hover: #405b68;
+  --decision: #d08770;
+  --decision-soft: #4e4141;
+  --question: #81a1c1;
+  --question-soft: #394958;
+  --idea: #b48ead;
+  --idea-soft: #493f4f;
+  --task: #a3be8c;
+  --task-soft: #3e4d40;
+  --danger: #bf616a;
+  --danger-soft: #513b42;
+  --warning: #ebcb8b;
+  --warning-soft: #514b3d;
+  --outline-muted: #697484;
+  --outline-active: #88c0d0;
+  --outline-guide: #434c5e;
+  --line: #4c566a;
+  --line-soft: #3b4351;
+  --sidebar: #292f3a;
+  --control: #3b4252;
+  --control-hover: #434c5e;
+  --on-solid: #242933;
+  --focus-ring: rgba(136, 192, 208, .3);
+  --accent-line: rgba(136, 192, 208, .7);
+  --glass-border: rgba(76, 86, 106, .75);
+  --nav-glass: rgba(41, 47, 58, .93);
+  --toolbar-glass: rgba(46, 52, 64, .95);
+  --shadow: 0 18px 55px rgba(0, 0, 0, .25);
+  --shadow-soft: 0 9px 32px rgba(0, 0, 0, .18);
+  --shadow-1: var(--shadow-soft);
+  --shadow-2: 0 18px 48px rgba(0, 0, 0, .32);
+  --shadow-3: 0 26px 80px rgba(0, 0, 0, .36);
+}
