@@ -40,7 +40,7 @@ export function TabSwitcher({ tabs, selected, onHighlight, onCommit, onCancel }:
       <section className="tab-switcher" role="dialog" aria-modal="true" aria-label="Switch tabs">
         <header>
           <span className="eyebrow">Open tabs</span>
-          <span className="tab-switcher-hint">Most recently used &mdash; release <kbd>Ctrl</kbd> or press <kbd>Enter</kbd> to switch</span>
+          <span className="tab-switcher-hint">Most recently used &mdash; release <kbd>Option</kbd> or press <kbd>Enter</kbd> to switch</span>
         </header>
         <div ref={gridRef} className="tab-switcher-grid" role="listbox" aria-label="Open tabs">
           {tabs.map((tab, index) => {

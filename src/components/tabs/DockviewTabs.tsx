@@ -176,7 +176,7 @@ export function DockviewTabs() {
   // dockview -> URL: the user clicked a different tab, or closing the active
   // tab made dockview activate an adjacent one -- follow it. Every activation
   // (user click or programmatic navigation) also refreshes the MRU order
-  // that powers the Ctrl+Tab switcher.
+  // that powers the Option+Tab switcher.
   useEffect(() => {
     if (!api) return
     const disposable = api.onDidActivePanelChange((event) => {
@@ -216,12 +216,12 @@ export function DockviewTabs() {
     if (target) navigate(target.path)
   }, [navigate])
 
-  // Firefox-style Ctrl+Tab: press once to preview the previous tab, keep
-  // tapping Tab to walk the recency list, release Ctrl (or Enter/click) to
+  // Firefox-style Option+Tab: press once to preview the previous tab, keep
+  // tapping Tab to walk the recency list, release Option (or Enter/click) to
   // switch. Shift reverses direction; Esc cancels without switching.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Tab' && event.ctrlKey && !event.metaKey && !event.altKey) {
+      if (event.key === 'Tab' && event.altKey && !event.metaKey && !event.ctrlKey) {
         event.preventDefault()
         if (!switcher) openSwitcher(event.shiftKey ? -1 : 1)
         else {
@@ -249,7 +249,7 @@ export function DockviewTabs() {
   useEffect(() => {
     if (!switcher) return
     const onKeyUp = (event: KeyboardEvent) => {
-      if (event.key === 'Control' || !event.ctrlKey) commitSwitcher()
+      if (event.key === 'Alt' || !event.altKey) commitSwitcher()
     }
     const cancel = () => setSwitcher(null)
     window.addEventListener('keyup', onKeyUp)

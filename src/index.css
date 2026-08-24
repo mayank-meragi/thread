@@ -331,7 +331,7 @@ a { color: inherit; text-decoration: none; }
 .command-sheet > footer { display: flex; align-items: center; justify-content: flex-end; gap: 7px; margin-top: 15px; padding-top: 12px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 9px; }
 .command-sheet > footer kbd { padding: 3px 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--control); font: 500 8px 'IBM Plex Mono', monospace; }
 
-.tab-switcher-backdrop { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 20px; background: rgba(18, 24, 32, .18); backdrop-filter: blur(2px); }
+.tab-switcher-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(18, 24, 32, .18); backdrop-filter: blur(2px); }
 .tab-switcher { width: min(680px, 100%); padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper-raised); box-shadow: var(--shadow); }
 .tab-switcher > header { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
 .tab-switcher-hint { color: var(--muted); font-size: 11px; }

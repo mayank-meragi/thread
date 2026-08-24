@@ -1,5 +1,5 @@
-import { BookOpenText, ListTodo, Plus, Search, Settings, Sparkle } from 'lucide-react'
-import { Link, NavLink } from 'react-router-dom'
+import { BookOpenText, ListTodo, Plus, Search, Settings } from 'lucide-react'
+import { NavLink } from 'react-router-dom'
 import { RailSyncIndicator, type RailSyncIndicatorProps } from './RailSyncIndicator'
 
 const nav = [
@@ -18,7 +18,6 @@ interface ActivityBarProps {
 export function ActivityBar({ hidden, onOpenCommand, sync }: ActivityBarProps) {
   return (
     <aside className="icon-rail" hidden={hidden} aria-label="Application navigation">
-      <Link to="/" className="rail-brand" aria-label="Thread, open Today"><Sparkle size={16} /></Link>
       <nav className="rail-nav" aria-label="Primary destinations">
         {nav.map(({ to, label, icon: Icon, end }) => (
           <NavLink key={to} to={to} end={end} aria-label={label} title={label} className={({ isActive }) => isActive ? 'active' : ''}>
