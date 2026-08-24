@@ -87,6 +87,41 @@ below against the new palette before shipping it.
 None of this migration touched a component's ARIA (`role`, `aria-modal`, focus trap, Escape-to-close)
 or event logic — only which CSS classes render the same markup.
 
+## Inline editor suggestions (`[[`, `#`, `/`)
+
+`src/lib/inlineSuggestions.ts` is the single ProseMirror plugin driving all three of the editor's
+inline trigger menus. One trigger-detection dispatcher (`findSuggestionTrigger` in
+`src/lib/suggestions.ts`), one menu controller, one keydown handler, and one positioner serve all
+three — there's no per-trigger duplication to keep in sync.
+
+**Two intentional divergences** — don't "fix" these as bugs:
+- The hashtag menu's Space-to-commit shortcut (`handleKeyDown`'s `event.key === ' '` branch) is
+  hashtag-only. Generalizing it to wikilinks would break typing multi-word titles (a space mid-title
+  would commit early); slash commands have no query text long enough to need it either.
+- Slash commands mutate the block directly (bullet/checkbox type) and render no inline chip on
+  commit, unlike tag/wikilink pills — they're a structurally different operation (block-level
+  conversion, not inline insertion), so there's nothing equivalent to render.
+
+**Dismissal is sticky.** Escape suppresses a trigger occurrence by `kind:from` (`isTriggerDismissed`),
+not the full `kind:from:to:query` tuple — so it stays dismissed through further edits (typing *or*
+Backspace) at that same position, and only re-arms once a genuinely new trigger starts elsewhere.
+
+**Positioning** is delegated to `@milkdown/plugin-slash`'s `SlashProvider` (floating-ui under the
+hood, with `flip()`/`offset()`/`shift()` middleware), used purely for anchor computation — Thread's
+own `menu.hidden` toggle remains the single source of truth for visibility, since `SlashProvider`'s
+built-in `shouldShow` only recognizes a lone trigger character, not the multi-character queries these
+menus actually match. Adopting Crepe's higher-level `BlockEdit` slash-menu feature instead was
+considered and rejected: its `buildMenu` groups only cover generic Markdown blocks, nothing for
+Thread's custom semantic kinds (task/idea/question/decision/checklist), and it has no counterpart at
+all for `#`/`[[` — so it wouldn't have reduced the actually domain-specific code (ranking, "create"
+entries, keyboard handling), only moved the `/` menu's DOM shell onto a less flexible API.
+
+**Accessibility**: the menu carries `role="listbox"` + a kind-specific `aria-label`, each option has
+a stable `id` referenced by the menu's `aria-activedescendant` (updated on arrow-key and pointer
+hover), and a visually-hidden `role="status" aria-live="polite"` element (mirroring
+`RailSyncIndicator.tsx`'s convention, the app's other live-region) announces loading/empty/result-
+count changes without re-announcing on every arrow-key move.
+
 ## Motion
 
 - `@keyframes spin` and `.spin` live in `primitives.css`; `Spinner.tsx` and the in-progress task

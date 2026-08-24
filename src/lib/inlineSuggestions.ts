@@ -1,4 +1,6 @@
+import { shift } from '@floating-ui/dom'
 import { linkSchema } from '@milkdown/preset-commonmark'
+import { SlashProvider } from '@milkdown/plugin-slash'
 import { Plugin, TextSelection } from '@milkdown/prose/state'
 import type { EditorState } from '@milkdown/prose/state'
 import type { EditorView } from '@milkdown/prose/view'
@@ -29,6 +31,16 @@ interface InlineSuggestionOptions {
 type ActiveTrigger = SuggestionTrigger & {
   from: number
   to: number
+}
+
+// Escape dismisses a trigger occurrence for as long as the cursor stays inside
+// it — including further edits (typing or Backspace) — and only re-arms once
+// a genuinely new trigger starts (a different `from` position). Keying on
+// `kind:from` rather than the full kind:from:to:query tuple is what makes
+// this "sticky": from is the one part of the tuple that doesn't change as the
+// query grows or shrinks within the same occurrence.
+export function isTriggerDismissed(dismissedKey: string, trigger: { kind: string; from: number }): boolean {
+  return dismissedKey === `${trigger.kind}:${trigger.from}`
 }
 
 type MenuEntry =
@@ -92,6 +104,41 @@ function createMenuController(
   menu.hidden = true
   document.body.append(menu)
 
+  const status = document.createElement('div')
+  status.className = 'sr-only'
+  status.setAttribute('role', 'status')
+  status.setAttribute('aria-live', 'polite')
+
+  // Positioning only: SlashProvider never drives visibility itself (its own
+  // trigger-char shouldShow check is too coarse for our multi-character
+  // queries) -- `menu.hidden` remains the single source of truth for whether
+  // the menu is shown, same as before this was introduced. See the
+  // `shouldShow` option below for why it still needs to track `menu.hidden`.
+  const slashProvider = new SlashProvider({
+    content: menu,
+    // menu is `position: fixed` and already appended to document.body below;
+    // without an explicit root, SlashProvider reparents `content` into
+    // view.dom.parentElement on its first update, which would move it out of
+    // body and could change its fixed-position containing block.
+    root: document.body,
+    debounce: 0,
+    offset: 7,
+    // `menu.hidden` is the single source of truth for visibility (set by
+    // render()/dismiss() before this ever runs); this only gates whether
+    // SlashProvider computes a position at all, not whether it's shown --
+    // shouldShow: () => false would skip its internal computePosition() call
+    // entirely, leaving left/top unset even though we still need it computed.
+    shouldShow: () => !menu.hidden,
+    // flip() and offset() are already applied internally by SlashProvider;
+    // shift() adds the horizontal/vertical viewport clamping the old manual
+    // positionMenu() did (10px gutter, matching padding here).
+    middleware: [shift({ padding: 10 })],
+    // matches .editor-suggestion-menu's `position: fixed` -- floating-ui's
+    // default 'absolute' strategy would compute coordinates that don't
+    // account for fixed positioning correctly once the page/editor scrolls.
+    floatingUIOptions: { strategy: 'fixed' },
+  })
+
   let activeTrigger: ActiveTrigger | null = null
   let entries: MenuEntry[] = []
   let activeIndex = 0
@@ -105,6 +152,7 @@ function createMenuController(
   let previousKind: ActiveTrigger['kind'] | null = null
 
   const triggerKey = (trigger: ActiveTrigger) => `${trigger.kind}:${trigger.from}:${trigger.to}:${trigger.query}`
+  const dismissKey = (trigger: ActiveTrigger) => `${trigger.kind}:${trigger.from}`
 
   const makeEntries = (trigger: ActiveTrigger): MenuEntry[] => {
     if (trigger.kind === 'slash') {
@@ -134,23 +182,9 @@ function createMenuController(
 
   const positionMenu = () => {
     if (!activeTrigger || menu.hidden) return
-    const coords = view.coordsAtPos(view.state.selection.from)
-    const viewport = window.visualViewport
-    const viewportLeft = viewport?.offsetLeft ?? 0
-    const viewportTop = viewport?.offsetTop ?? 0
-    const viewportWidth = viewport?.width ?? window.innerWidth
-    const viewportHeight = viewport?.height ?? window.innerHeight
-    const gutter = 10
-    const width = Math.min(310, viewportWidth - gutter * 2)
-    const left = Math.min(Math.max(coords.left, viewportLeft + gutter), viewportLeft + viewportWidth - width - gutter)
-    const below = coords.bottom + 7
-    const availableBelow = viewportTop + viewportHeight - below - gutter
-    const top = availableBelow >= menu.offsetHeight
-      ? below
-      : Math.max(viewportTop + gutter, coords.top - menu.offsetHeight - 7)
-    menu.style.width = `${width}px`
-    menu.style.left = `${left}px`
-    menu.style.top = `${top}px`
+    const viewportWidth = window.visualViewport?.width ?? window.innerWidth
+    menu.style.width = `${Math.min(310, viewportWidth - 20)}px`
+    slashProvider.update(view)
   }
 
   const accept = (entry: MenuEntry, appendSpace = false) => {
@@ -190,24 +224,30 @@ function createMenuController(
     view.focus()
   }
 
+  const optionId = (index: number) => `${menu.id}-option-${index}`
+
   const render = () => {
     menu.replaceChildren()
     if (!activeTrigger) {
       menu.hidden = true
+      menu.removeAttribute('aria-activedescendant')
       return
     }
 
     entries = makeEntries(activeTrigger)
     activeIndex = Math.min(activeIndex, Math.max(0, entries.length - 1))
+
+    const kindLabel = activeTrigger.kind === 'wikilink' ? 'Wikilink suggestions' : activeTrigger.kind === 'hashtag' ? 'Tag suggestions' : 'Block command suggestions'
+    menu.setAttribute('aria-label', kindLabel)
+    menu.append(status)
+
     const heading = document.createElement('div')
     heading.className = 'suggestion-heading'
     heading.textContent = activeTrigger.kind === 'wikilink' ? 'Link a thread' : activeTrigger.kind === 'hashtag' ? 'Add a tag' : 'Change block'
     menu.append(heading)
 
     if (entries.length === 0) {
-      const empty = document.createElement('div')
-      empty.className = 'suggestion-empty'
-      empty.textContent = activeTrigger.kind === 'wikilink' && !threadsReady
+      const emptyText = activeTrigger.kind === 'wikilink' && !threadsReady
         ? 'Finding threads…'
         : activeTrigger.kind === 'hashtag' && !tagsReady
           ? 'Finding tags…'
@@ -216,11 +256,19 @@ function createMenuController(
           : activeTrigger.kind === 'hashtag'
             ? 'Type a name to create a tag'
           : 'No matching commands'
+      const empty = document.createElement('div')
+      empty.className = 'suggestion-empty'
+      empty.textContent = emptyText
       menu.append(empty)
+      menu.removeAttribute('aria-activedescendant')
+      status.textContent = emptyText
     } else {
+      status.textContent = `${entries.length} ${activeTrigger.kind === 'slash' ? 'command' : activeTrigger.kind === 'hashtag' ? 'tag' : 'thread'}${entries.length === 1 ? '' : 's'} found`
+      menu.setAttribute('aria-activedescendant', optionId(activeIndex))
       entries.forEach((entry, index) => {
         const button = document.createElement('button')
         button.type = 'button'
+        button.id = optionId(index)
         button.className = `menu-item suggestion-option${index === activeIndex ? ' active' : ''}`
         button.setAttribute('role', 'option')
         button.setAttribute('aria-selected', String(index === activeIndex))
@@ -263,6 +311,7 @@ function createMenuController(
         button.append(glyph, copy, shortcut)
         button.addEventListener('pointerenter', () => {
           activeIndex = index
+          menu.setAttribute('aria-activedescendant', optionId(activeIndex))
           menu.querySelectorAll<HTMLElement>('.suggestion-option').forEach((option, optionIndex) => {
             option.classList.toggle('active', optionIndex === activeIndex)
             option.setAttribute('aria-selected', String(optionIndex === activeIndex))
@@ -319,7 +368,17 @@ function createMenuController(
 
   const sync = () => {
     const trigger = triggerFromState(view.state)
-    if (!trigger || triggerKey(trigger) === dismissedTriggerKey || !view.hasFocus()) {
+    if (!trigger) {
+      // The trigger syntax itself is gone (cursor moved away, or the trigger
+      // character was deleted) -- clear the dismissal so a fresh trigger
+      // elsewhere isn't accidentally suppressed by a stale key.
+      activeTrigger = null
+      previousKind = null
+      dismissedTriggerKey = ''
+      menu.hidden = true
+      return
+    }
+    if (isTriggerDismissed(dismissedTriggerKey, trigger) || !view.hasFocus()) {
       activeTrigger = null
       previousKind = null
       menu.hidden = true
@@ -337,7 +396,7 @@ function createMenuController(
   }
 
   const dismiss = () => {
-    if (activeTrigger) dismissedTriggerKey = triggerKey(activeTrigger)
+    if (activeTrigger) dismissedTriggerKey = dismissKey(activeTrigger)
     activeTrigger = null
     menu.hidden = true
   }
@@ -409,6 +468,7 @@ function createMenuController(
       window.removeEventListener('scroll', handleViewportChange, true)
       window.visualViewport?.removeEventListener('resize', handleViewportChange)
       window.visualViewport?.removeEventListener('scroll', handleViewportChange)
+      slashProvider.destroy()
       menu.remove()
     },
   }
