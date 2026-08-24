@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Bot, Check, GitBranch, LoaderCircle, Palette, Plus, ShieldCheck, Sparkles, Trash2, Unplug, Users } from 'lucide-react'
+import { AlertTriangle, Bot, Check, GitBranch, LoaderCircle, Palette, Plus, ShieldCheck, Trash2, Unplug, Users, Wand2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
 import { generateText } from 'ai'
 import { db, type PersonaRecord } from '../db'
 import { isoToday } from '../lib/dates'
 import { clearAIConfig, getAIConfig, resolveModel, saveAIConfig, type AIConfig, type AIProvider } from '../lib/ai'
+import { DynamicIcon } from '../lib/icons'
 import { archivePersona, createPersona, GENERAL_PERSONA_ID, updatePersona } from '../lib/personas'
+import { generatePersonaFromDescription } from '../lib/personaBuilder'
+import { IconPicker } from '../components/IconPicker'
 import {
   clearGitHubConfig,
   getGitHubConfig,
@@ -147,6 +150,9 @@ export function SettingsPage() {
   const [newPersonaIcon, setNewPersonaIcon] = useState('Bot')
   const [newPersonaPrompt, setNewPersonaPrompt] = useState('')
   const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null)
+  const [aiDescription, setAIDescription] = useState('')
+  const [aiBuilding, setAIBuilding] = useState(false)
+  const [aiBuildError, setAIBuildError] = useState('')
 
   async function addPersona() {
     if (!newPersonaName.trim()) return
@@ -154,7 +160,23 @@ export function SettingsPage() {
     setNewPersonaName('')
     setNewPersonaIcon('Bot')
     setNewPersonaPrompt('')
+    setAIDescription('')
     setCreatingPersona(false)
+  }
+
+  async function buildPersonaWithAI() {
+    setAIBuildError('')
+    setAIBuilding(true)
+    try {
+      const generated = await generatePersonaFromDescription(aiDescription)
+      setNewPersonaName(generated.name)
+      setNewPersonaIcon(generated.icon)
+      setNewPersonaPrompt(generated.systemPrompt)
+    } catch (caught) {
+      setAIBuildError(caught instanceof Error ? caught.message : String(caught))
+    } finally {
+      setAIBuilding(false)
+    }
   }
 
   return (
@@ -298,13 +320,33 @@ export function SettingsPage() {
           ))}
         </div>
         {creatingPersona ? (
-          <div className="persona-create-form field-grid">
-            <label><span>Name</span><input value={newPersonaName} onChange={(event) => setNewPersonaName(event.target.value)} placeholder="Career coach" /></label>
-            <label><span>Icon</span><input value={newPersonaIcon} onChange={(event) => setNewPersonaIcon(event.target.value)} placeholder="Briefcase" /></label>
-            <label className="persona-prompt-field"><span>System prompt</span><textarea value={newPersonaPrompt} onChange={(event) => setNewPersonaPrompt(event.target.value)} rows={3} placeholder="You are a supportive career coach…" /></label>
-            <div className="settings-actions">
-              <button className="primary-button" onClick={() => void addPersona()} disabled={!newPersonaName.trim()}><Plus size={16} /> Create persona</button>
-              <button className="text-button" onClick={() => setCreatingPersona(false)}>Cancel</button>
+          <div className="persona-create-form">
+            <div className="persona-ai-builder">
+              <label>
+                <span>Describe the persona you want</span>
+                <textarea
+                  value={aiDescription}
+                  onChange={(event) => setAIDescription(event.target.value)}
+                  rows={2}
+                  placeholder="A blunt fitness coach who checks in on my workouts and calls out excuses"
+                />
+              </label>
+              {aiBuildError && <p className="form-error">{aiBuildError}</p>}
+              <div className="settings-actions">
+                <button className="secondary-button" onClick={() => void buildPersonaWithAI()} disabled={aiBuilding || !aiDescription.trim()}>
+                  {aiBuilding ? <LoaderCircle className="spin" size={16} /> : <Wand2 size={16} />}
+                  {aiBuilding ? 'Generating…' : 'Generate with AI'}
+                </button>
+              </div>
+            </div>
+            <div className="field-grid">
+              <label><span>Name</span><input value={newPersonaName} onChange={(event) => setNewPersonaName(event.target.value)} placeholder="Career coach" /></label>
+              <label><span>Icon</span><IconPicker value={newPersonaIcon} onChange={setNewPersonaIcon} /></label>
+              <label className="persona-prompt-field"><span>System prompt</span><textarea value={newPersonaPrompt} onChange={(event) => setNewPersonaPrompt(event.target.value)} rows={3} placeholder="You are a supportive career coach…" /></label>
+              <div className="settings-actions">
+                <button className="primary-button" onClick={() => void addPersona()} disabled={!newPersonaName.trim()}><Plus size={16} /> Create persona</button>
+                <button className="text-button" onClick={() => setCreatingPersona(false)}>Cancel</button>
+              </div>
             </div>
           </div>
         ) : (
@@ -342,7 +384,7 @@ function PersonaRow({
   if (!editing) {
     return (
       <div className="persona-row">
-        <Sparkles size={16} />
+        <DynamicIcon name={persona.icon} size={16} />
         <span className="persona-row-name">{persona.name}</span>
         <div className="settings-actions">
           <button className="text-button" onClick={onEdit}>Edit</button>
@@ -357,7 +399,7 @@ function PersonaRow({
   return (
     <div className="persona-create-form field-grid">
       <label><span>Name</span><input value={name} onChange={(event) => setName(event.target.value)} /></label>
-      <label><span>Icon</span><input value={icon} onChange={(event) => setIcon(event.target.value)} /></label>
+      <label><span>Icon</span><IconPicker value={icon} onChange={setIcon} /></label>
       <label className="persona-prompt-field"><span>System prompt</span><textarea value={systemPrompt} onChange={(event) => setSystemPrompt(event.target.value)} rows={3} /></label>
       <div className="settings-actions">
         <button className="primary-button" onClick={() => void save()}>Save</button>

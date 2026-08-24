@@ -23,7 +23,6 @@ import {
   semanticPrefixPlugin,
 } from '../lib/blockKinds'
 import { inlineSuggestionsPlugin } from '../lib/inlineSuggestions'
-import { parseOutline } from '../lib/outline'
 import type { BlockConversionKind } from '../lib/suggestions'
 import { editorLinksToWiki, wikiLinkInputRule, wikiLinkInteractionPlugin, wikiLinksToEditor } from '../lib/wikilinks'
 import { editorLinksToTags, tagLinkInputRule, tagLinksToEditor } from '../lib/taglinks'
@@ -276,7 +275,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
         void installCollapseControls(root, day)
         crepe.editor.action((ctx) => {
           const view = ctx.get(editorViewCtx)
-          void installTaskControls(view, day, detail.markdown)
+          void installTaskControls(view, day)
           void installBlockMetadataControls(view, day, setInspectorBlockId)
         })
       }, 120)
@@ -288,7 +287,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       if (disposed || detail?.day !== day) return
       crepe.editor.action((ctx) => {
         const view = ctx.get(editorViewCtx)
-        void installTaskControls(view, day, latest)
+        void installTaskControls(view, day)
         void installBlockMetadataControls(view, day, setInspectorBlockId)
       })
     }
@@ -334,11 +333,19 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
         }, 0)
         // Walk the live document in the same tick the transaction landed, so
         // the DOM node and its identity always come from the same node --
-        // never a DOM query zipped against a separately fetched list.
+        // never a DOM query zipped against a separately fetched list. This
+        // first pass will usually pair against `db.tasks` rows from *before*
+        // this edit (persist()'s save is debounced 180ms and reindexing is
+        // async), so it can only refresh already-persisted tasks; the delayed
+        // pass below re-reads `db.tasks` once that save has had time to land,
+        // which is what actually picks up a freshly NLP-parsed due date or a
+        // brand-new task line.
         const view = ctx.get(editorViewCtx)
-        void installTaskControls(view, day, canonical)
+        void installTaskControls(view, day)
         window.setTimeout(() => {
-          if (!disposed) void installBlockMetadataControls(view, day, setInspectorBlockId)
+          if (disposed) return
+          void installTaskControls(view, day)
+          void installBlockMetadataControls(view, day, setInspectorBlockId)
         }, 240)
       })
       listener.blur(() => {
@@ -357,7 +364,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       crepe.editor.action((ctx) => {
         const view = ctx.get(editorViewCtx)
         void installBlockMetadataControls(view, day, setInspectorBlockId)
-        void installTaskControls(view, day, latest).then(() => onReadyRef.current?.())
+        void installTaskControls(view, day).then(() => onReadyRef.current?.())
       })
       // Let initialization events drain before accepting editor writes.
       activationFrame = window.requestAnimationFrame(() => {
@@ -469,21 +476,17 @@ interface LiveTaskNode {
   checked: boolean
 }
 
-// Walk the live ProseMirror document -- not a separately queried DOM list, not
-// a separately fetched DB array -- and read each task's identity and its DOM
-// element off the very same node in the very same pass. Two lists derived at
-// different times (or from different sources) can drift out of step with each
-// other; a single node can't drift out of step with itself.
-//
-// The block-id path scheme (day:0.1.2, following indentation nesting) has one
-// canonical implementation: parseOutline in lib/outline.ts, which is also
-// what produces the TaskRecord ids stored in Dexie. Re-deriving that same
-// scheme here from the live ProseMirror tree would mean two algorithms have
-// to stay in lockstep forever; instead we pair each live task DOM node with
-// its parsed block purely by shared document order -- both are walked from
-// the same markdown snapshot in the same synchronous pass, so their order and
-// count always agree.
-function collectTaskNodes(view: EditorView, day: string, markdown: string): LiveTaskNode[] {
+// Walk the live ProseMirror document for the DOM side, and pair each node
+// with its stable id from `db.tasks` -- the same reconciled-id source
+// `installBlockMetadataControls` below already uses for blocks in general.
+// This used to re-derive ids locally via `parseOutline(markdown, day)`, but
+// that free parse has no access to `reconcileBlockMetadata`'s id reuse (it
+// always falls back to the positional `${day}:${path}` scheme), so its ids
+// never matched the `block_<uuid>` ids `indexAndStoreDay` actually persists
+// to `db.tasks` -- every inline due-date/priority/status lookup missed and
+// silently rendered a blank stub. Pairing by document order against the
+// persisted, already-reconciled rows keeps a single source of truth for ids.
+async function collectTaskNodes(view: EditorView, day: string): Promise<LiveTaskNode[]> {
   const domNodes: HTMLElement[] = []
   view.state.doc.descendants((node, pos) => {
     if (node.type.name !== 'list_item' || typeof node.attrs.checked !== 'boolean') return true
@@ -496,13 +499,14 @@ function collectTaskNodes(view: EditorView, day: string, markdown: string): Live
     return true
   })
 
-  const taskBlocks = parseOutline(markdown, day).blocks.filter((block) => block.kind === 'task')
-  // A mismatch means the document has already moved on from this markdown
-  // snapshot by the time this ran -- skip rather than risk pairing the wrong
-  // id with the wrong DOM node. The next scheduled pass retries.
-  if (domNodes.length !== taskBlocks.length) return []
+  const taskRows = await db.tasks.where('day').equals(day).sortBy('order')
+  // A mismatch means the document has already moved on from this snapshot by
+  // the time the query resolved (e.g. `indexAndStoreDay` hasn't caught up
+  // yet) -- skip rather than risk pairing the wrong id with the wrong DOM
+  // node. The next scheduled pass retries.
+  if (domNodes.length !== taskRows.length) return []
 
-  return domNodes.map((dom, index) => ({ id: taskBlocks[index].id, dom, checked: taskBlocks[index].checked }))
+  return domNodes.map((dom, index) => ({ id: taskRows[index].id, dom, checked: taskRows[index].checked }))
 }
 
 // Same document-order pairing trick as collectTaskNodes, but unfiltered --
@@ -547,8 +551,8 @@ async function installBlockMetadataControls(view: EditorView, day: string, onOpe
 // own that rendering entirely. This function's job is just: figure out which
 // <li> is a task right now and hand it off -- a future kind with its own
 // extra fields plugs in the same way, without touching this tree-walk.
-async function installTaskControls(view: EditorView, day: string, markdown: string): Promise<void> {
-  const nodes = collectTaskNodes(view, day, markdown)
+async function installTaskControls(view: EditorView, day: string): Promise<void> {
+  const nodes = await collectTaskNodes(view, day)
 
   // A block that stops being a task (e.g. converted to a question/decision/
   // idea via the slash command) still carries the classes and DOM controls
