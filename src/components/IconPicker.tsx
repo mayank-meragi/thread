@@ -41,9 +41,10 @@ export function IconPicker({ value, onChange }: { value: string; onChange: (icon
         <ChevronDown size={13} />
       </button>
       {open && (
-        <div className="icon-picker-panel" role="dialog" aria-label="Choose an icon">
+        <div className="menu-panel icon-picker-panel" role="dialog" aria-label="Choose an icon">
           <input
             autoFocus
+            className="field-control"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search icons…"

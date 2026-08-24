@@ -86,7 +86,7 @@ function createMenuController(
   linkType: ReturnType<typeof linkSchema.type>,
 ) {
   const menu = document.createElement('div')
-  menu.className = 'editor-suggestion-menu'
+  menu.className = 'menu-panel editor-suggestion-menu'
   menu.id = `thread-suggestions-${Math.random().toString(36).slice(2)}`
   menu.setAttribute('role', 'listbox')
   menu.hidden = true
@@ -221,7 +221,7 @@ function createMenuController(
       entries.forEach((entry, index) => {
         const button = document.createElement('button')
         button.type = 'button'
-        button.className = `suggestion-option${index === activeIndex ? ' active' : ''}`
+        button.className = `menu-item suggestion-option${index === activeIndex ? ' active' : ''}`
         button.setAttribute('role', 'option')
         button.setAttribute('aria-selected', String(index === activeIndex))
         button.tabIndex = -1

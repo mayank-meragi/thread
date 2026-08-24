@@ -68,7 +68,7 @@ export function DatePicker({ selected, onSelect }: DatePickerProps) {
         <CalendarDays size={16} />
       </button>
       {open && (
-        <div className="date-picker-panel" role="dialog" aria-label="Choose a date">
+        <div className="menu-panel date-picker-panel" role="dialog" aria-label="Choose a date">
           <div className="date-picker-nav">
             <button type="button" aria-label="Previous month" onClick={() => setViewMonth((month) => shiftMonth(month, -1))}>
               <ChevronLeft size={14} />

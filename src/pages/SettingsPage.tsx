@@ -193,7 +193,7 @@ export function SettingsPage() {
               <p>These days changed both here and in the data repository. Pick which copy to keep.</p>
             </div>
           </div>
-          {resolveError && <p className="form-error">{resolveError}</p>}
+          {resolveError && <p className="banner banner-error form-error">{resolveError}</p>}
           {conflicts.map((conflict) => (
             <div className="conflict-row" key={conflict.id}>
               <div className="conflict-day">{conflict.day}</div>
@@ -258,7 +258,7 @@ export function SettingsPage() {
         </div>
         <label><span>Fine-grained token</span><input type="password" value={token} onChange={(event) => setToken(event.target.value)} placeholder="github_pat_…" /></label>
         <div className="security-note"><ShieldCheck size={16} /><span>Stored only in this browser and sent only to api.github.com. Restrict it to the data repository with Contents read/write access.</span></div>
-        {error && <p className="form-error">{error}</p>}
+        {error && <p className="banner banner-error form-error">{error}</p>}
         <div className="settings-actions">
           <button className="primary-button" onClick={() => void connect()} disabled={state !== 'idle' || !repo || !token}>
             {state === 'checking' || state === 'syncing' ? <LoaderCircle className="spin" size={16} /> : state === 'done' ? <Check size={16} /> : <GitBranch size={16} />}
@@ -295,7 +295,7 @@ export function SettingsPage() {
         </div>
         <label><span>API key</span><input type="password" value={aiApiKey} onChange={(event) => setAIApiKey(event.target.value)} placeholder="sk-…" /></label>
         <div className="security-note"><ShieldCheck size={16} /><span>Stored only in this browser and sent only to the provider you pick, directly from this device.</span></div>
-        {aiError && <p className="form-error">{aiError}</p>}
+        {aiError && <p className="banner banner-error form-error">{aiError}</p>}
         <div className="settings-actions">
           <button className="primary-button" onClick={() => void connectAI()} disabled={aiState !== 'idle' || !aiApiKey || !aiModel}>
             {aiState === 'checking' ? <LoaderCircle className="spin" size={16} /> : aiState === 'done' ? <Check size={16} /> : <Bot size={16} />}
@@ -331,7 +331,7 @@ export function SettingsPage() {
                   placeholder="A blunt fitness coach who checks in on my workouts and calls out excuses"
                 />
               </label>
-              {aiBuildError && <p className="form-error">{aiBuildError}</p>}
+              {aiBuildError && <p className="banner banner-error form-error">{aiBuildError}</p>}
               <div className="settings-actions">
                 <button className="secondary-button" onClick={() => void buildPersonaWithAI()} disabled={aiBuilding || !aiDescription.trim()}>
                   {aiBuilding ? <LoaderCircle className="spin" size={16} /> : <Wand2 size={16} />}

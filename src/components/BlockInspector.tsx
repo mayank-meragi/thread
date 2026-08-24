@@ -96,10 +96,10 @@ export function BlockInspector({ blockId, onClose }: BlockInspectorProps) {
   }
 
   return (
-    <div className="block-inspector-layer" role="presentation" onMouseDown={(event) => {
+    <div className="layer-backdrop layer-backdrop-end block-inspector-layer" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose()
     }}>
-      <aside className="block-inspector" role="dialog" aria-modal="true" aria-labelledby="block-inspector-title">
+      <aside className="sheet block-inspector" role="dialog" aria-modal="true" aria-labelledby="block-inspector-title">
         <header className="block-inspector-head">
           <div>
             <span className="block-inspector-kicker"><Braces size={13} /> Block properties</span>
@@ -167,7 +167,7 @@ export function BlockInspector({ blockId, onClose }: BlockInspectorProps) {
               : <button type="button" className="inspector-add-property" onClick={() => setNewPropertyOpen(true)}><Plus size={14} /> New property</button>}
           </section>
 
-          {error && <p className="inspector-error" role="alert">{error}</p>}
+          {error && <p className="banner banner-error inspector-error" role="alert">{error}</p>}
 
           <footer className="block-inspector-foot">
             <span>Stable ID</span><code>{block.id}</code>

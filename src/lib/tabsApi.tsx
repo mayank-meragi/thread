@@ -97,12 +97,13 @@ export function TabsApiProvider({ openTab, children }: { openTab: OpenTab; child
       {longPressMenu && (
         <div className="link-context-backdrop" onClick={() => setLongPressMenu(null)} onTouchStart={() => setLongPressMenu(null)}>
           <div
-            className="link-context-menu"
+            className="menu-panel link-context-menu"
             style={{ left: Math.min(longPressMenu.x, window.innerWidth - 190), top: longPressMenu.y }}
             onClick={(event) => event.stopPropagation()}
           >
             <button
               type="button"
+              className="menu-item"
               onClick={() => {
                 openTab(longPressMenu.href.slice(1), { background: true })
                 setLongPressMenu(null)

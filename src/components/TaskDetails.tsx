@@ -41,8 +41,8 @@ export function TaskDetails({ taskId, onClose }: { taskId: string | null; onClos
   }
 
   return (
-    <div className="task-detail-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <aside className="task-detail-panel" role="dialog" aria-modal="true" aria-labelledby="task-detail-title">
+    <div className="layer-backdrop layer-backdrop-end task-detail-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+      <aside className="sheet task-detail-panel" role="dialog" aria-modal="true" aria-labelledby="task-detail-title">
         <header className="task-detail-head">
           <div><span className="task-detail-kicker">Task record</span><h2 id="task-detail-title">Details</h2></div>
           <button type="button" className="inspector-icon-button" aria-label="Close task details" onClick={onClose}><X size={17} /></button>
@@ -102,7 +102,7 @@ export function TaskDetails({ taskId, onClose }: { taskId: string | null; onClos
             </div>
           </section>
 
-          {error && <p className="inspector-error" role="alert">{error}</p>}
+          {error && <p className="banner banner-error inspector-error" role="alert">{error}</p>}
           <footer className="task-detail-foot">
             <span><CalendarDays size={12} /> Created in {formatDay(task.day).full}</span>
             {task.estimatedMinutes && <span><Clock3 size={12} /> {task.estimatedMinutes} min</span>}

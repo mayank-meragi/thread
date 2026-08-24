@@ -146,14 +146,9 @@
 .persona-switcher-trigger:hover { background: var(--control-hover); }
 .persona-switcher-trigger span { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .persona-switcher-trigger svg:last-child { color: var(--muted); }
-.persona-switcher-panel {
-  position: absolute; top: calc(100% + 4px); left: 10px; z-index: 20; min-width: 200px; max-height: 300px;
-  overflow-y: auto; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper-raised);
-  box-shadow: var(--shadow-2);
-}
-.persona-option { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 12px; text-align: left; cursor: pointer; }
-.persona-option:hover { background: var(--control-hover); }
-.persona-option.active { background: var(--control); font-weight: 600; }
+/* .persona-switcher-panel composes .menu-panel (border/radius/background/shadow); this only adds positioning. */
+.persona-switcher-panel { position: absolute; top: calc(100% + 4px); left: 10px; z-index: 20; min-width: 200px; max-height: 300px; overflow-y: auto; }
+/* .persona-option composes .menu-item (layout/hover/active states); this only adds icon coloring. */
 .persona-option span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .persona-option svg:last-child { color: var(--thread); }
 .chat-panel-body { flex: 1; min-height: 0; display: flex; }
@@ -171,7 +166,8 @@
 .chat-message { max-width: 90%; min-width: 0; padding: 8px 11px; border-radius: 12px; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .chat-message-user { justify-self: end; background: var(--thread-soft); color: var(--ink); white-space: pre-wrap; }
 .chat-message-assistant { justify-self: start; background: var(--control); color: var(--ink); }
-.chat-message-error { margin: 4px 0 0; color: var(--danger); font-size: 12px; }
+/* .chat-message-error composes .banner.banner-error; this only adds spacing to match the message list rhythm. */
+.chat-message-error { margin: 4px 0 0; }
 
 .chat-message-assistant p { margin: 0.6em 0; }
 .chat-message-assistant p:first-child { margin-top: 0; }
@@ -197,8 +193,9 @@
 .mobile-nav { display: none; }
 .mobile-editor-toolbar { display: none; }
 
-.command-backdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 20px; background: rgba(18, 24, 32, .2); backdrop-filter: blur(3px); }
-.command-sheet { width: min(460px, 100%); padding: 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--paper-raised); box-shadow: var(--shadow-3); }
+/* .command-backdrop composes .layer-backdrop.layer-backdrop-center.layer-backdrop-blur; no overrides needed. */
+/* .command-sheet composes .dialog (border/radius/background/shadow); this only adjusts width/padding. */
+.command-sheet { width: min(460px, 100%); padding: 22px; }
 .command-sheet > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
 .command-sheet h2 { margin: 7px 0 0; font: 500 25px/1.05 'Newsreader', serif; }
 .command-close { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 9px; background: var(--control); color: var(--muted); cursor: pointer; }
@@ -214,8 +211,10 @@
 .command-sheet > footer { display: flex; align-items: center; justify-content: flex-end; gap: 7px; margin-top: 15px; padding-top: 12px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 9px; }
 .command-sheet > footer kbd { padding: 3px 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--control); font: 500 8px 'IBM Plex Mono', monospace; }
 
-.tab-switcher-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(18, 24, 32, .18); backdrop-filter: blur(2px); }
-.tab-switcher { width: min(680px, 100%); padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper-raised); box-shadow: var(--shadow); }
+/* .tab-switcher-backdrop composes .layer-backdrop.layer-backdrop-center.layer-backdrop-blur; this only raises stacking above other layers. */
+.tab-switcher-backdrop { z-index: 1000; }
+/* .tab-switcher composes .dialog (border/radius/background/shadow); this only adjusts width/padding. */
+.tab-switcher { width: min(680px, 100%); padding: 16px; }
 .tab-switcher > header { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
 .tab-switcher-hint { color: var(--muted); font-size: 11px; }
 .tab-switcher-hint kbd { padding: 2px 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--control); font: 500 9px 'IBM Plex Mono', monospace; }
@@ -236,32 +235,19 @@
 .tab-card-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .link-context-backdrop { position: fixed; inset: 0; z-index: 60; }
-.link-context-menu {
-  position: fixed; transform: translateY(8px); min-width: 170px; padding: 4px;
-  border: 1px solid var(--line); border-radius: 10px; background: var(--paper-raised);
-  box-shadow: var(--shadow-2);
-}
-.link-context-menu button { width: 100%; padding: 10px 12px; border: 0; border-radius: 7px; background: transparent; color: var(--ink); font-size: 13px; font-weight: 500; text-align: left; }
-.link-context-menu button:hover, .link-context-menu button:active { background: var(--control-hover); }
-.link-context-menu button[disabled] { opacity: .45; cursor: default; }
-.link-context-menu button[disabled]:hover, .link-context-menu button[disabled]:active { background: transparent; }
-.link-context-divider { height: 1px; margin: 4px 8px; background: var(--line-soft); }
+/* .link-context-menu composes .menu-panel; positioning only here. Buttons compose .menu-item. */
+.link-context-menu { position: fixed; transform: translateY(8px); min-width: 170px; }
+.link-context-menu .menu-item { font-size: 13px; font-weight: 500; }
 a[href^="#/"] { -webkit-touch-callout: none; }
-.editor-suggestion-menu {
-  position: fixed; z-index: 90; max-height: min(360px, calc(100vh - 20px)); padding: 6px;
-  overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--paper-raised);
-  color: var(--ink); box-shadow: var(--shadow-2);
-}
+/* .editor-suggestion-menu composes .menu-panel; positioning/scroll only here. */
+.editor-suggestion-menu { position: fixed; z-index: 90; max-height: min(360px, calc(100vh - 20px)); overflow-y: auto; color: var(--ink); }
 .editor-suggestion-menu[hidden] { display: none; }
 .suggestion-heading {
   padding: 7px 9px 8px; color: var(--muted); font: 500 9px/1 'IBM Plex Mono', monospace;
   letter-spacing: .1em; text-transform: uppercase;
 }
-.suggestion-option {
-  width: 100%; min-height: 45px; padding: 5px 8px; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto;
-  align-items: center; gap: 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ink);
-  cursor: pointer; text-align: left;
-}
+/* .suggestion-option composes .menu-item; this only adds the icon/label/shortcut grid. */
+.suggestion-option { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; }
 .suggestion-option.active { background: var(--thread-soft); }
 .suggestion-glyph {
   width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--line);
@@ -314,11 +300,8 @@ a[href^="#/"] { -webkit-touch-callout: none; }
 .day-section-heading h2 span { color: var(--muted); font-weight: 500; }
 
 .date-picker { position: relative; }
-.date-picker-panel {
-  position: absolute; top: 38px; right: 0; z-index: 20; width: 240px; padding: 12px;
-  border: 1px solid var(--line); border-radius: 12px; background: var(--paper-raised);
-  box-shadow: var(--shadow-2);
-}
+/* .date-picker-panel composes .menu-panel (border/radius/background/shadow); this only adds positioning. */
+.date-picker-panel { position: absolute; top: 38px; right: 0; z-index: 20; width: 240px; padding: 12px; }
 .date-picker-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; font-weight: 600; }
 .date-picker-nav button { height: 24px; width: 24px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
 .date-picker-nav button:hover:not(:disabled) { background: var(--canvas); color: var(--ink); }
@@ -464,14 +447,11 @@ a[href^="#/"] { -webkit-touch-callout: none; }
 .task-metadata-row input:focus, .task-metadata-row select:focus { border-color: var(--line); background: var(--paper-raised); }
 .thread-editor .ProseMirror blockquote { border-left-color: var(--thread); color: var(--muted); }
 
-.block-inspector-layer {
-  position: fixed; inset: 0; z-index: 60; display: flex; justify-content: flex-end;
-  background: rgba(18, 24, 32, .16); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
-}
-.block-inspector {
-  position: relative; width: min(410px, 100vw); height: 100%; padding: 25px 25px 30px; overflow-y: auto;
-  border-left: 1px solid var(--line); background: var(--paper-raised); box-shadow: -20px 0 60px rgba(20, 26, 35, .13);
-}
+/* .block-inspector-layer composes .layer-backdrop.layer-backdrop-end; this only adds its own blur/scrim tint. */
+.block-inspector-layer { backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); z-index: 60; }
+/* .block-inspector composes .sheet (width/padding/border/background/overflow); the side panel needs a
+   leftward shadow instead of .sheet's default vertical one, so box-shadow is overridden here. */
+.block-inspector { box-shadow: -20px 0 60px rgba(20, 26, 35, .13); }
 .block-inspector::before {
   content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 3px;
   background: linear-gradient(180deg, var(--thread), var(--idea) 55%, transparent 92%);
@@ -520,7 +500,7 @@ a[href^="#/"] { -webkit-touch-callout: none; }
 .inspector-add-property:hover { background: var(--thread-soft); }
 .new-property-form { display: grid; grid-template-columns: minmax(0, 1fr) 105px; gap: 7px; margin-top: 12px; padding: 12px; border-radius: 11px; background: var(--canvas); }
 .new-property-form button { min-height: 32px; border-radius: 8px; cursor: pointer; }
-.inspector-error { padding: 9px 11px; border-radius: 8px; background: var(--danger-soft); color: var(--danger); font-size: 11px; }
+/* .inspector-error composes .banner.banner-error; no overrides needed. */
 .block-inspector-foot { display: grid; gap: 5px; margin-top: 32px; padding-top: 15px; border-top: 1px solid var(--line); }
 .block-inspector-foot span { color: var(--muted); font: 500 8px/1 'IBM Plex Mono', monospace; letter-spacing: .1em; text-transform: uppercase; }
 .block-inspector-foot code { overflow: hidden; color: var(--outline-muted); font: 400 9px 'IBM Plex Mono', monospace; text-overflow: ellipsis; }
@@ -602,12 +582,13 @@ a[href^="#/"] { -webkit-touch-callout: none; }
 .task-status-button.status-blocked { border-color: var(--warning); background: var(--warning-soft); color: var(--warning); }
 .task-status-button.status-done { border-color: var(--task); background: var(--task); color: var(--on-solid); }
 .task-status-button.status-canceled { color: var(--muted); opacity: .7; }
-.task-status-menu { position: absolute; z-index: 25; top: 32px; left: 0; width: 160px; padding: 5px; border: 1px solid var(--line); border-radius: 11px; background: var(--paper-raised); box-shadow: var(--shadow); }
-.task-status-menu button { width: 100%; min-height: 34px; display: grid; grid-template-columns: 18px 1fr 14px; gap: 6px; align-items: center; padding: 0 8px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-soft); font-size: 10px; text-align: left; cursor: pointer; }
-.task-status-menu button:hover { background: var(--control-hover); }
-.task-status-menu button.status-in_progress { color: var(--thread); }
-.task-status-menu button.status-blocked { color: var(--warning); }
-.task-status-menu button.status-done { color: var(--task); }
+/* .task-status-menu composes .menu-panel; positioning only here. */
+.task-status-menu { position: absolute; z-index: 25; top: 32px; left: 0; width: 160px; }
+/* Buttons compose .menu-item; this only adds the grid layout + status colors. */
+.task-status-menu .menu-item { display: grid; grid-template-columns: 18px 1fr 14px; gap: 6px; font-size: 10px; }
+.task-status-menu .menu-item.status-in_progress { color: var(--thread); }
+.task-status-menu .menu-item.status-blocked { color: var(--warning); }
+.task-status-menu .menu-item.status-done { color: var(--task); }
 .task-row-body { min-width: 0; display: grid; gap: 3px; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
 .task-row-title { overflow: hidden; color: var(--ink-soft); font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .task-row-description { overflow: hidden; color: var(--muted); font: 400 11px/1.3 'Newsreader', serif; text-overflow: ellipsis; white-space: nowrap; }
@@ -624,8 +605,11 @@ a[href^="#/"] { -webkit-touch-callout: none; }
 .tasks-empty h2 { margin: 13px 0 5px; color: var(--ink); font: 500 22px 'Newsreader', serif; }
 .tasks-empty p { margin: 0; font-size: 12px; }
 
-.task-detail-layer { position: fixed; inset: 0; z-index: 65; display: flex; justify-content: flex-end; background: rgba(18, 24, 32, .16); backdrop-filter: blur(2px); }
-.task-detail-panel { width: min(455px, 100vw); height: 100%; padding: 25px 27px 32px; overflow-y: auto; border-left: 1px solid var(--line); background: var(--paper-raised); box-shadow: -20px 0 60px rgba(20, 26, 35, .14); }
+/* .task-detail-layer composes .layer-backdrop.layer-backdrop-end; this only adds its own blur/stacking. */
+.task-detail-layer { backdrop-filter: blur(2px); z-index: 65; }
+/* .task-detail-panel composes .sheet (border/background/overflow); width/padding and the leftward
+   shadow (a right-edge panel needs it, unlike .sheet's default vertical one) are overridden here. */
+.task-detail-panel { width: min(455px, 100vw); padding: 25px 27px 32px; box-shadow: -20px 0 60px rgba(20, 26, 35, .14); }
 .task-detail-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
 .task-detail-kicker { color: var(--task); font: 500 9px 'IBM Plex Mono', monospace; letter-spacing: .1em; text-transform: uppercase; }
 .task-detail-head h2 { margin: 6px 0 0; font: 500 28px 'Newsreader', serif; }
@@ -791,13 +775,10 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .icon-picker-trigger { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 40px; padding: 0 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--control); color: var(--ink); cursor: pointer; }
 .icon-picker-trigger:hover { background: var(--control-hover); }
 .icon-picker-trigger svg:last-child { color: var(--muted); }
-.icon-picker-panel {
-  position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; width: 220px; padding: 10px;
-  border: 1px solid var(--line); border-radius: 12px; background: var(--paper-raised);
-  box-shadow: var(--shadow-2);
-}
-.icon-picker-panel input { width: 100%; height: 32px; margin-bottom: 8px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; outline: 0; background: var(--control); color: var(--ink); font-size: 12px; }
-.icon-picker-panel input:focus { border-color: var(--thread); box-shadow: 0 0 0 3px var(--thread-soft); }
+/* .icon-picker-panel composes .menu-panel (border/radius/background/shadow); this only adds positioning. */
+.icon-picker-panel { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; width: 220px; }
+/* Search field composes .field-control; this only adds spacing. */
+.icon-picker-panel .field-control { height: 32px; margin-bottom: 8px; font-size: 12px; }
 .icon-picker-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; max-height: 190px; overflow-y: auto; }
 .icon-picker-grid button { height: 30px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--ink-soft); cursor: pointer; }
 .icon-picker-grid button:hover { background: var(--control-hover); color: var(--ink); }
@@ -805,7 +786,8 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .icon-picker-empty { grid-column: 1 / -1; margin: 8px 0; color: var(--muted); font-size: 11px; text-align: center; }
 .security-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 13px; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .security-note svg { flex: 0 0 auto; color: var(--task); }
-.form-error { margin-top: 12px !important; padding: 9px 11px; border-radius: 8px; background: var(--danger-soft); color: var(--danger) !important; }
+/* .form-error composes .banner.banner-error; this only adds spacing above the field it follows. */
+.form-error { margin-top: 12px !important; }
 .settings-actions { display: flex; align-items: center; gap: 9px; margin-top: 20px; flex-wrap: wrap; }
 .settings-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 37px; padding: 0 13px; border-radius: 9px; cursor: pointer; font-size: 12px; font-weight: 500; }
 .conflicts-card .settings-title svg { color: var(--warning); }
@@ -922,7 +904,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .mobile-nav .mobile-create { overflow: visible; color: var(--ink); }
   .mobile-create-mark { width: 31px; height: 27px; display: grid; place-items: center; margin-top: -12px; border: 1px solid var(--thread); border-radius: 10px; background: var(--ink); color: var(--on-solid); box-shadow: 0 7px 16px color-mix(in srgb, var(--thread) 25%, transparent); }
   body.mobile-editor-active .mobile-nav { display: none; }
-  .command-backdrop { align-items: end; padding: 0; background: rgba(18, 24, 32, .26); }
+  .command-backdrop { align-items: end; padding: 0; background: var(--scrim-strong); }
   .command-sheet { width: 100%; padding: 21px 18px calc(22px + env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0; border-bottom: 0; }
   .command-sheet > footer { display: none; }
   .command-actions > button { min-height: 58px; }
@@ -968,7 +950,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .thread-editor .ProseMirror { font-size: 16px; min-height: 55vh; }
   .thread-editor .ProseMirror .task-inline-meta { position: static; margin-left: 8px; background: transparent; }
   .thread-editor .ProseMirror .block-property-trigger { right: -4px; opacity: .55; }
-  .block-inspector-layer { align-items: flex-end; background: rgba(18, 24, 32, .26); }
+  .block-inspector-layer { align-items: flex-end; background: var(--scrim-strong); }
   .block-inspector { width: 100%; height: min(86vh, 760px); padding: 21px 20px calc(28px + env(safe-area-inset-bottom)); border: 1px solid var(--line); border-bottom: 0; border-radius: 20px 20px 0 0; box-shadow: 0 -20px 60px rgba(20, 26, 35, .18); }
   .block-inspector::before { top: 0; right: 0; bottom: auto; width: auto; height: 3px; background: linear-gradient(90deg, transparent, var(--thread), var(--idea), transparent); }
   .inspector-property > label { grid-template-columns: 88px minmax(0, 1fr); }
@@ -993,7 +975,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .task-row-foot > span:first-child { display: none; }
   .task-bulk-bar { top: 8px; flex-wrap: wrap; }
   .task-bulk-bar strong { flex-basis: calc(100% - 80px); }
-  .task-detail-layer { align-items: flex-end; background: rgba(18, 24, 32, .26); }
+  .task-detail-layer { align-items: flex-end; background: var(--scrim-strong); }
   .task-detail-panel { width: 100%; height: min(90vh, 820px); padding: 21px 20px calc(28px + env(safe-area-inset-bottom)); border: 1px solid var(--line); border-bottom: 0; border-radius: 20px 20px 0 0; box-shadow: 0 -20px 60px rgba(20, 26, 35, .18); }
   .field-grid { grid-template-columns: 1fr; gap: 0; }
   .theme-groups { grid-template-columns: 1fr; }

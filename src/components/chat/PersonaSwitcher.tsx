@@ -46,7 +46,7 @@ export function PersonaSwitcher({
         <ChevronDown size={13} />
       </button>
       {open && (
-        <div className="persona-switcher-panel" role="listbox" aria-label="Personas">
+        <div className="menu-panel persona-switcher-panel" role="listbox" aria-label="Personas">
           {personas.map((persona) => {
             const Icon = iconFor(persona.icon)
             const isActive = persona.id === activePersonaId
@@ -56,7 +56,7 @@ export function PersonaSwitcher({
                 type="button"
                 role="option"
                 aria-selected={isActive}
-                className={isActive ? 'persona-option active' : 'persona-option'}
+                className={isActive ? 'menu-item persona-option active' : 'menu-item persona-option'}
                 onClick={() => {
                   onChange(persona.id)
                   setOpen(false)

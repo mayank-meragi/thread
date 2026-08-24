@@ -12,6 +12,7 @@ import {
   type PropertyValue,
   type TagDefinitionRecord,
 } from '../db'
+import { DEFAULT_TAG_COLOR } from '../lib/tagColors'
 
 const FIELD_TYPES: Array<{ value: PropertyType; label: string }> = [
   { value: 'text', label: 'Text' },
@@ -73,7 +74,7 @@ export function MetadataSchemas() {
           <button type="submit" className="text-button" disabled={!newField.trim()}><Plus size={14} /> Add field</button>
         </form>
       </div>
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <p className="banner banner-error form-error" role="alert">{error}</p>}
     </section>
   )
 }
@@ -81,7 +82,7 @@ export function MetadataSchemas() {
 function SchemaEditor({ tag, definitions, onError }: { tag: TagDefinitionRecord; definitions: PropertyDefinitionRecord[]; onError: (message: string) => void }) {
   const visibleDefinitions = definitions.filter((definition) => !definition.hidden)
   const [name, setName] = useState(tag.name)
-  const [color, setColor] = useState(tag.color ?? '#5f7864')
+  const [color, setColor] = useState(tag.color ?? DEFAULT_TAG_COLOR)
   const [propertyIds, setPropertyIds] = useState<string[]>(tag.propertyIds)
   const [required, setRequired] = useState<string[]>(tag.requiredPropertyIds ?? [])
   const [defaults, setDefaults] = useState<Record<string, PropertyValue>>(tag.propertyDefaults ?? {})
@@ -107,7 +108,7 @@ function SchemaEditor({ tag, definitions, onError }: { tag: TagDefinitionRecord;
   return (
     <details className="schema-editor">
       <summary>
-        <span className="schema-color" style={{ background: tag.color ?? '#5f7864' }} />
+        <span className="schema-color" style={{ background: tag.color ?? DEFAULT_TAG_COLOR }} />
         <span><b>#{tag.name}</b><small>{tag.propertyIds.length ? `${tag.propertyIds.length} field${tag.propertyIds.length === 1 ? '' : 's'}` : 'Plain tag'}</small></span>
         <ChevronDown size={15} />
       </summary>

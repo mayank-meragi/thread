@@ -32,12 +32,12 @@ export function TabSwitcher({ tabs, selected, onHighlight, onCommit, onCancel }:
 
   return (
     <div
-      className="tab-switcher-backdrop"
+      className="layer-backdrop layer-backdrop-center layer-backdrop-blur tab-switcher-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onCancel()
       }}
     >
-      <section className="tab-switcher" role="dialog" aria-modal="true" aria-label="Switch tabs">
+      <section className="dialog tab-switcher" role="dialog" aria-modal="true" aria-label="Switch tabs">
         <header>
           <span className="eyebrow">Open tabs</span>
           <span className="tab-switcher-hint">Most recently used &mdash; release <kbd>Option</kbd> or press <kbd>Enter</kbd> to switch</span>

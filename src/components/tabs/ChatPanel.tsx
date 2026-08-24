@@ -49,7 +49,7 @@ function AssistantMessage() {
         }}
       />
       <MessagePrimitive.Error>
-        <p className="chat-message-error">Something went wrong. Check your AI provider settings.</p>
+        <p className="banner banner-error chat-message-error">Something went wrong. Check your AI provider settings.</p>
       </MessagePrimitive.Error>
     </MessagePrimitive.Root>
   )

@@ -111,7 +111,7 @@ export function TasksPage() {
 
       {selected.size > 0 && <BulkBar ids={[...selected]} onClear={() => setSelected(new Set())} />}
 
-      <div className="task-ledger">
+      <>
         {groups.map((group) => <section className={`task-list-group group-${group.id}`} key={group.id}>
           <header><span>{group.label}</span><small>{group.tasks.length}</small></header>
           <div>
@@ -132,7 +132,7 @@ export function TasksPage() {
           </div>
         </section>)}
         {groups.length === 0 && <div className="tasks-empty"><Check size={24} /><h2>No tasks in this view</h2><p>Change a filter or capture the next thing you want to move forward.</p></div>}
-      </div>
+      </>
       <TaskDetails taskId={detailsTaskId} onClose={() => setDetailsTaskId(null)} />
     </article>
   )

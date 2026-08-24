@@ -41,8 +41,8 @@ export function GlobalCommandMenu({ open, onClose, onTogglePanel }: GlobalComman
   }
 
   return (
-    <div className="command-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <section ref={sheetRef} className="command-sheet" role="dialog" aria-modal="true" aria-labelledby="command-title">
+    <div className="layer-backdrop layer-backdrop-center layer-backdrop-blur command-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+      <section ref={sheetRef} className="dialog command-sheet" role="dialog" aria-modal="true" aria-labelledby="command-title">
         <header>
           <div><span className="eyebrow">Create or go</span><h2 id="command-title">What do you want to do?</h2></div>
           <button type="button" className="command-close" aria-label="Close create menu" onClick={onClose}><X size={17} /></button>

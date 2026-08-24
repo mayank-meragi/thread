@@ -82,7 +82,7 @@ export function RouteTab({ params, api, containerApi }: IDockviewPanelHeaderProp
               }}
             />
             <div
-              className="link-context-menu"
+              className="menu-panel link-context-menu"
               role="menu"
               style={{
                 left: Math.min(menu.x, window.innerWidth - 200),
@@ -92,6 +92,7 @@ export function RouteTab({ params, api, containerApi }: IDockviewPanelHeaderProp
               <button
                 type="button"
                 role="menuitem"
+                className="menu-item"
                 disabled={!splittable}
                 title={splittable ? undefined : 'A split needs at least two tabs in this group'}
                 onClick={() => runAction(() => void splitPanel(containerApi, api.id, 'right'))}
@@ -101,6 +102,7 @@ export function RouteTab({ params, api, containerApi }: IDockviewPanelHeaderProp
               <button
                 type="button"
                 role="menuitem"
+                className="menu-item"
                 disabled={!splittable}
                 title={splittable ? undefined : 'A split needs at least two tabs in this group'}
                 onClick={() => runAction(() => void splitPanel(containerApi, api.id, 'below'))}
@@ -110,6 +112,7 @@ export function RouteTab({ params, api, containerApi }: IDockviewPanelHeaderProp
               <button
                 type="button"
                 role="menuitem"
+                className="menu-item"
                 disabled={!movable}
                 title={movable ? undefined : 'No other group to move this tab to'}
                 onClick={() => runAction(() => void moveToNextGroup(containerApi, api.id))}
@@ -118,8 +121,8 @@ export function RouteTab({ params, api, containerApi }: IDockviewPanelHeaderProp
               </button>
               {closable && (
                 <>
-                  <div className="link-context-divider" />
-                  <button type="button" role="menuitem" onClick={() => runAction(() => api.close())}>
+                  <div className="menu-divider link-context-divider" />
+                  <button type="button" role="menuitem" className="menu-item" onClick={() => runAction(() => api.close())}>
                     Close tab
                   </button>
                 </>

@@ -52,9 +52,9 @@ export function TaskStatusControl({ task, compact = false }: { task: TaskRecord;
         <TaskStatusIcon status={task.status} size={compact ? 13 : 15} />
         {!compact && <span>{TASK_STATUS_LABELS[task.status]}</span>}
       </button>
-      {open && <div className="task-status-menu" role="menu">
+      {open && <div className="menu-panel task-status-menu" role="menu">
         {(Object.keys(TASK_STATUS_LABELS) as TaskStatus[]).map((status) => (
-          <button type="button" role="menuitem" key={status} className={`status-${status}`} onClick={() => void choose(status)}>
+          <button type="button" role="menuitem" key={status} className={`menu-item status-${status}`} onClick={() => void choose(status)}>
             <TaskStatusIcon status={status} size={14} />
             <span>{TASK_STATUS_LABELS[status]}</span>
             {task.status === status && <CircleDotDashed size={12} />}
