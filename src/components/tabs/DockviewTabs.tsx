@@ -4,11 +4,13 @@ import { DockviewReact, type DockviewApi, type DockviewReadyEvent, type Dockview
 import 'dockview-react/dist/styles/dockview.css'
 import { getTheme, isDarkTheme } from '../../lib/theme'
 import { appendMissing, cycleSelection, loadMru, pruneMru, pushMru, saveMru } from '../../lib/tabMru'
-import { applyRailVisibility, ensureContextRail, toggleContextRail, TOGGLE_RAIL_EVENT } from '../../lib/dockviewActions'
+import { applyRailVisibility, ensureContextRail, OPEN_CHAT_EVENT, openChatPanel, toggleContextRail, TOGGLE_RAIL_EVENT } from '../../lib/dockviewActions'
 import { isGridGroup, isWorkingPath, tabIdForPath, TODAY_TAB_ID } from '../../lib/tabsModel'
 import { TabsApiProvider, type OpenTab } from '../../lib/tabsApi'
 import { ContextRail } from './ContextRail'
 import { ContextTab } from './ContextTab'
+import { ChatPanel } from './ChatPanel'
+import { ChatTab } from './ChatTab'
 import { RoutePanel } from './RoutePanel'
 import { RouteTab } from './RouteTab'
 import { GroupActions } from './GroupActions'
@@ -16,8 +18,8 @@ import { TabSwitcher, type SwitcherTab } from './TabSwitcher'
 
 const STORAGE_KEY = 'thread.dockview-layout'
 
-const components = { route: RoutePanel, context: ContextRail }
-const tabComponents = { route: RouteTab, context: ContextTab }
+const components = { route: RoutePanel, context: ContextRail, chat: ChatPanel }
+const tabComponents = { route: RouteTab, context: ContextTab, chat: ChatTab }
 
 interface SwitcherState {
   tabs: SwitcherTab[]
@@ -268,6 +270,15 @@ export function DockviewTabs() {
     }
     window.addEventListener(TOGGLE_RAIL_EVENT, toggle)
     return () => window.removeEventListener(TOGGLE_RAIL_EVENT, toggle)
+  }, [])
+
+  useEffect(() => {
+    const open = () => {
+      const current = apiRef.current
+      if (current) openChatPanel(current)
+    }
+    window.addEventListener(OPEN_CHAT_EVENT, open)
+    return () => window.removeEventListener(OPEN_CHAT_EVENT, open)
   }, [])
 
   // Mobile widths hide the rail entirely (replaces the old display:none CSS

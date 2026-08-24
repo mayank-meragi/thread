@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Check, GitBranch, LoaderCircle, Palette, ShieldCheck, Unplug } from 'lucide-react'
+import { AlertTriangle, Bot, Check, GitBranch, LoaderCircle, Palette, Plus, ShieldCheck, Sparkles, Trash2, Unplug, Users } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
-import { db } from '../db'
+import { generateText } from 'ai'
+import { db, type PersonaRecord } from '../db'
 import { isoToday } from '../lib/dates'
+import { clearAIConfig, getAIConfig, resolveModel, saveAIConfig, type AIConfig, type AIProvider } from '../lib/ai'
+import { archivePersona, createPersona, GENERAL_PERSONA_ID, updatePersona } from '../lib/personas'
 import {
   clearGitHubConfig,
   getGitHubConfig,
@@ -110,6 +113,50 @@ export function SettingsPage() {
     applyTheme(nextTheme)
   }
 
+  const existingAI = getAIConfig()
+  const [aiProvider, setAIProvider] = useState<AIProvider>(existingAI?.provider ?? 'anthropic')
+  const [aiApiKey, setAIApiKey] = useState(existingAI?.apiKey ?? '')
+  const [aiModel, setAIModel] = useState(existingAI?.model ?? '')
+  const [aiState, setAIState] = useState<'idle' | 'checking' | 'done'>('idle')
+  const [aiError, setAIError] = useState('')
+
+  async function connectAI() {
+    setAIError('')
+    const config: AIConfig = { provider: aiProvider, apiKey: aiApiKey.trim(), model: aiModel.trim() }
+    if (!config.apiKey || !config.model) return setAIError('An API key and model are both required.')
+    setAIState('checking')
+    try {
+      await generateText({ model: resolveModel(config), prompt: 'Reply with the single word "ok".' })
+      saveAIConfig(config)
+      setAIState('done')
+    } catch (caught) {
+      setAIError(caught instanceof Error ? caught.message : String(caught))
+      setAIState('idle')
+    }
+  }
+
+  useEffect(() => {
+    if (aiState !== 'done') return
+    const timer = window.setTimeout(() => setAIState('idle'), 1800)
+    return () => window.clearTimeout(timer)
+  }, [aiState])
+
+  const personas = useLiveQuery(() => db.personas.filter((persona) => !persona.archivedAt).toArray(), [], [])
+  const [creatingPersona, setCreatingPersona] = useState(false)
+  const [newPersonaName, setNewPersonaName] = useState('')
+  const [newPersonaIcon, setNewPersonaIcon] = useState('Bot')
+  const [newPersonaPrompt, setNewPersonaPrompt] = useState('')
+  const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null)
+
+  async function addPersona() {
+    if (!newPersonaName.trim()) return
+    await createPersona({ name: newPersonaName, icon: newPersonaIcon.trim() || 'Bot', systemPrompt: newPersonaPrompt })
+    setNewPersonaName('')
+    setNewPersonaIcon('Bot')
+    setNewPersonaPrompt('')
+    setCreatingPersona(false)
+  }
+
   return (
     <article className="utility-page settings-page">
       <div className="eyebrow">Your data, your repository</div>
@@ -210,6 +257,112 @@ export function SettingsPage() {
         <div><h2>Local database</h2><p>IndexedDB is the working database. Notes open and save without a network connection.</p></div>
         <div className="database-stat"><strong>{pending}</strong><span>changes waiting to sync</span></div>
       </section>
+
+      <section className="settings-card">
+        <div className="settings-title"><Bot size={20} /><div><h2>AI provider</h2><p>Bring your own API key. Switching providers here changes every persona at once -- no other setup needed.</p></div></div>
+        <div className="field-grid">
+          <label>
+            <span>Provider</span>
+            <select value={aiProvider} onChange={(event) => setAIProvider(event.target.value as AIProvider)}>
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+              <option value="google">Google (Gemini)</option>
+            </select>
+          </label>
+          <label><span>Model</span><input value={aiModel} onChange={(event) => setAIModel(event.target.value)} placeholder={aiProvider === 'anthropic' ? 'claude-sonnet-5' : aiProvider === 'google' ? 'gemini-2.5-pro' : 'gpt-5'} /></label>
+        </div>
+        <label><span>API key</span><input type="password" value={aiApiKey} onChange={(event) => setAIApiKey(event.target.value)} placeholder="sk-…" /></label>
+        <div className="security-note"><ShieldCheck size={16} /><span>Stored only in this browser and sent only to the provider you pick, directly from this device.</span></div>
+        {aiError && <p className="form-error">{aiError}</p>}
+        <div className="settings-actions">
+          <button className="primary-button" onClick={() => void connectAI()} disabled={aiState !== 'idle' || !aiApiKey || !aiModel}>
+            {aiState === 'checking' ? <LoaderCircle className="spin" size={16} /> : aiState === 'done' ? <Check size={16} /> : <Bot size={16} />}
+            {aiState === 'checking' ? 'Checking…' : aiState === 'done' ? 'Connected' : existingAI ? 'Reconnect' : 'Connect'}
+          </button>
+          {existingAI && <button className="text-button" onClick={() => { clearAIConfig(); setAIApiKey('') }}><Unplug size={15} /> Disconnect</button>}
+        </div>
+      </section>
+
+      <section className="settings-card">
+        <div className="settings-title"><Users size={20} /><div><h2>Personas</h2><p>Each persona keeps its own notes and sessions, alongside your other threads.</p></div></div>
+        <div className="persona-settings-list">
+          {personas.map((persona) => (
+            <PersonaRow
+              key={persona.id}
+              persona={persona}
+              editing={editingPersonaId === persona.id}
+              onEdit={() => setEditingPersonaId(persona.id)}
+              onCancelEdit={() => setEditingPersonaId(null)}
+              onSaved={() => setEditingPersonaId(null)}
+            />
+          ))}
+        </div>
+        {creatingPersona ? (
+          <div className="persona-create-form field-grid">
+            <label><span>Name</span><input value={newPersonaName} onChange={(event) => setNewPersonaName(event.target.value)} placeholder="Career coach" /></label>
+            <label><span>Icon</span><input value={newPersonaIcon} onChange={(event) => setNewPersonaIcon(event.target.value)} placeholder="Briefcase" /></label>
+            <label className="persona-prompt-field"><span>System prompt</span><textarea value={newPersonaPrompt} onChange={(event) => setNewPersonaPrompt(event.target.value)} rows={3} placeholder="You are a supportive career coach…" /></label>
+            <div className="settings-actions">
+              <button className="primary-button" onClick={() => void addPersona()} disabled={!newPersonaName.trim()}><Plus size={16} /> Create persona</button>
+              <button className="text-button" onClick={() => setCreatingPersona(false)}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="settings-actions">
+            <button className="secondary-button" onClick={() => setCreatingPersona(true)}><Plus size={16} /> New persona</button>
+          </div>
+        )}
+      </section>
     </article>
+  )
+}
+
+function PersonaRow({
+  persona,
+  editing,
+  onEdit,
+  onCancelEdit,
+  onSaved,
+}: {
+  persona: PersonaRecord
+  editing: boolean
+  onEdit: () => void
+  onCancelEdit: () => void
+  onSaved: () => void
+}) {
+  const [name, setName] = useState(persona.name)
+  const [icon, setIcon] = useState(persona.icon)
+  const [systemPrompt, setSystemPrompt] = useState(persona.systemPrompt)
+
+  async function save() {
+    await updatePersona(persona.id, { name, icon, systemPrompt })
+    onSaved()
+  }
+
+  if (!editing) {
+    return (
+      <div className="persona-row">
+        <Sparkles size={16} />
+        <span className="persona-row-name">{persona.name}</span>
+        <div className="settings-actions">
+          <button className="text-button" onClick={onEdit}>Edit</button>
+          {persona.id !== GENERAL_PERSONA_ID && (
+            <button className="text-button" onClick={() => void archivePersona(persona.id)}><Trash2 size={15} /></button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="persona-create-form field-grid">
+      <label><span>Name</span><input value={name} onChange={(event) => setName(event.target.value)} /></label>
+      <label><span>Icon</span><input value={icon} onChange={(event) => setIcon(event.target.value)} /></label>
+      <label className="persona-prompt-field"><span>System prompt</span><textarea value={systemPrompt} onChange={(event) => setSystemPrompt(event.target.value)} rows={3} /></label>
+      <div className="settings-actions">
+        <button className="primary-button" onClick={() => void save()}>Save</button>
+        <button className="text-button" onClick={onCancelEdit}>Cancel</button>
+      </div>
+    </div>
   )
 }

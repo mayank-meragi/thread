@@ -1,5 +1,5 @@
 import type { DockviewApi } from 'dockview-react'
-import { CONTEXT_GROUP_ID, CONTEXT_PANEL_ID, CONTEXT_RAIL_POSITION, isGridGroup, type EdgePosition } from './tabsModel'
+import { CHAT_PANEL_ID, CONTEXT_GROUP_ID, CONTEXT_PANEL_ID, CONTEXT_RAIL_POSITION, isGridGroup, type EdgePosition } from './tabsModel'
 
 export type SplitDirection = 'right' | 'below'
 
@@ -7,6 +7,7 @@ const RAIL_PREF_KEY = 'thread.context-rail'
 const RAIL_MOBILE_QUERY = '(max-width: 760px)'
 export const TOGGLE_RAIL_EVENT = 'thread:toggle-context-rail'
 export const RAIL_VISIBILITY_EVENT = 'thread:context-rail-visibility'
+export const OPEN_CHAT_EVENT = 'thread:open-chat-panel'
 
 function isMobileViewport(): boolean {
   return typeof window !== 'undefined' && window.matchMedia(RAIL_MOBILE_QUERY).matches
@@ -73,6 +74,31 @@ export function ensureContextRail(api: DockviewApi, railWidth?: number): void {
   const edgeApi = api.getEdgeGroup(CONTEXT_RAIL_POSITION)
   if (edgeApi && edgeApi.getHeaderPosition() !== 'top') edgeApi.setHeaderPosition('top')
   applyRailVisibility(api)
+}
+
+// The chat panel lives as a second tab in the context rail's edge group, but
+// unlike the context panel it isn't shown by default -- it only exists once
+// opened, and stays inactive (behind Context) otherwise.
+export function ensureChatPanel(api: DockviewApi): void {
+  if (api.getPanel(CHAT_PANEL_ID)) return
+  const group = api.groups.find((candidate) => candidate.id === CONTEXT_GROUP_ID)
+  api.addPanel({
+    id: CHAT_PANEL_ID,
+    component: 'chat',
+    tabComponent: 'chat',
+    params: {},
+    inactive: true,
+    position: group ? { referenceGroup: group.id, direction: 'within' } : undefined,
+  })
+}
+
+// The icon-rail entry point: force the rail visible (even if the user hid it)
+// and bring Chat to the front, regardless of which tab was showing before.
+export function openChatPanel(api: DockviewApi): void {
+  ensureChatPanel(api)
+  if (isUserRailHidden()) toggleContextRail(api)
+  else applyRailVisibility(api)
+  api.getPanel(CHAT_PANEL_ID)?.api.setActive()
 }
 
 export function canSplitPanel(api: DockviewApi, panelId: string): boolean {

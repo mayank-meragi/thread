@@ -7,6 +7,8 @@ export const CONTEXT_GROUP_ID = 'context-rail'
 export type EdgePosition = 'left' | 'right'
 export const CONTEXT_RAIL_POSITION: EdgePosition = 'right'
 
+export const CHAT_PANEL_ID = 'chat-panel'
+
 const STATIC_TAB_PATHS = ['/tasks', '/search', '/settings']
 
 export function isWorkingPath(path: string): boolean {

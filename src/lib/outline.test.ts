@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cleanMarkdownLine, extractThreadMentions, parseOutline, slugifyThread } from './outline'
+import { cleanMarkdownLine, extractThreadMentions, insertPersonaNote, parseOutline, slugifyThread } from './outline'
 
 describe('outline parsing', () => {
   it('normalizes thread names', () => {
@@ -61,5 +61,33 @@ describe('outline parsing', () => {
 
   it('turns a markdown block into a readable excerpt', () => {
     expect(cleanMarkdownLine('  - **Start** with [[Browser]]')).toBe('Start with Browser')
+  })
+})
+
+describe('insertPersonaNote', () => {
+  it('replaces a blank placeholder day with a fresh persona heading', () => {
+    const markdown = insertPersonaNote('- ', 'Career Coach', 'Wants to move into management')
+    expect(markdown).toBe('- [[Career Coach]]\n  - Wants to move into management')
+    expect(extractThreadMentions(markdown, '2026-08-24')).toMatchObject([
+      { threadId: 'career-coach', excerpt: 'Career Coach' },
+      { threadId: 'career-coach', excerpt: 'Wants to move into management' },
+    ])
+  })
+
+  it('appends a fresh heading after existing journal content', () => {
+    const markdown = insertPersonaNote('- Need to improve onboarding', 'Career Coach', 'First note')
+    expect(markdown).toBe('- Need to improve onboarding\n\n- [[Career Coach]]\n  - First note')
+  })
+
+  it('nests a second note under an existing heading for the same day instead of duplicating it', () => {
+    const first = insertPersonaNote('- ', 'Career Coach', 'First note')
+    const second = insertPersonaNote(first, 'Career Coach', 'Second note')
+    expect(second).toBe('- [[Career Coach]]\n  - First note\n  - Second note')
+  })
+
+  it('inserts a note under the right heading without disturbing a later top-level block', () => {
+    const markdown = '- [[Career Coach]]\n  - First note\n\n- Unrelated later thought'
+    const result = insertPersonaNote(markdown, 'Career Coach', 'Second note')
+    expect(result).toBe('- [[Career Coach]]\n  - First note\n  - Second note\n\n- Unrelated later thought')
   })
 })

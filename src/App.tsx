@@ -3,7 +3,7 @@ import { BookOpenText, ListTodo, Plus, Search, Settings } from 'lucide-react'
 import { HashRouter, NavLink, useNavigate } from 'react-router-dom'
 import { initializeDatabase } from './db'
 import { isoToday } from './lib/dates'
-import { TOGGLE_RAIL_EVENT } from './lib/dockviewActions'
+import { OPEN_CHAT_EVENT, TOGGLE_RAIL_EVENT } from './lib/dockviewActions'
 import { isUserActivityBarHidden, toggleActivityBarHidden } from './lib/activityBar'
 import { DockviewTabs } from './components/tabs/DockviewTabs'
 import { GlobalCommandMenu } from './components/GlobalCommandMenu'
@@ -20,6 +20,9 @@ function AppShell() {
   const openCommand = useCallback(() => setCommandOpen(true), [])
   const toggleRail = useCallback(() => {
     window.dispatchEvent(new Event(TOGGLE_RAIL_EVENT))
+  }, [])
+  const openChat = useCallback(() => {
+    window.dispatchEvent(new Event(OPEN_CHAT_EVENT))
   }, [])
   const toggleActivityBar = useCallback(() => {
     setActivityBarHidden(toggleActivityBarHidden())
@@ -63,7 +66,7 @@ function AppShell() {
       />
 
       <div className="workbench">
-        <ActivityBar hidden={activityBarHidden} onOpenCommand={openCommand} sync={syncProps} />
+        <ActivityBar hidden={activityBarHidden} onOpenCommand={openCommand} onOpenChat={openChat} sync={syncProps} />
 
         <div className="content-shell">
           <div className="content-row">

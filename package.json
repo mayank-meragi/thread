@@ -11,12 +11,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.41",
+    "@ai-sdk/google": "^4.0.50",
+    "@ai-sdk/openai": "^4.0.46",
+    "@assistant-ui/react": "^0.15.16",
+    "@assistant-ui/react-markdown": "^0.14.12",
     "@milkdown/core": "^7.22.1",
     "@milkdown/crepe": "latest",
     "@milkdown/plugin-trailing": "^7.22.1",
     "@milkdown/preset-commonmark": "^7.22.1",
     "@milkdown/prose": "^7.22.1",
     "@milkdown/utils": "^7.22.1",
+    "ai": "^7.0.77",
     "chrono-node": "^2.10.1",
     "dexie": "latest",
     "dexie-react-hooks": "latest",
@@ -25,7 +31,8 @@
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "react-router-dom": "latest"
+    "react-router-dom": "latest",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "latest",

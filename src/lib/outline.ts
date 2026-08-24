@@ -67,6 +67,30 @@ export function cleanMarkdownLine(line: string): string {
     .trim()
 }
 
+// Appends a note under a `[[Persona]]` heading bullet in a day's markdown --
+// reusing the same `[[Title]]`-as-heading convention the demo journal and
+// regular wiki-threads already use, so the note picks up a mention/occurrence
+// like anything else typed by hand, and shows up in both the day and the
+// thread. Reuses today's `[[Persona]]` block if one is already present
+// (so a second note this session nests under it instead of duplicating the
+// heading), or appends a fresh one at the end otherwise.
+export function insertPersonaNote(markdown: string, personaTitle: string, note: string): string {
+  const lines = markdown.split('\n')
+  const indentOf = (line: string) => line.match(/^\s*/)?.[0].length ?? 0
+  const headingIndex = lines.findIndex((line) => indentOf(line) === 0 && cleanMarkdownLine(line) === personaTitle)
+
+  if (headingIndex === -1) {
+    const trimmed = markdown.replace(/\s+$/, '')
+    const prefix = trimmed && trimmed !== '-' ? `${trimmed}\n\n` : ''
+    return `${prefix}- [[${personaTitle}]]\n  - ${note.trim()}`
+  }
+
+  let insertAt = headingIndex + 1
+  while (insertAt < lines.length && lines[insertAt].trim() !== '' && indentOf(lines[insertAt]) > 0) insertAt += 1
+  lines.splice(insertAt, 0, `  - ${note.trim()}`)
+  return lines.join('\n')
+}
+
 export function extractThreadMentions(markdown: string, day: string): ParsedMention[] {
   const mentions: ParsedMention[] = []
   const contextStack: Array<{ indent: number; threads: Array<{ id: string; title: string }> }> = []

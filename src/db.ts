@@ -11,9 +11,10 @@ import {
   type TagDefinitionRecord,
 } from './lib/blockMetadata'
 import { normalizePropertyValue, parseDayDocument, type DayMetadata, type PropertyValue } from './lib/dayDocument'
-import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, parseOutline, type BlockKind, type OutlineBlock, type ParsedMention } from './lib/outline'
+import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, insertPersonaNote, parseOutline, type BlockKind, type OutlineBlock, type ParsedMention } from './lib/outline'
 import { parseTaskDate, type ParsedTaskDate } from './lib/taskDates'
 import { extractHashtags, slugifyTag } from './lib/hashtags'
+import { isoToday } from './lib/dates'
 
 export interface DayRecord {
   date: string
@@ -97,6 +98,33 @@ export interface DayRevisionRecord extends DayRecord {
   archivedAt: string
 }
 
+export interface PersonaRecord {
+  id: string
+  name: string
+  icon: string
+  systemPrompt: string
+  threadId: string
+  createdAt: string
+  updatedAt: string
+  archivedAt?: string
+}
+
+export interface ChatSessionRecord {
+  id: string
+  personaId: string
+  title: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChatMessageRecord {
+  id: string
+  sessionId: string
+  role: 'user' | 'assistant'
+  content: string
+  createdAt: string
+}
+
 export type TaskPriority = 'low' | 'medium' | 'high'
 export type TaskStatus = 'not_started' | 'in_progress' | 'blocked' | 'done' | 'canceled'
 
@@ -141,6 +169,9 @@ class ThreadDatabase extends Dexie {
   blockProperties!: EntityTable<BlockPropertyRecord, 'id'>
   tagDefinitions!: EntityTable<TagDefinitionRecord, 'id'>
   blockTags!: EntityTable<BlockTagRecord, 'id'>
+  personas!: EntityTable<PersonaRecord, 'id'>
+  chatSessions!: EntityTable<ChatSessionRecord, 'id'>
+  chatMessages!: EntityTable<ChatMessageRecord, 'id'>
 
   constructor() {
     super('thread-v1')
@@ -231,10 +262,69 @@ class ThreadDatabase extends Dexie {
       tagDefinitions: 'id, name, updatedAt',
       blockTags: 'id, blockId, day, tagId, [blockId+tagId], [tagId+day]',
     })
+    this.version(8).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, kind, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, day, detectedAt, resolvedAt',
+      blocks: 'id, day, parentId, kind, [day+order]',
+      occurrences: 'id, threadId, day, rootBlockId, [threadId+day]',
+      viewState: 'key, view, blockId, collapsed',
+      revisions: 'id, day, archivedAt, [day+localRevision]',
+      tasks: 'id, blockId, day, status, parentTaskId, dueDate, startDate, priority, [day+order], [status+dueDate]',
+      threadNotes: 'threadId, updatedAt',
+      propertyDefinitions: 'id, name, type, updatedAt',
+      blockProperties: 'id, blockId, day, propertyId, [blockId+propertyId], [propertyId+day]',
+      tagDefinitions: 'id, name, updatedAt',
+      blockTags: 'id, blockId, day, tagId, [blockId+tagId], [tagId+day]',
+      personas: 'id, updatedAt',
+      chatSessions: 'id, personaId, updatedAt, [personaId+updatedAt]',
+      chatMessages: 'id, sessionId, createdAt, [sessionId+createdAt]',
+    })
+    this.version(9).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, kind, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, day, detectedAt, resolvedAt',
+      blocks: 'id, day, parentId, kind, [day+order]',
+      occurrences: 'id, threadId, day, rootBlockId, [threadId+day]',
+      viewState: 'key, view, blockId, collapsed',
+      revisions: 'id, day, archivedAt, [day+localRevision]',
+      tasks: 'id, blockId, day, status, parentTaskId, dueDate, startDate, priority, [day+order], [status+dueDate]',
+      threadNotes: 'threadId, updatedAt',
+      propertyDefinitions: 'id, name, type, updatedAt',
+      blockProperties: 'id, blockId, day, propertyId, [blockId+propertyId], [propertyId+day]',
+      tagDefinitions: 'id, name, updatedAt',
+      blockTags: 'id, blockId, day, tagId, [blockId+tagId], [tagId+day]',
+      personas: 'id, threadId, updatedAt',
+      chatSessions: 'id, personaId, updatedAt, [personaId+updatedAt]',
+      chatMessages: 'id, sessionId, createdAt, [sessionId+createdAt]',
+    })
   }
 }
 
 export const db = new ThreadDatabase()
+
+// Writes a persona's note into today's journal under a `[[Persona]]` heading
+// rather than into a separate per-thread scratchpad -- this way the note is
+// dated the same way any other journal entry is, and it shows up in both the
+// day view and the persona's thread (via the normal wiki-mention pipeline)
+// with no separate rendering path to keep in sync.
+export async function appendPersonaJournalNote(personaTitle: string, note: string): Promise<void> {
+  const date = isoToday()
+  await ensureDay(date)
+  const day = await db.days.get(date)
+  const markdown = insertPersonaNote(day?.markdown ?? '- ', personaTitle, note)
+  await saveDay(date, markdown)
+  // The chat panel writes this from outside whatever editor Today happens to
+  // have open -- same situation as a remote sync pull -- so the open editor
+  // needs the same nudge to pick up content it didn't type itself.
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('thread:day-external-update', { detail: { day: date, markdown } }))
+  }
+}
 
 export type { BlockPropertyRecord, BlockTagRecord, PropertyDefinitionRecord, PropertySource, PropertyType, PropertyValue, TagDefinitionRecord }
 
@@ -260,6 +350,9 @@ export async function initializeDatabase(today: string): Promise<void> {
     else await reindexDay(day)
   }
   await pruneOrphanThreads()
+  const { ensureGeneralPersona, repairPersonaThreads } = await import('./lib/personas')
+  await ensureGeneralPersona()
+  await repairPersonaThreads()
 }
 
 async function ensureBuiltInProperties(): Promise<void> {
@@ -341,7 +434,7 @@ async function indexAndStoreDay(record: DayRecord, previous?: DayRecord, options
   record = { ...record, metadata: reconciled.metadata }
   const parsed = withBlockIds(extractThreadMentions(record.markdown, record.date), outline.blocks)
   const taskRecords = await buildTaskRecords(outline.blocks, record.date, reconciled.metadata)
-  await db.transaction('rw', [db.days, db.threads, db.mentions, db.blocks, db.occurrences, db.outbox, db.revisions, db.tasks, db.threadNotes, db.blockProperties, db.blockTags], async () => {
+  await db.transaction('rw', [db.days, db.threads, db.mentions, db.blocks, db.occurrences, db.outbox, db.revisions, db.tasks, db.threadNotes, db.blockProperties, db.blockTags, db.personas], async () => {
     if (previous && previous.markdown !== record.markdown) {
       await db.revisions.put({
         ...previous,
@@ -397,7 +490,7 @@ async function reindexDay(record: DayRecord): Promise<void> {
   await syncInlineHashtags(outline.blocks, reconciled.metadata)
   const parsed = withBlockIds(extractThreadMentions(record.markdown, record.date), outline.blocks)
   const taskRecords = await buildTaskRecords(outline.blocks, record.date, reconciled.metadata)
-  await db.transaction('rw', [db.days, db.threads, db.mentions, db.blocks, db.occurrences, db.tasks, db.threadNotes, db.blockProperties, db.blockTags], async () => {
+  await db.transaction('rw', [db.days, db.threads, db.mentions, db.blocks, db.occurrences, db.tasks, db.threadNotes, db.blockProperties, db.blockTags, db.personas], async () => {
     if (!record.metadata || JSON.stringify(record.metadata) !== JSON.stringify(reconciled.metadata)) {
       await db.days.update(record.date, { metadata: reconciled.metadata })
     }
@@ -525,6 +618,11 @@ function hasMeaningfulThreadNote(markdown: string): boolean {
 
 async function pruneThreadIfOrphan(threadId: string): Promise<void> {
   if (await db.mentions.where('threadId').equals(threadId).count()) return
+  // Persona threads never get a `[[wiki-link]]` mention -- they're written to
+  // directly by the AI's note-taking tool, not discovered through journal
+  // text -- so the mention-count check alone would prune them the moment
+  // they're created (before any note exists) and they'd never come back.
+  if (await db.personas.where('threadId').equals(threadId).count()) return
   const note = await db.threadNotes.get(threadId)
   if (note && hasMeaningfulThreadNote(note.markdown)) return
   await db.threads.delete(threadId)
@@ -532,7 +630,7 @@ async function pruneThreadIfOrphan(threadId: string): Promise<void> {
 }
 
 export async function pruneOrphanThreads(): Promise<void> {
-  await db.transaction('rw', [db.threads, db.mentions, db.threadNotes], async () => {
+  await db.transaction('rw', [db.threads, db.mentions, db.threadNotes, db.personas], async () => {
     const threads = await db.threads.toArray()
     for (const thread of threads) await pruneThreadIfOrphan(thread.id)
   })
