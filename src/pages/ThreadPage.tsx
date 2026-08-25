@@ -1,16 +1,14 @@
-import { useState } from 'react'
 import { ArrowLeft, CheckCircle2, ChevronRight, Circle, GitBranch, HelpCircle, Lightbulb, MoreHorizontal, Quote } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { db, toggleChecklistBlock, toggleTaskByBlockId, type ThreadOccurrenceRecord, type ViewStateRecord } from '../db'
 import { formatDay } from '../lib/dates'
 import { useOpenTab } from '../lib/tabsApi'
+import { openBlockInspector } from '../lib/inspectorTarget'
 import type { OutlineBlock } from '../lib/outline'
 import { ThreadComposer } from '../components/ThreadComposer'
-import { BlockInspector } from '../components/BlockInspector'
 
 export function ThreadPage() {
-  const [inspectorBlockId, setInspectorBlockId] = useState<string | null>(null)
   const { threadId = '' } = useParams()
   const thread = useLiveQuery(() => db.threads.get(threadId), [threadId])
   const mentions = useLiveQuery(
@@ -81,7 +79,7 @@ export function ThreadPage() {
               blocks={blocks}
               view={view}
               collapseStates={collapseStates}
-              onInspect={setInspectorBlockId}
+              onInspect={openBlockInspector}
             />
           ))}
           {outlines.length === 0 && <div className="section-empty">No source outline is indexed yet</div>}
@@ -121,7 +119,6 @@ export function ThreadPage() {
           {ideas.length === 0 && <div className="section-empty">No related ideas yet</div>}
         </div>
       </ProjectionDisclosure>
-      <BlockInspector blockId={inspectorBlockId} onClose={() => setInspectorBlockId(null)} />
     </article>
   )
 }

@@ -28,7 +28,7 @@ import { editorLinksToWiki, wikiLinkInputRule, wikiLinkInteractionPlugin, wikiLi
 import { editorLinksToTags, tagLinkInputRule, tagLinksToEditor } from '../lib/taglinks'
 import { replaceAll } from '@milkdown/utils'
 import { MobileEditorToolbar, type ToolbarAction, type ToolbarBlockKind } from './MobileEditorToolbar'
-import { BlockInspector } from './BlockInspector'
+import { openBlockInspector } from '../lib/inspectorTarget'
 
 interface MarkdownEditorProps {
   day: string
@@ -47,7 +47,6 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
   const runToolbarActionRef = useRef<(action: ToolbarAction) => void>(() => undefined)
   const [ready, setReady] = useState(false)
   const [toolbar, setToolbar] = useState({ visible: false, top: 0, activeKind: 'bullet' as ToolbarBlockKind })
-  const [inspectorBlockId, setInspectorBlockId] = useState<string | null>(null)
 
   useEffect(() => {
     onChangeRef.current = onChange
@@ -276,7 +275,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
         crepe.editor.action((ctx) => {
           const view = ctx.get(editorViewCtx)
           void installTaskControls(view, day)
-          void installBlockMetadataControls(view, day, setInspectorBlockId)
+          void installBlockMetadataControls(view, day, openBlockInspector)
         })
       }, 120)
     }
@@ -288,7 +287,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       crepe.editor.action((ctx) => {
         const view = ctx.get(editorViewCtx)
         void installTaskControls(view, day)
-        void installBlockMetadataControls(view, day, setInspectorBlockId)
+        void installBlockMetadataControls(view, day, openBlockInspector)
       })
     }
     window.addEventListener('thread:block-metadata-update', refreshBlockMetadata)
@@ -345,7 +344,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
         window.setTimeout(() => {
           if (disposed) return
           void installTaskControls(view, day)
-          void installBlockMetadataControls(view, day, setInspectorBlockId)
+          void installBlockMetadataControls(view, day, openBlockInspector)
         }, 240)
       })
       listener.blur(() => {
@@ -363,7 +362,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       void installCollapseControls(root, day)
       crepe.editor.action((ctx) => {
         const view = ctx.get(editorViewCtx)
-        void installBlockMetadataControls(view, day, setInspectorBlockId)
+        void installBlockMetadataControls(view, day, openBlockInspector)
         void installTaskControls(view, day).then(() => onReadyRef.current?.())
       })
       // Let initialization events drain before accepting editor writes.
@@ -410,7 +409,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day])
 
-  return (<>
+  return (
       <div className="editor-wrap" data-ready={ready}>
         {!ready && <div className="editor-loading">{loadingLabel}</div>}
         <div ref={rootRef} className="thread-editor" aria-label={ariaLabel} />
@@ -421,8 +420,6 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
           onAction={(action) => runToolbarActionRef.current(action)}
         />
       </div>
-      <BlockInspector blockId={inspectorBlockId} onClose={() => setInspectorBlockId(null)} />
-    </>
   )
 }
 

@@ -7,6 +7,7 @@ import { OPEN_CHAT_EVENT, TOGGLE_RAIL_EVENT } from './lib/dockviewActions'
 import { isUserActivityBarHidden, toggleActivityBarHidden } from './lib/activityBar'
 import { DockviewTabs } from './components/tabs/DockviewTabs'
 import { Omnibox } from './components/Omnibox'
+import { ContextualInspector } from './components/ContextualInspector'
 import { ActivityBar } from './components/shell/ActivityBar'
 import { TitleBar } from './components/shell/TitleBar'
 import { useGitHubSync } from './hooks/useGitHubSync'
@@ -97,6 +98,7 @@ function AppShell() {
       </nav>
 
       <Omnibox open={omnibox.open} initialMode={omnibox.mode} onClose={closeOmnibox} onTogglePanel={toggleRail} />
+      <ContextualInspector />
     </div>
   )
 }

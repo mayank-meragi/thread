@@ -39,7 +39,7 @@
 
 /* ---------------------------------------------------------------------- */
 /* Layer / backdrop / sheet / dialog — replaces GlobalCommandMenu,
-   TabSwitcher, BlockInspector, TaskDetails modal chrome. */
+   TabSwitcher, ContextualInspector modal chrome. */
 .layer-backdrop {
   position: fixed;
   inset: 0;

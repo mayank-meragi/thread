@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom'
 import { db, type BlockTagRecord, type MentionRecord, type TagDefinitionRecord, type TaskPriority, type TaskRecord, type TaskStatus } from '../db'
 import { formatDay, isoToday } from '../lib/dates'
 import { bulkSetTaskDueDate, bulkSetTaskPriority, bulkSetTaskStatus, createTask } from '../lib/tasks'
-import { TaskDetails } from '../components/TaskDetails'
+import { openTaskInspector } from '../lib/inspectorTarget'
 import { TaskRow, type TaskDisplayMode } from '../components/TaskRow'
 import { TaskFilterPopover, type TaskFilterKey } from '../components/TaskFilterPopover'
 import { Chip } from '../components/ui/Chip'
@@ -77,7 +77,6 @@ export function TasksPage() {
   const [params, setParams] = useSearchParams()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [detailsTaskId, setDetailsTaskId] = useState<string | null>(null)
   const [mobileViewOpen, setMobileViewOpen] = useState(false)
   const [mobileQuickAddOpen, setMobileQuickAddOpen] = useState(false)
   const isMobile = useIsMobile()
@@ -221,13 +220,12 @@ export function TasksPage() {
               mode={mode}
               onToggle={(id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next })}
               onSelect={(id, checked) => setSelected((current) => { const next = new Set(current); if (checked) next.add(id); else next.delete(id); return next })}
-              onOpen={setDetailsTaskId}
+              onOpen={openTaskInspector}
             />)}
           </div>
         </section>)}
         {groups.length === 0 && <div className="tasks-empty"><Check size={24} /><h2>No tasks in this view</h2><p>Change a filter or capture the next thing you want to move forward.</p></div>}
       </>
-      <TaskDetails taskId={detailsTaskId} onClose={() => setDetailsTaskId(null)} />
 
       {isMobile && <button type="button" className="task-fab" aria-label="Add task" onClick={() => setMobileQuickAddOpen(true)}><Plus size={22} /></button>}
 
