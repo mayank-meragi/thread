@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { AlignJustify, ArrowLeft, CheckCircle2, ChevronRight, Circle, GitBranch, HelpCircle, Kanban, Lightbulb, List, MoreHorizontal, Quote } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { db, toggleChecklistBlock, toggleTaskByBlockId, type TaskRecord, type ThreadOccurrenceRecord, type ViewStateRecord } from '../db'
+import { db, toggleChecklistBlock, toggleTaskByBlockId, type BlockTagRecord, type MentionRecord, type TaskRecord, type ThreadOccurrenceRecord, type ViewStateRecord } from '../db'
 import { formatDay } from '../lib/dates'
 import { useOpenTab } from '../lib/tabsApi'
 import { openBlockInspector, openTaskInspector } from '../lib/inspectorTarget'
@@ -55,20 +55,20 @@ export function ThreadPage() {
   )
   const taskIdsKey = taskIds.join(',')
   const threadTasks = useLiveQuery(
-    () => (taskIds.length ? db.tasks.where('id').anyOf(taskIds).toArray() : Promise.resolve([])),
+    () => (taskIds.length ? db.tasks.where('id').anyOf(taskIds).toArray() : Promise.resolve([] as TaskRecord[])),
     [taskIdsKey],
-    [],
+    [] as TaskRecord[],
   )
   const threadTags = useLiveQuery(
-    () => (taskIds.length ? db.blockTags.where('blockId').anyOf(taskIds).toArray() : Promise.resolve([])),
+    () => (taskIds.length ? db.blockTags.where('blockId').anyOf(taskIds).toArray() : Promise.resolve([] as BlockTagRecord[])),
     [taskIdsKey],
-    [],
+    [] as BlockTagRecord[],
   )
   const tagDefinitions = useLiveQuery(() => db.tagDefinitions.orderBy('name').toArray(), [], [])
   const taskMentions = useLiveQuery(
-    () => (taskIds.length ? db.mentions.where('blockId').anyOf(taskIds).toArray() : Promise.resolve([])),
+    () => (taskIds.length ? db.mentions.where('blockId').anyOf(taskIds).toArray() : Promise.resolve([] as MentionRecord[])),
     [taskIdsKey],
-    [],
+    [] as MentionRecord[],
   )
 
   const taskChildren = useMemo(() => {
