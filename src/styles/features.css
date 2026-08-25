@@ -794,9 +794,16 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .settings-actions { display: flex; align-items: center; gap: 9px; margin-top: 20px; flex-wrap: wrap; }
 .settings-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 37px; padding: 0 13px; border-radius: 9px; cursor: pointer; font-size: 12px; font-weight: 500; }
 .conflicts-card .settings-title svg { color: var(--warning); }
-.conflict-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.conflict-row { display: flex; flex-direction: column; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
 .conflict-day { font: 500 13px 'IBM Plex Mono', monospace; color: var(--ink); }
 .conflict-actions { margin-top: 0; }
+.conflict-hunk { display: grid; gap: 6px; }
+.conflict-hunk-label { color: var(--muted); font-size: var(--text-meta); }
+.conflict-hunk-sides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.conflict-hunk-sides button { display: grid; gap: 6px; height: auto; padding: 9px 11px; text-align: left; align-items: start; justify-content: start; }
+.conflict-hunk-sides button[aria-pressed='true'] { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.conflict-hunk-side-title { color: var(--muted); font: 500 9px 'IBM Plex Mono', monospace; text-transform: uppercase; }
+.conflict-hunk-text { max-height: 140px; margin: 0; overflow: auto; color: var(--ink); font: 400 12px/1.5 'IBM Plex Mono', monospace; white-space: pre-wrap; word-break: break-word; }
 .settings-actions button:disabled { opacity: .55; cursor: default; }
 .schema-settings-card { overflow: hidden; }
 .schema-settings-card > .settings-title > svg { color: var(--idea); }

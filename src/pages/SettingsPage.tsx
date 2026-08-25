@@ -14,7 +14,7 @@ import {
   clearGitHubConfig,
   getGitHubConfig,
   pullDay,
-  resolveDayConflict,
+  resolveConflict,
   saveGitHubConfig,
   syncPending,
   validateGitHub,
@@ -45,12 +45,22 @@ export function SettingsPage() {
   )
   const [resolving, setResolving] = useState<string | null>(null)
   const [resolveError, setResolveError] = useState('')
+  const [hunkChoices, setHunkChoices] = useState<Record<string, Record<number, 'local' | 'remote'>>>({})
 
-  async function resolve(conflictId: string, resolution: 'local' | 'remote') {
+  function setHunkChoice(conflictId: string, index: number, choice: 'local' | 'remote') {
+    setHunkChoices((prev) => ({ ...prev, [conflictId]: { ...prev[conflictId], [index]: choice } }))
+  }
+
+  async function resolve(conflictId: string, choice: 'local' | 'remote' | Map<number, 'local' | 'remote'>) {
     setResolving(conflictId)
     setResolveError('')
     try {
-      await resolveDayConflict(conflictId, resolution)
+      await resolveConflict(conflictId, choice)
+      setHunkChoices((prev) => {
+        const next = { ...prev }
+        delete next[conflictId]
+        return next
+      })
     } catch (caught) {
       setResolveError(caught instanceof Error ? caught.message : String(caught))
     } finally {
@@ -190,33 +200,76 @@ export function SettingsPage() {
             <AlertTriangle size={20} />
             <div>
               <h2>Sync conflicts</h2>
-              <p>These days changed both here and in the data repository. Pick which copy to keep.</p>
+              <p>Most changes merge automatically. These spots were edited both here and in the data repository -- pick which side to keep.</p>
             </div>
           </div>
           {resolveError && <p className="banner banner-error form-error">{resolveError}</p>}
-          {conflicts.map((conflict) => (
-            <div className="conflict-row" key={conflict.id}>
-              <div className="conflict-day">{conflict.day}</div>
-              <div className="settings-actions conflict-actions">
-                <button
-                  type="button"
-                  className="secondary-button"
-                  disabled={resolving === conflict.id}
-                  onClick={() => void resolve(conflict.id, 'local')}
-                >
-                  Keep this browser's copy
-                </button>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  disabled={resolving === conflict.id}
-                  onClick={() => void resolve(conflict.id, 'remote')}
-                >
-                  Keep the repository's copy
-                </button>
+          {conflicts.map((conflict) => {
+            const label = conflict.scope === 'day' ? conflict.aggregateId : `thread “${conflict.aggregateId}”`
+            const spotWord = conflict.conflicts.length === 1 ? 'spot' : 'spots'
+            const choices = hunkChoices[conflict.id] ?? {}
+            return (
+              <div className="conflict-row" key={conflict.id}>
+                <div className="conflict-day">{label} -- {conflict.conflicts.length} {spotWord} differ</div>
+                {conflict.conflicts.map((hunk) => {
+                  const choice = choices[hunk.index] ?? 'local'
+                  return (
+                    <div className="conflict-hunk" key={hunk.index}>
+                      <div className="conflict-hunk-label">near “{hunk.blockLabel}”</div>
+                      <div className="conflict-hunk-sides">
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          aria-pressed={choice === 'local'}
+                          disabled={resolving === conflict.id}
+                          onClick={() => setHunkChoice(conflict.id, hunk.index, 'local')}
+                        >
+                          <div className="conflict-hunk-side-title">This browser</div>
+                          <pre className="conflict-hunk-text">{hunk.local || '(removed)'}</pre>
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          aria-pressed={choice === 'remote'}
+                          disabled={resolving === conflict.id}
+                          onClick={() => setHunkChoice(conflict.id, hunk.index, 'remote')}
+                        >
+                          <div className="conflict-hunk-side-title">Repository</div>
+                          <pre className="conflict-hunk-text">{hunk.remote || '(removed)'}</pre>
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+                <div className="settings-actions conflict-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={resolving === conflict.id}
+                    onClick={() => void resolve(conflict.id, 'local')}
+                  >
+                    Keep this browser's copy
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={resolving === conflict.id}
+                    onClick={() => void resolve(conflict.id, 'remote')}
+                  >
+                    Keep the repository's copy
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled={resolving === conflict.id}
+                    onClick={() => void resolve(conflict.id, new Map(conflict.conflicts.map((hunk) => [hunk.index, choices[hunk.index] ?? 'local'])))}
+                  >
+                    Resolve all
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </section>
       )}
 

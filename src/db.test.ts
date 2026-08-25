@@ -235,7 +235,7 @@ describe('sync races', () => {
 
     // The in-flight push for the earlier, now-stale revision finally
     // resolves and reports success.
-    await markDaySynced(DATE, 'remote-sha-for-stale-push', pushedRevision)
+    await markDaySynced(DATE, 'remote-sha-for-stale-push', pushedRevision, '- This is sy')
 
     // The newer content must not be silently dropped from the sync queue --
     // it was never actually pushed to the remote.
@@ -248,7 +248,7 @@ describe('sync races', () => {
     await saveDay(DATE, '- only version')
     const revision = (await db.days.get(DATE))!.localRevision
 
-    await markDaySynced(DATE, 'remote-sha', revision)
+    await markDaySynced(DATE, 'remote-sha', revision, '- only version')
 
     expect(await db.outbox.get(`day:${DATE}`)).toBeUndefined()
   })

@@ -1,5 +1,6 @@
-import { applyRemoteDay, db, hasOpenDayConflict, markConflictResolved, markDaySynced, markThreadNoteSynced, recordDayConflict, type DayRecord, type ThreadNoteRecord } from '../db'
+import { applyMergedDay, applyMergedThreadNote, applyRemoteDay, db, hasOpenConflict, markConflictResolved, markDaySynced, markThreadNoteSynced, recordConflict, saveDay, type DayRecord, type ThreadNoteRecord } from '../db'
 import { emptyDayMetadata, parseDayDocument, serializeDayDocument } from './dayDocument'
+import { applyConflictResolutions, mergeMarkdown } from './conflictMerge'
 
 const API = 'https://api.github.com'
 const STORAGE_KEY = 'thread.github'
@@ -119,7 +120,7 @@ async function pushDay(config: GitHubConfig, day: DayRecord, path: string): Prom
   const content = serializeDayDocument(day.markdown, day.metadata ?? emptyDayMetadata())
   try {
     const sha = await putFile(config, path, content, day.remoteSha)
-    await markDaySynced(day.date, sha, day.localRevision)
+    await markDaySynced(day.date, sha, day.localRevision, day.markdown, day.metadata)
     return 1
   } catch (error) {
     if (!(error instanceof SyncConflictError)) throw error
@@ -130,7 +131,7 @@ async function pushDay(config: GitHubConfig, day: DayRecord, path: string): Prom
       // gone now -- e.g. deleted upstream between our attempt and this
       // recovery fetch. A plain create is now correct.
       const sha = await putFile(config, path, content, undefined)
-      await markDaySynced(day.date, sha, day.localRevision)
+      await markDaySynced(day.date, sha, day.localRevision, day.markdown, day.metadata)
       return 1
     }
     const freshDocument = parseDayDocument(fresh.content)
@@ -140,23 +141,35 @@ async function pushDay(config: GitHubConfig, day: DayRecord, path: string): Prom
     if (fresh.content === content || (!hasUserMetadata && freshDocument.markdown === day.markdown)) {
       // Remote already matches what we were trying to write (e.g. another
       // tab in this same browser got there first) -- nothing left to push.
-      await markDaySynced(day.date, fresh.sha, day.localRevision)
+      await markDaySynced(day.date, fresh.sha, day.localRevision, day.markdown, day.metadata)
       return 1
     }
-    await recordDayConflict(day.date, day.markdown, freshDocument.markdown)
+
+    // A genuine text divergence -- try a three-way merge against the last
+    // content both sides agreed on before falling back to asking the user.
+    // Most real divergences (edits to different parts of the day) resolve
+    // here with zero interruption.
+    const merged = mergeMarkdown(day.lastSyncedMarkdown ?? null, day.markdown, freshDocument.markdown)
+    if (merged.conflicts.length === 0) {
+      const mergedContent = serializeDayDocument(merged.markdown, day.metadata ?? emptyDayMetadata())
+      const sha = await putFile(config, path, mergedContent, fresh.sha)
+      await applyMergedDay(day.date, merged.markdown, day.metadata, sha, day.localRevision)
+      return 1
+    }
+
+    await recordConflict('day', day.date, merged.markdown, merged.conflicts)
     throw new Error(`${path} changed in the data repository. Resolve the conflict to continue syncing.`, { cause: error })
   }
 }
 
-// Same recovery shape as pushDay, minus conflict recording -- thread notes
-// don't have a resolution UI (ConflictRecord is day-scoped only). A genuine
-// divergence still surfaces a clear error rather than a raw 409, and self-
-// heals if the remote already matches; it just can't offer a "keep mine/
-// keep theirs" choice the way a day sync can.
+// Same recovery shape as pushDay: self-heal on an unchanged remote, three-
+// way merge on a genuine divergence, and only fall back to a recorded
+// conflict (resolved through the same Settings UI as day conflicts) when
+// the merge actually finds overlapping edits.
 async function pushThreadNote(config: GitHubConfig, note: ThreadNoteRecord, path: string): Promise<number> {
   try {
     const sha = await putFile(config, path, note.markdown, note.remoteSha)
-    await markThreadNoteSynced(note.threadId, sha, note.localRevision)
+    await markThreadNoteSynced(note.threadId, sha, note.localRevision, note.markdown)
     return 1
   } catch (error) {
     if (!(error instanceof SyncConflictError)) throw error
@@ -164,14 +177,23 @@ async function pushThreadNote(config: GitHubConfig, note: ThreadNoteRecord, path
     const fresh = await getRemoteFile(config, path)
     if (!fresh) {
       const sha = await putFile(config, path, note.markdown, undefined)
-      await markThreadNoteSynced(note.threadId, sha, note.localRevision)
+      await markThreadNoteSynced(note.threadId, sha, note.localRevision, note.markdown)
       return 1
     }
     if (fresh.content === note.markdown) {
-      await markThreadNoteSynced(note.threadId, fresh.sha, note.localRevision)
+      await markThreadNoteSynced(note.threadId, fresh.sha, note.localRevision, note.markdown)
       return 1
     }
-    throw new Error(`${path} already contains different notes. The local copy was kept.`, { cause: error })
+
+    const merged = mergeMarkdown(note.lastSyncedMarkdown ?? null, note.markdown, fresh.content)
+    if (merged.conflicts.length === 0) {
+      const sha = await putFile(config, path, merged.markdown, fresh.sha)
+      await applyMergedThreadNote(note.threadId, merged.markdown, sha, note.localRevision)
+      return 1
+    }
+
+    await recordConflict('thread-note', note.threadId, merged.markdown, merged.conflicts)
+    throw new Error(`${path} changed in the data repository. Resolve the conflict to continue syncing.`, { cause: error })
   }
 }
 
@@ -190,6 +212,10 @@ export async function syncPending(): Promise<number> {
           await db.outbox.delete(item.key)
           continue
         }
+        // An unresolved conflict already describes this exact problem.
+        // Retrying it every cycle would hammer the API and pile up a fresh
+        // conflict row each time; wait for the user to resolve it instead.
+        if (await hasOpenConflict('thread-note', note.threadId)) continue
         const path = `threads/${note.threadId}.md`
         synced += await pushThreadNote(config, note, path)
         continue
@@ -201,10 +227,7 @@ export async function syncPending(): Promise<number> {
         continue
       }
 
-      // An unresolved conflict already describes this exact problem. Retrying
-      // it every cycle would hammer the API and pile up a fresh conflict row
-      // each time; wait for the user to resolve it instead.
-      if (await hasOpenDayConflict(day.date)) continue
+      if (await hasOpenConflict('day', day.date)) continue
 
       const year = day.date.slice(0, 4)
       const path = `days/${year}/${day.date}.md`
@@ -259,49 +282,60 @@ export async function pullDay(date: string): Promise<void> {
     await applyRemoteDay(date, remote.content, remote.sha)
     return
   }
-  const localContent = day ? serializeDayDocument(day.markdown, day.metadata ?? emptyDayMetadata()) : null
-  if (day && localContent !== remote.content) {
-    await recordDayConflict(date, localContent!, remote.content)
+  if (!day) return
+  const localContent = serializeDayDocument(day.markdown, day.metadata ?? emptyDayMetadata())
+  if (localContent === remote.content) return
+
+  const freshDocument = parseDayDocument(remote.content)
+  const merged = mergeMarkdown(day.lastSyncedMarkdown ?? null, day.markdown, freshDocument.markdown)
+  if (merged.conflicts.length === 0) {
+    // Auto-mergeable: adopt the merged text as a new local edit and leave it
+    // queued in the outbox. remoteSha still won't match what that push sends
+    // (remote only has its own half of the merge so far), but pushDay's own
+    // SyncConflictError recovery handles that on the next cycle exactly like
+    // any other divergence -- by which point local already contains remote's
+    // side too, so that merge resolves cleanly.
+    await saveDay(date, merged.markdown)
+    return
   }
+  await recordConflict('day', date, merged.markdown, merged.conflicts)
 }
 
-// A conflict's recorded remoteMarkdown/remoteSha can already be stale by the
-// time the user resolves it (more commits may have landed since), so this
-// re-fetches the file fresh rather than trusting the snapshot taken when the
-// conflict was first detected.
-//
-// "Keep the repository's copy" is just adopting that fresh fetch locally --
-// applyRemoteDay already does the right thing.
-//
-// "Keep this browser's copy" previously only cleared the conflict's
-// resolvedAt flag and hoped the next ordinary sync cycle would push local
-// content -- but day.remoteSha was still whatever it was before (often
-// undefined, or the old, now-wrong parent), so that next cycle either
-// re-detected the exact same divergence and opened a fresh conflict, or hit
-// a 409 from GitHub for using a stale parent sha. This forces the push here,
-// using the sha just fetched above as the correct current parent, so local
-// content actually overwrites remote instead of the resolution silently
-// doing nothing.
-export async function resolveDayConflict(conflictId: string, resolution: 'local' | 'remote'): Promise<void> {
+// A conflict's merged draft can already be stale by the time the user
+// resolves it (more commits may have landed since), so this re-fetches the
+// file fresh rather than trusting the snapshot taken when the conflict was
+// first detected. `choices` is either a single resolution applied to every
+// open hunk (the "keep this browser's copy" / "keep the repository's copy"
+// bulk buttons) or a per-hunk map from the focused resolution UI -- either
+// way, hunks the merge already resolved automatically are left untouched.
+export async function resolveConflict(
+  conflictId: string,
+  choices: 'local' | 'remote' | Map<number, 'local' | 'remote'>,
+): Promise<void> {
   const conflict = await db.conflicts.get(conflictId)
   if (!conflict) return
   const config = getGitHubConfig()
   if (!config) throw new Error('Connect to GitHub before resolving a sync conflict.')
 
-  const year = conflict.day.slice(0, 4)
-  const path = `days/${year}/${conflict.day}.md`
-  const fresh = await getRemoteFile(config, path)
+  const choiceMap = choices instanceof Map
+    ? choices
+    : new Map(conflict.conflicts.map((item) => [item.index, choices] as const))
+  const resolvedMarkdown = applyConflictResolutions(conflict.mergedMarkdown, choiceMap)
 
-  if (resolution === 'remote') {
-    if (fresh) await applyRemoteDay(conflict.day, fresh.content, fresh.sha)
+  if (conflict.scope === 'day') {
+    const year = conflict.aggregateId.slice(0, 4)
+    const path = `days/${year}/${conflict.aggregateId}.md`
+    const fresh = await getRemoteFile(config, path)
+    const day = await db.days.get(conflict.aggregateId)
+    const content = serializeDayDocument(resolvedMarkdown, day?.metadata ?? emptyDayMetadata())
+    const sha = await putFile(config, path, content, fresh?.sha)
+    await applyMergedDay(conflict.aggregateId, resolvedMarkdown, day?.metadata, sha, day?.localRevision ?? -1)
   } else {
-    const day = await db.days.get(conflict.day)
-    // Reuses pushDay's own recovery path rather than a bare putFile: on the
-    // (rare) chance the file changed again in the instant between the fetch
-    // above and this write, that's a genuinely new conflict, and pushDay
-    // records it as one instead of the force-push silently failing or
-    // clobbering something newer.
-    if (day) await pushDay(config, { ...day, remoteSha: fresh?.sha }, path)
+    const path = `threads/${conflict.aggregateId}.md`
+    const fresh = await getRemoteFile(config, path)
+    const note = await db.threadNotes.get(conflict.aggregateId)
+    const sha = await putFile(config, path, resolvedMarkdown, fresh?.sha)
+    await applyMergedThreadNote(conflict.aggregateId, resolvedMarkdown, sha, note?.localRevision ?? -1)
   }
 
   await markConflictResolved(conflictId)

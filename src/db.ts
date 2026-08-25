@@ -11,6 +11,7 @@ import {
   type TagDefinitionRecord,
 } from './lib/blockMetadata'
 import { normalizePropertyValue, parseDayDocument, type DayMetadata, type PropertyValue } from './lib/dayDocument'
+import { LOCAL_MARKER, REMOTE_MARKER, SEPARATOR_MARKER, type MergeConflict } from './lib/conflictMerge'
 import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, insertPersonaNote, parseOutline, type BlockKind, type OutlineBlock, type ParsedMention } from './lib/outline'
 import { parseTaskDate, type ParsedTaskDate } from './lib/taskDates'
 import { extractHashtags, slugifyTag } from './lib/hashtags'
@@ -25,6 +26,12 @@ export interface DayRecord {
   localRevision: number
   remoteSha?: string
   lastSyncedAt?: string
+  // The markdown/metadata last confirmed in sync with remoteSha -- the
+  // common ancestor a three-way merge needs. Absent for records that
+  // predate this field, in which case a conflict has no known base and
+  // falls back to whole-file resolution (see lib/conflictMerge.ts).
+  lastSyncedMarkdown?: string
+  lastSyncedMetadata?: DayMetadata
 }
 
 export interface ThreadRecord {
@@ -43,6 +50,7 @@ export interface ThreadNoteRecord {
   localRevision: number
   remoteSha?: string
   lastSyncedAt?: string
+  lastSyncedMarkdown?: string
 }
 
 export interface MentionRecord {
@@ -68,9 +76,10 @@ export interface OutboxRecord {
 
 export interface ConflictRecord {
   id: string
-  day: string
-  localMarkdown: string
-  remoteMarkdown: string
+  scope: 'day' | 'thread-note'
+  aggregateId: string
+  mergedMarkdown: string
+  conflicts: MergeConflict[]
   detectedAt: string
   resolvedAt?: string
 }
@@ -302,6 +311,45 @@ class ThreadDatabase extends Dexie {
       chatSessions: 'id, personaId, updatedAt, [personaId+updatedAt]',
       chatMessages: 'id, sessionId, createdAt, [sessionId+createdAt]',
     })
+    this.version(10).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, kind, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, scope, aggregateId, detectedAt, resolvedAt',
+      blocks: 'id, day, parentId, kind, [day+order]',
+      occurrences: 'id, threadId, day, rootBlockId, [threadId+day]',
+      viewState: 'key, view, blockId, collapsed',
+      revisions: 'id, day, archivedAt, [day+localRevision]',
+      tasks: 'id, blockId, day, status, parentTaskId, dueDate, startDate, priority, [day+order], [status+dueDate]',
+      threadNotes: 'threadId, updatedAt',
+      propertyDefinitions: 'id, name, type, updatedAt',
+      blockProperties: 'id, blockId, day, propertyId, [blockId+propertyId], [propertyId+day]',
+      tagDefinitions: 'id, name, updatedAt',
+      blockTags: 'id, blockId, day, tagId, [blockId+tagId], [tagId+day]',
+      personas: 'id, threadId, updatedAt',
+      chatSessions: 'id, personaId, updatedAt, [personaId+updatedAt]',
+      chatMessages: 'id, sessionId, createdAt, [sessionId+createdAt]',
+    }).upgrade(async (tx) => {
+      // Pre-diff3 conflicts had no scope/aggregateId and stored raw
+      // local/remote blobs instead of a merged draft with per-hunk
+      // conflicts. Wrap each as a single whole-document conflict so an
+      // in-flight conflict isn't silently dropped by the migration.
+      await tx.table('conflicts').toCollection().modify((record: Record<string, unknown>) => {
+        if (record.scope) return
+        const local = typeof record.localMarkdown === 'string' ? record.localMarkdown : ''
+        const remote = typeof record.remoteMarkdown === 'string' ? record.remoteMarkdown : ''
+        record.scope = 'day'
+        record.aggregateId = record.day
+        record.mergedMarkdown = local === remote
+          ? local
+          : [LOCAL_MARKER, local, SEPARATOR_MARKER, remote, REMOTE_MARKER].join('\n')
+        record.conflicts = local === remote ? [] : [{ index: 0, blockLabel: 'the whole note', local, remote }]
+        delete record.day
+        delete record.localMarkdown
+        delete record.remoteMarkdown
+      })
+    })
   }
 }
 
@@ -408,6 +456,7 @@ export function saveThreadNote(threadId: string, markdown: string): Promise<void
         localRevision: (previous?.localRevision ?? 0) + 1,
         remoteSha: previous?.remoteSha,
         lastSyncedAt: previous?.lastSyncedAt,
+        lastSyncedMarkdown: previous?.lastSyncedMarkdown,
       })
       await db.outbox.put({
         key: `thread-note:${threadId}`,
@@ -826,6 +875,8 @@ async function saveDayNow(date: string, markdown: string): Promise<void> {
     localRevision: (previous?.localRevision ?? 0) + 1,
     remoteSha: previous?.remoteSha,
     lastSyncedAt: previous?.lastSyncedAt,
+    lastSyncedMarkdown: previous?.lastSyncedMarkdown,
+    lastSyncedMetadata: previous?.lastSyncedMetadata,
   }, previous)
 }
 
@@ -1106,44 +1157,137 @@ export async function deleteTagDefinition(id: string): Promise<void> {
 // outbox entry unconditionally would silently drop that newer edit from the
 // sync queue -- it would never reach the remote until something else touched
 // this day again. Only clear the pending marker if nothing changed since.
-export async function markDaySynced(date: string, sha: string, syncedRevision: number): Promise<void> {
+// `markdown`/`metadata` are the content that was actually pushed (the merge
+// base for the next conflict, if any) -- distinct from `current.markdown`,
+// which may have moved on if the user kept typing while the push was in
+// flight.
+export async function markDaySynced(date: string, sha: string, syncedRevision: number, markdown: string, metadata?: DayMetadata): Promise<void> {
   await db.transaction('rw', db.days, db.outbox, async () => {
     const current = await db.days.get(date)
-    await db.days.update(date, { remoteSha: sha, lastSyncedAt: new Date().toISOString() })
+    await db.days.update(date, {
+      remoteSha: sha,
+      lastSyncedAt: new Date().toISOString(),
+      lastSyncedMarkdown: markdown,
+      lastSyncedMetadata: metadata,
+    })
     if (current && current.localRevision === syncedRevision) {
       await db.outbox.delete(`day:${date}`)
     }
   })
 }
 
-export async function markThreadNoteSynced(threadId: string, sha: string, syncedRevision: number): Promise<void> {
+// Thread-note counterpart to applyMergedDay: `markdown` is what's now
+// actually on the remote, so this both adopts it locally (unless a newer
+// local edit is in flight, in which case only the new remote baseline is
+// recorded) and clears the outbox entry rather than re-queuing it.
+export async function applyMergedThreadNote(threadId: string, markdown: string, sha: string, syncedRevision: number): Promise<void> {
   await db.transaction('rw', db.threadNotes, db.outbox, async () => {
     const current = await db.threadNotes.get(threadId)
-    await db.threadNotes.update(threadId, { remoteSha: sha, lastSyncedAt: new Date().toISOString() })
+    if (!current) return
+    const now = new Date().toISOString()
+    if (current.localRevision !== syncedRevision) {
+      await db.threadNotes.update(threadId, { remoteSha: sha, lastSyncedAt: now, lastSyncedMarkdown: markdown })
+      return
+    }
+    await db.threadNotes.update(threadId, {
+      markdown,
+      blockCount: countMarkdownBlocks(markdown),
+      updatedAt: now,
+      localRevision: current.localRevision + 1,
+      remoteSha: sha,
+      lastSyncedAt: now,
+      lastSyncedMarkdown: markdown,
+    })
+    await db.outbox.delete(`thread-note:${threadId}`)
+  })
+}
+
+export async function markThreadNoteSynced(threadId: string, sha: string, syncedRevision: number, markdown: string): Promise<void> {
+  await db.transaction('rw', db.threadNotes, db.outbox, async () => {
+    const current = await db.threadNotes.get(threadId)
+    await db.threadNotes.update(threadId, {
+      remoteSha: sha,
+      lastSyncedAt: new Date().toISOString(),
+      lastSyncedMarkdown: markdown,
+    })
     if (current && current.localRevision === syncedRevision) {
       await db.outbox.delete(`thread-note:${threadId}`)
     }
   })
 }
 
-// Records a day conflict, but only if one isn't already open for this day --
-// otherwise a repeated pull/push against the same unresolved divergence would
-// pile up a fresh row every cycle.
-export async function recordDayConflict(date: string, localMarkdown: string, remoteMarkdown: string): Promise<void> {
-  const existing = await db.conflicts.where('day').equals(date).filter((conflict) => !conflict.resolvedAt).first()
+// Records a sync conflict, but only if one isn't already open for this
+// day/thread-note -- otherwise a repeated pull/push against the same
+// unresolved divergence would pile up a fresh row every cycle.
+export async function recordConflict(
+  scope: 'day' | 'thread-note',
+  aggregateId: string,
+  mergedMarkdown: string,
+  conflicts: MergeConflict[],
+): Promise<void> {
+  const existing = await db.conflicts
+    .where('aggregateId').equals(aggregateId)
+    .filter((conflict) => conflict.scope === scope && !conflict.resolvedAt)
+    .first()
   if (existing) return
   await db.conflicts.put({
-    id: `${date}:${Date.now()}`,
-    day: date,
-    localMarkdown,
-    remoteMarkdown,
+    id: `${scope}:${aggregateId}:${Date.now()}`,
+    scope,
+    aggregateId,
+    mergedMarkdown,
+    conflicts,
     detectedAt: new Date().toISOString(),
   })
 }
 
-export async function hasOpenDayConflict(date: string): Promise<boolean> {
-  const existing = await db.conflicts.where('day').equals(date).filter((conflict) => !conflict.resolvedAt).first()
+export async function hasOpenConflict(scope: 'day' | 'thread-note', aggregateId: string): Promise<boolean> {
+  const existing = await db.conflicts
+    .where('aggregateId').equals(aggregateId)
+    .filter((conflict) => conflict.scope === scope && !conflict.resolvedAt)
+    .first()
   return Boolean(existing)
+}
+
+// Applies a day's content after a successful auto-merged push: `markdown` is
+// what's now actually on the remote at `sha` (local content merged with
+// whatever changed remotely), so -- unlike a plain local edit -- this is
+// already fully synced and clears the outbox entry rather than re-queuing
+// it. If a newer local edit landed while the merge/push was in flight
+// (localRevision has moved past `syncedRevision`), that edit is left alone;
+// only the new remote baseline is recorded, and the next sync cycle merges
+// the newer edit against it.
+export async function applyMergedDay(
+  date: string,
+  markdown: string,
+  metadata: DayMetadata | undefined,
+  sha: string,
+  syncedRevision: number,
+): Promise<void> {
+  const previous = await db.days.get(date)
+  if (!previous) return
+  const now = new Date().toISOString()
+  if (previous.localRevision !== syncedRevision) {
+    await db.days.update(date, {
+      remoteSha: sha,
+      lastSyncedAt: now,
+      lastSyncedMarkdown: markdown,
+      lastSyncedMetadata: metadata,
+    })
+    return
+  }
+  await indexAndStoreDay({
+    ...previous,
+    markdown,
+    metadata,
+    blockCount: countMarkdownBlocks(markdown),
+    updatedAt: now,
+    localRevision: previous.localRevision + 1,
+    remoteSha: sha,
+    lastSyncedAt: now,
+    lastSyncedMarkdown: markdown,
+    lastSyncedMetadata: metadata,
+  }, previous, { queueOutbox: false })
+  await db.outbox.delete(`day:${date}`)
 }
 
 // Applies a day's content as fetched from the remote repository. Unlike
@@ -1153,7 +1297,12 @@ export async function applyRemoteDay(date: string, markdown: string, sha: string
   const document = parseDayDocument(markdown)
   const previous = await db.days.get(date)
   if (previous?.markdown === document.markdown && JSON.stringify(previous.metadata) === JSON.stringify(document.metadata)) {
-    await db.days.update(date, { remoteSha: sha, lastSyncedAt: new Date().toISOString() })
+    await db.days.update(date, {
+      remoteSha: sha,
+      lastSyncedAt: new Date().toISOString(),
+      lastSyncedMarkdown: document.markdown,
+      lastSyncedMetadata: document.metadata,
+    })
     return
   }
   const now = new Date().toISOString()
@@ -1166,6 +1315,8 @@ export async function applyRemoteDay(date: string, markdown: string, sha: string
     localRevision: (previous?.localRevision ?? 0) + 1,
     remoteSha: sha,
     lastSyncedAt: now,
+    lastSyncedMarkdown: document.markdown,
+    lastSyncedMetadata: document.metadata,
   }, previous, { queueOutbox: false })
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('thread:day-external-update', { detail: { day: date, markdown: document.markdown } }))
 }

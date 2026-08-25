@@ -55,12 +55,16 @@ describe('sync conflict recovery', () => {
 
     await expect(syncPending()).rejects.toThrow(/changed in the data repository/)
 
-    const conflicts = await db.conflicts.where('day').equals(DATE).toArray()
+    const conflicts = await db.conflicts.where('aggregateId').equals(DATE).toArray()
     expect(conflicts).toHaveLength(1)
-    expect(conflicts[0]).toMatchObject({
-      localMarkdown: '- original content',
-      remoteMarkdown: '- someone else changed this',
-    })
+    expect(conflicts[0].scope).toBe('day')
+    // No lastSyncedMarkdown was ever recorded for this day (remoteSha was
+    // set directly, bypassing a real sync), so there's no known merge base
+    // and the whole document is treated as one conflict -- same as before
+    // three-way merge existed.
+    expect(conflicts[0].conflicts).toMatchObject([
+      { local: '- original content', remote: '- someone else changed this' },
+    ])
   })
 
   it('self-heals without recording a conflict when the remote already matches after a 409', async () => {
@@ -102,6 +106,73 @@ describe('sync conflict recovery', () => {
 
     await syncPending()
     expect(fetchMock.mock.calls.length).toBe(callsAfterFirstCycle)
-    expect(await db.conflicts.where('day').equals(DATE).count()).toBe(1)
+    expect(await db.conflicts.where('aggregateId').equals(DATE).count()).toBe(1)
+  })
+})
+
+// Most real-world divergences aren't real conflicts -- they touch different
+// parts of the day. These exercise the three-way merge (via node-diff3)
+// that resolves those automatically, only recording a ConflictRecord when
+// two sides genuinely changed the same lines differently.
+describe('three-way auto-merge', () => {
+  it('auto-merges edits to different blocks without recording a conflict', async () => {
+    await saveDay(DATE, '- Tasks\n- middle\n- Notes')
+    // Simulate a prior successful sync: remote and local agree on this
+    // content, and it's recorded as the merge base.
+    await db.days.update(DATE, { remoteSha: 'base-sha', lastSyncedMarkdown: '- Tasks\n- middle\n- Notes' })
+    // A local-only edit to the first line.
+    await saveDay(DATE, '- Tasks (updated)\n- middle\n- Notes')
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+
+    let putCalls = 0
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        putCalls += 1
+        // The first push loses the race (stale parent sha); the retry after
+        // the merge, using the fresh sha as parent, succeeds.
+        if (putCalls === 1) return new Response(JSON.stringify({ message: 'sha mismatch', status: '409' }), { status: 409 })
+        return new Response(JSON.stringify({ content: { sha: 'remote-sha' } }), { status: 200 })
+      }
+      // Remote independently edited the last line only.
+      return new Response(JSON.stringify({ content: base64('- Tasks\n- middle\n- Notes (updated)'), sha: 'remote-sha-before-push' }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const synced = await syncPending()
+
+    expect(synced).toBe(1)
+    expect(await db.conflicts.count()).toBe(0)
+    expect(putCalls).toBe(2)
+    const day = await db.days.get(DATE)
+    expect(day?.markdown).toBe('- Tasks (updated)\n- middle\n- Notes (updated)')
+    expect(day?.remoteSha).toBe('remote-sha')
+    expect(await db.outbox.get(`day:${DATE}`)).toBeUndefined()
+  })
+
+  it('records only the block that both sides edited differently, not the whole day', async () => {
+    await saveDay(DATE, '- Tasks\n- Notes')
+    await db.days.update(DATE, { remoteSha: 'base-sha', lastSyncedMarkdown: '- Tasks\n- Notes' })
+    // Local edits the first line...
+    await saveDay(DATE, '- Tasks (mine)\n- Notes')
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        return new Response(JSON.stringify({ message: 'sha mismatch', status: '409' }), { status: 409 })
+      }
+      // ...and remote edits the *same* first line, differently.
+      return new Response(JSON.stringify({ content: base64('- Tasks (theirs)\n- Notes'), sha: 'remote-sha' }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(syncPending()).rejects.toThrow(/changed in the data repository/)
+
+    const conflicts = await db.conflicts.where('aggregateId').equals(DATE).toArray()
+    expect(conflicts).toHaveLength(1)
+    expect(conflicts[0].conflicts).toMatchObject([
+      { local: '- Tasks (mine)', remote: '- Tasks (theirs)' },
+    ])
+    // The un-conflicting "Notes" line isn't part of the conflict at all.
+    expect(conflicts[0].conflicts[0].local).not.toContain('Notes')
   })
 })
