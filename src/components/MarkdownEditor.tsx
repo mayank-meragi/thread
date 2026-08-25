@@ -8,7 +8,8 @@ import { liftListItem, sinkListItem } from '@milkdown/prose/schema-list'
 import { TextSelection } from '@milkdown/prose/state'
 import type { EditorView } from '@milkdown/prose/view'
 import '@milkdown/crepe/theme/common/style.css'
-import { db } from '../db'
+import { db, setBlockProperty } from '../db'
+import { parseTaskDate, stripMatchedText } from '../lib/taskDates'
 import {
   activeOutlinePathPlugin,
   checklistCheckedPattern,
@@ -179,6 +180,14 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
     root.addEventListener('pointerdown', markPointerMutation, true)
     root.addEventListener('keydown', markKeyboardMutation, true)
 
+    let lastFocusedTaskId: string | null = null
+    const flushTaskDateStrip = (taskId: string) => {
+      crepe.editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx)
+        void commitTaskDateStrip(view, day, taskId, markUserMutation)
+      })
+    }
+
     const syncFocusedTask = () => {
       // The caret/selection position is the reliable signal for "which task
       // line is active" -- document.activeElement is the outer contenteditable
@@ -196,6 +205,10 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
         if (item !== focusedTask) item.classList.remove('task-focused')
       })
       focusedTask?.classList.add('task-focused')
+
+      const focusedTaskId = focusedTask?.dataset.taskId ?? null
+      if (focusedTaskId !== lastFocusedTaskId && lastFocusedTaskId) flushTaskDateStrip(lastFocusedTaskId)
+      lastFocusedTaskId = focusedTaskId
     }
     document.addEventListener('selectionchange', syncFocusedTask)
     document.addEventListener('selectionchange', syncToolbar)
@@ -349,6 +362,11 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       })
       listener.blur(() => {
         if (saveTimer) window.clearTimeout(saveTimer)
+        // Redundant flush: focus can leave the DOM without an intervening
+        // selectionchange (e.g. the whole window loses focus), which would
+        // otherwise leave a matched date word un-stripped until the next
+        // focus change picks a different task.
+        if (lastFocusedTaskId) flushTaskDateStrip(lastFocusedTaskId)
         persist()
       })
     })
@@ -465,6 +483,57 @@ function setCurrentBlockKind(
   }
 
   view.dispatch(transaction)
+}
+
+// Finds the minimal replaced span between two strings by trimming the common
+// prefix/suffix -- lets a strip land as one small delete(+insert) touching
+// only the changed text, instead of replacing the whole paragraph and
+// clobbering marks (wikilinks, tags) elsewhere on the line.
+function computeStripRange(text: string, stripped: string): { from: number; to: number; replacement: string } {
+  let prefix = 0
+  while (prefix < text.length && prefix < stripped.length && text[prefix] === stripped[prefix]) prefix += 1
+  let suffix = 0
+  while (
+    suffix < text.length - prefix &&
+    suffix < stripped.length - prefix &&
+    text[text.length - 1 - suffix] === stripped[stripped.length - 1 - suffix]
+  ) suffix += 1
+  return { from: prefix, to: text.length - suffix, replacement: stripped.slice(prefix, stripped.length - suffix) }
+}
+
+// Fires when the caret leaves a task line: if the line's text still contains
+// an NLP-recognizable date phrase (e.g. "today"), strip it from the raw
+// Markdown the same way buildTaskRecords (db.ts) already strips it from the
+// derived task text, and record the due date -- unless the task already has
+// a manually-set due date, which always wins. Runs on focus loss rather than
+// per-keystroke so it never yanks text out from under an in-progress edit.
+async function commitTaskDateStrip(view: EditorView, day: string, taskId: string, markUserMutation: () => void): Promise<void> {
+  let match: { paragraphStart: number; text: string } | null = null
+  view.state.doc.descendants((node, pos) => {
+    if (match || node.type.name !== 'list_item') return true
+    const wrapper = view.nodeDOM(pos)
+    const dom = wrapper instanceof HTMLElement ? wrapper.querySelector<HTMLElement>(':scope > li') ?? wrapper : null
+    if (dom instanceof HTMLElement && dom.dataset.taskId === taskId && node.firstChild?.type.name === 'paragraph') {
+      match = { paragraphStart: pos + 2, text: node.firstChild.textContent }
+    }
+    return true
+  })
+  if (!match) return
+  const found: { paragraphStart: number; text: string } = match
+  const detected = parseTaskDate(found.text, day)
+  if (!detected) return
+
+  const task = await db.tasks.get(taskId)
+  const stripped = stripMatchedText(found.text, detected)
+  const range = computeStripRange(found.text, stripped)
+  if (range.from === range.to && !range.replacement) return
+
+  markUserMutation()
+  let transaction = view.state.tr.delete(found.paragraphStart + range.from, found.paragraphStart + range.to)
+  if (range.replacement) transaction = transaction.insertText(range.replacement, found.paragraphStart + range.from)
+  view.dispatch(transaction)
+
+  if (task?.dueSource !== 'manual') await setBlockProperty(taskId, 'due-date', detected.dueDate)
 }
 
 interface LiveTaskNode {

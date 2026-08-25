@@ -13,7 +13,7 @@ import {
 import { normalizePropertyValue, parseDayDocument, type DayMetadata, type PropertyValue } from './lib/dayDocument'
 import { LOCAL_MARKER, REMOTE_MARKER, SEPARATOR_MARKER, type MergeConflict } from './lib/conflictMerge'
 import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, insertPersonaNote, parseOutline, type BlockKind, type OutlineBlock, type ParsedMention } from './lib/outline'
-import { parseTaskDate, type ParsedTaskDate } from './lib/taskDates'
+import { parseTaskDate, stripMatchedText } from './lib/taskDates'
 import { extractHashtags, slugifyTag } from './lib/hashtags'
 import { isoToday } from './lib/dates'
 
@@ -712,15 +712,6 @@ export async function pruneOrphanThreads(): Promise<void> {
 function withBlockIds(mentions: ParsedMention[], blocks: OutlineBlock[]): MentionRecord[] {
   const blockIdByOrder = new Map(blocks.map((block) => [block.order, block.id]))
   return mentions.map((mention) => ({ ...mention, blockId: blockIdByOrder.get(mention.line) ?? '' }))
-}
-
-// The NLP date parser picks up phrases like "today"/"next friday" inline in
-// the task text -- once that's captured as the due date, showing it again in
-// the task label is redundant clutter, so cut just the matched span out.
-function stripMatchedText(text: string, detected: ParsedTaskDate): string {
-  const before = text.slice(0, detected.index)
-  const after = text.slice(detected.index + detected.matchedText.length)
-  return `${before}${after}`.replace(/\s{2,}/g, ' ').trim()
 }
 
 async function buildTaskRecords(blocks: OutlineBlock[], day: string, metadata?: DayMetadata): Promise<TaskRecord[]> {
