@@ -1,12 +1,18 @@
-import { ArrowLeft, CheckCircle2, ChevronRight, Circle, GitBranch, HelpCircle, Lightbulb, MoreHorizontal, Quote } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { AlignJustify, ArrowLeft, CheckCircle2, ChevronRight, Circle, GitBranch, HelpCircle, Kanban, Lightbulb, List, MoreHorizontal, Quote } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { db, toggleChecklistBlock, toggleTaskByBlockId, type ThreadOccurrenceRecord, type ViewStateRecord } from '../db'
+import { db, toggleChecklistBlock, toggleTaskByBlockId, type TaskRecord, type ThreadOccurrenceRecord, type ViewStateRecord } from '../db'
 import { formatDay } from '../lib/dates'
 import { useOpenTab } from '../lib/tabsApi'
-import { openBlockInspector } from '../lib/inspectorTarget'
+import { openBlockInspector, openTaskInspector } from '../lib/inspectorTarget'
 import type { OutlineBlock } from '../lib/outline'
 import { ThreadComposer } from '../components/ThreadComposer'
+import { TaskBoard } from '../components/TaskBoard'
+import { TaskBranch } from './TasksPage'
+import type { TaskDisplayMode } from '../components/TaskRow'
+
+type ThreadTaskMode = TaskDisplayMode | 'board'
 
 export function ThreadPage() {
   const { threadId = '' } = useParams()
@@ -43,9 +49,49 @@ export function ThreadPage() {
     [],
   )
 
+  const taskIds = useMemo(
+    () => Array.from(new Set(mentions.filter((item) => item.kind === 'task').map((item) => item.blockId))),
+    [mentions],
+  )
+  const taskIdsKey = taskIds.join(',')
+  const threadTasks = useLiveQuery(
+    () => (taskIds.length ? db.tasks.where('id').anyOf(taskIds).toArray() : Promise.resolve([])),
+    [taskIdsKey],
+    [],
+  )
+  const threadTags = useLiveQuery(
+    () => (taskIds.length ? db.blockTags.where('blockId').anyOf(taskIds).toArray() : Promise.resolve([])),
+    [taskIdsKey],
+    [],
+  )
+  const tagDefinitions = useLiveQuery(() => db.tagDefinitions.orderBy('name').toArray(), [], [])
+  const taskMentions = useLiveQuery(
+    () => (taskIds.length ? db.mentions.where('blockId').anyOf(taskIds).toArray() : Promise.resolve([])),
+    [taskIdsKey],
+    [],
+  )
+
+  const taskChildren = useMemo(() => {
+    const map = new Map<string, TaskRecord[]>()
+    threadTasks.forEach((task) => {
+      if (!task.parentTaskId) return
+      const list = map.get(task.parentTaskId) ?? []
+      list.push(task)
+      map.set(task.parentTaskId, list)
+    })
+    return map
+  }, [threadTasks])
+  const threadRoots = useMemo(() => {
+    const ids = new Set(threadTasks.map((task) => task.id))
+    return threadTasks.filter((task) => !task.parentTaskId || !ids.has(task.parentTaskId))
+  }, [threadTasks])
+
+  const [taskMode, setTaskMode] = useState<ThreadTaskMode>('board')
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
+
   if (!thread) return <div className="page-loading">Finding this thread…</div>
 
-  const tasks = mentions.filter((item) => item.kind === 'task' && !item.checked)
   const questions = mentions.filter((item) => item.kind === 'question' && !item.checked)
   const decisions = mentions.filter((item) => item.kind === 'decision')
   const ideas = mentions.filter((item) => item.kind === 'idea')
@@ -62,15 +108,9 @@ export function ThreadPage() {
         <div><div className="eyebrow">Living thread</div><h1>{thread.title}</h1></div>
       </header>
 
-      <section className="projection-section direction-section">
-        <div className="section-label"><span>Current direction</span><small>from your latest notes</small></div>
-        <p>{direction ?? 'Keep writing. A direction will emerge as this thread grows.'}</p>
-      </section>
-
       <ThreadComposer key={thread.id} threadId={thread.id} title={thread.title} />
 
-      <section className="projection-section outline-section">
-        <div className="section-label"><span>All notes</span><small>{outlines.length} occurrences</small></div>
+      <ProjectionDisclosure title="All notes" meta={`${outlines.length} occurrences`} contentClassName="full-bleed">
         <div className="thread-occurrences">
           {outlines.map(({ occurrence, blocks }) => (
             <ThreadOccurrence
@@ -84,36 +124,79 @@ export function ThreadPage() {
           ))}
           {outlines.length === 0 && <div className="section-empty">No source outline is indexed yet</div>}
         </div>
-      </section>
+      </ProjectionDisclosure>
 
-      <ProjectionDisclosure title="Open questions" count={questions.length}>
+      <ProjectionDisclosure title="Tasks" meta={threadTasks.length} contentClassName="full-bleed">
+        {threadTasks.length === 0 ? (
+          <div className="section-empty">No tasks linked to this thread yet — mention <code>[[{thread.title}]]</code> on a task to add one.</div>
+        ) : (
+          <>
+            <div className="thread-task-toolbar">
+              <div className="task-mode-toggle" role="group" aria-label="Display mode">
+                <button type="button" aria-pressed={taskMode === 'list'} aria-label="List view" onClick={() => setTaskMode('list')}><List size={14} /></button>
+                <button type="button" aria-pressed={taskMode === 'compact'} aria-label="Compact view" onClick={() => setTaskMode('compact')}><AlignJustify size={14} /></button>
+                <button type="button" aria-pressed={taskMode === 'board'} aria-label="Board view" onClick={() => setTaskMode('board')}><Kanban size={14} /></button>
+              </div>
+            </div>
+            {taskMode === 'board' ? (
+              <TaskBoard
+                tasks={threadRoots}
+                tags={threadTags}
+                tagDefinitions={tagDefinitions}
+                mentions={taskMentions}
+                selectable={false}
+                onOpen={openTaskInspector}
+              />
+            ) : (
+              <div className="thread-task-list">
+                {threadRoots.map((task) => (
+                  <TaskBranch
+                    key={task.id}
+                    task={task}
+                    children={taskChildren}
+                    depth={0}
+                    expanded={expandedTasks}
+                    selected={selectedTasks}
+                    tags={threadTags}
+                    tagDefinitions={tagDefinitions}
+                    mentions={taskMentions}
+                    mode={taskMode}
+                    onToggle={(id) => setExpandedTasks((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next })}
+                    onSelect={(id, checked) => setSelectedTasks((current) => { const next = new Set(current); if (checked) next.add(id); else next.delete(id); return next })}
+                    onOpen={openTaskInspector}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </ProjectionDisclosure>
+
+      <ProjectionDisclosure title="Current direction" meta="from your latest notes" contentClassName="full-bleed direction-content">
+        <p>{direction ?? 'Keep writing. A direction will emerge as this thread grows.'}</p>
+      </ProjectionDisclosure>
+
+      <ProjectionDisclosure title="Open questions" meta={questions.length}>
         <div className="source-list">
           {questions.map((item) => <SourceRow key={item.id} icon={<HelpCircle size={15} />} {...item} />)}
           {questions.length === 0 && <div className="section-empty">No open questions</div>}
         </div>
       </ProjectionDisclosure>
 
-      <ProjectionDisclosure title="Open tasks" count={tasks.length}>
-        <div className="source-list">
-          {tasks.map((item) => <SourceRow key={item.id} icon={<Circle size={15} />} {...item} />)}
-          {tasks.length === 0 && <div className="section-empty"><CheckCircle2 size={16} /> Nothing unresolved</div>}
-        </div>
-      </ProjectionDisclosure>
-
-      <ProjectionDisclosure title="Decisions" count={decisions.length}>
+      <ProjectionDisclosure title="Decisions" meta={decisions.length}>
         <div className="source-list">
           {decisions.map((item) => <SourceRow key={item.id} icon={<Quote size={15} />} {...item} />)}
           {decisions.length === 0 && <div className="section-empty">No decisions recorded yet</div>}
         </div>
       </ProjectionDisclosure>
 
-      <ProjectionDisclosure title="Recent thoughts" count={thoughts.length}>
+      <ProjectionDisclosure title="Recent thoughts" meta={thoughts.length}>
         <div className="source-list">
           {thoughts.map((item) => <SourceRow key={item.id} icon={<span className="thread-dot" />} {...item} />)}
         </div>
       </ProjectionDisclosure>
 
-      <ProjectionDisclosure title="Ideas" count={ideas.length}>
+      <ProjectionDisclosure title="Ideas" meta={ideas.length}>
         <div className="source-list">
           {ideas.map((item) => <SourceRow key={item.id} icon={<Lightbulb size={15} />} {...item} />)}
           {ideas.length === 0 && <div className="section-empty">No related ideas yet</div>}
@@ -123,14 +206,14 @@ export function ThreadPage() {
   )
 }
 
-function ProjectionDisclosure({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
+function ProjectionDisclosure({ title, meta, contentClassName, children }: { title: string; meta?: React.ReactNode; contentClassName?: string; children: React.ReactNode }) {
   return (
     <details className="projection-disclosure">
       <summary>
         <span><ChevronRight size={15} /> {title}</span>
-        <small>{count}</small>
+        {meta !== undefined && <small>{meta}</small>}
       </summary>
-      <div className="projection-disclosure-content">{children}</div>
+      <div className={`projection-disclosure-content${contentClassName ? ` ${contentClassName}` : ''}`}>{children}</div>
     </details>
   )
 }

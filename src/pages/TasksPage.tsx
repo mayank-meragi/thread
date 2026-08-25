@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlignJustify, ChevronDown, Check, List, Plus, Search } from 'lucide-react'
+import { AlignJustify, ChevronDown, Check, Kanban, List, Plus, Search } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
 import { db, type BlockTagRecord, type MentionRecord, type TagDefinitionRecord, type TaskPriority, type TaskRecord, type TaskStatus } from '../db'
@@ -7,12 +7,14 @@ import { formatDay, isoToday } from '../lib/dates'
 import { bulkSetTaskDueDate, bulkSetTaskPriority, bulkSetTaskStatus, createTask } from '../lib/tasks'
 import { openTaskInspector } from '../lib/inspectorTarget'
 import { TaskRow, type TaskDisplayMode } from '../components/TaskRow'
+import { TaskBoard } from '../components/TaskBoard'
 import { TaskFilterPopover, type TaskFilterKey } from '../components/TaskFilterPopover'
 import { Chip } from '../components/ui/Chip'
 
 type TaskView = 'my-day' | 'in-progress' | 'overdue' | 'upcoming' | 'blocked' | 'unscheduled' | 'completed' | 'all'
 type TaskSort = 'smart' | 'due' | 'priority' | 'updated'
 type GroupBy = 'schedule' | 'status' | 'priority' | 'tag' | 'thread' | 'day'
+type PageMode = TaskDisplayMode | 'board'
 
 const TASK_VIEWS: { id: TaskView; label: string }[] = [
   { id: 'my-day', label: 'My Day' },
@@ -87,7 +89,7 @@ export function TasksPage() {
   const thread = params.get('thread') || 'all'
   const sort = (params.get('sort') as TaskSort) || 'smart'
   const groupBy = (params.get('group') as GroupBy) || 'schedule'
-  const mode = (params.get('mode') as TaskDisplayMode) || (isMobile ? 'compact' : 'list')
+  const mode = (params.get('mode') as PageMode) || (isMobile ? 'compact' : 'list')
   const query = params.get('q') || ''
   const today = isoToday()
 
@@ -115,6 +117,11 @@ export function TasksPage() {
   }, [tasks, tags, tag, mentions, thread, view, priority, query, today])
 
   const groups = useMemo(() => groupTasks(filtered, groupBy, sort, today, { tags, tagDefinitions, mentions }), [filtered, groupBy, sort, today, tags, tagDefinitions, mentions])
+
+  const boardRoots = useMemo(() => {
+    const ids = new Set(filtered.map((task) => task.id))
+    return filtered.filter((task) => !task.parentTaskId || !ids.has(task.parentTaskId))
+  }, [filtered])
 
   const viewCounts = useMemo(() => {
     const map = {} as Record<TaskView, number>
@@ -185,10 +192,11 @@ export function TasksPage() {
       <div className="task-controls-row">
         <label className="task-search"><Search size={15} /><input value={query} onChange={(event) => updateParam('q', event.target.value, '')} placeholder="Search tasks" /></label>
         <TaskFilterPopover priority={priority} tag={tag} thread={thread} sort={sort} tagDefinitions={tagDefinitions} threadOptions={threadOptions} onChange={onFilterChange} activeCount={activeFilterCount} />
-        <FilterSelect label="Group by" value={groupBy} onChange={(value) => updateParam('group', value, 'schedule')} options={GROUP_OPTIONS} />
+        {mode !== 'board' && <FilterSelect label="Group by" value={groupBy} onChange={(value) => updateParam('group', value, 'schedule')} options={GROUP_OPTIONS} />}
         <div className="task-mode-toggle" role="group" aria-label="Display mode">
           <button type="button" aria-pressed={mode === 'list'} aria-label="List view" onClick={() => updateParam('mode', 'list', isMobile ? 'compact' : 'list')}><List size={14} /></button>
           <button type="button" aria-pressed={mode === 'compact'} aria-label="Compact view" onClick={() => updateParam('mode', 'compact', isMobile ? 'compact' : 'list')}><AlignJustify size={14} /></button>
+          <button type="button" aria-pressed={mode === 'board'} aria-label="Board view" onClick={() => updateParam('mode', 'board', isMobile ? 'compact' : 'list')}><Kanban size={14} /></button>
         </div>
       </div>
 
@@ -203,29 +211,43 @@ export function TasksPage() {
 
       {selected.size > 0 && <BulkBar ids={[...selected]} onClear={() => setSelected(new Set())} />}
 
-      <>
-        {groups.map((group) => <section className={`task-list-group group-${group.id}`} key={group.id}>
-          <header><span>{group.label}</span><small>{group.tasks.length}</small></header>
-          <div>
-            {group.tasks.map((task) => <TaskBranch
-              key={task.id}
-              task={task}
-              children={children}
-              depth={0}
-              expanded={expanded}
-              selected={selected}
+      {mode === 'board' ? (
+        boardRoots.length === 0
+          ? <div className="tasks-empty"><Check size={24} /><h2>No tasks in this view</h2><p>Change a filter or capture the next thing you want to move forward.</p></div>
+          : <TaskBoard
+              tasks={boardRoots}
               tags={tags}
               tagDefinitions={tagDefinitions}
               mentions={mentions}
-              mode={mode}
-              onToggle={(id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next })}
+              selected={selected}
               onSelect={(id, checked) => setSelected((current) => { const next = new Set(current); if (checked) next.add(id); else next.delete(id); return next })}
               onOpen={openTaskInspector}
-            />)}
-          </div>
-        </section>)}
-        {groups.length === 0 && <div className="tasks-empty"><Check size={24} /><h2>No tasks in this view</h2><p>Change a filter or capture the next thing you want to move forward.</p></div>}
-      </>
+            />
+      ) : (
+        <>
+          {groups.map((group) => <section className={`task-list-group group-${group.id}`} key={group.id}>
+            <header><span>{group.label}</span><small>{group.tasks.length}</small></header>
+            <div>
+              {group.tasks.map((task) => <TaskBranch
+                key={task.id}
+                task={task}
+                children={children}
+                depth={0}
+                expanded={expanded}
+                selected={selected}
+                tags={tags}
+                tagDefinitions={tagDefinitions}
+                mentions={mentions}
+                mode={mode}
+                onToggle={(id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next })}
+                onSelect={(id, checked) => setSelected((current) => { const next = new Set(current); if (checked) next.add(id); else next.delete(id); return next })}
+                onOpen={openTaskInspector}
+              />)}
+            </div>
+          </section>)}
+          {groups.length === 0 && <div className="tasks-empty"><Check size={24} /><h2>No tasks in this view</h2><p>Change a filter or capture the next thing you want to move forward.</p></div>}
+        </>
+      )}
 
       {isMobile && <button type="button" className="task-fab" aria-label="Add task" onClick={() => setMobileQuickAddOpen(true)}><Plus size={22} /></button>}
 
@@ -286,7 +308,7 @@ function FilterSelect({ icon, label, value, options, onChange }: { icon?: React.
   return <label className="task-filter-select">{icon}<span className="sr-only">{label}</span><select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([option, text]) => <option key={option} value={option}>{text}</option>)}</select><ChevronDown size={12} /></label>
 }
 
-function TaskBranch(props: {
+export function TaskBranch(props: {
   task: TaskRecord
   children: Map<string, TaskRecord[]>
   depth: number
