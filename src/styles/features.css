@@ -205,6 +205,7 @@
 .command-icon { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--control); color: var(--muted); }
 .command-icon-note { border-color: var(--thread); background: var(--thread-soft); color: var(--thread); }
 .command-icon-task { border-color: var(--task); background: var(--task-soft); color: var(--task); }
+.command-icon-thread { border-color: var(--thread); background: var(--thread-soft); color: var(--thread); }
 .command-actions button > span:last-child { min-width: 0; display: grid; gap: 3px; }
 .command-actions strong { font-size: 12px; }
 .command-actions small { color: var(--muted); font-size: var(--text-meta); }

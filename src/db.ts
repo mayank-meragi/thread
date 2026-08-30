@@ -12,7 +12,7 @@ import {
 } from './lib/blockMetadata'
 import { normalizePropertyValue, parseDayDocument, type DayMetadata, type PropertyValue } from './lib/dayDocument'
 import { LOCAL_MARKER, REMOTE_MARKER, SEPARATOR_MARKER, type MergeConflict } from './lib/conflictMerge'
-import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, insertPersonaNote, parseOutline, type BlockKind, type OutlineBlock, type ParsedMention } from './lib/outline'
+import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, insertPersonaNote, parseOutline, slugifyThread, type BlockKind, type OutlineBlock, type ParsedMention } from './lib/outline'
 import { parseTaskDate, stripMatchedText } from './lib/taskDates'
 import { extractHashtags, slugifyTag } from './lib/hashtags'
 import { isoToday } from './lib/dates'
@@ -40,6 +40,11 @@ export interface ThreadRecord {
   normalizedTitle: string
   createdAt: string
   updatedAt: string
+  // Set only for threads the user started directly (command panel / search
+  // fallback) rather than via a `[[wiki-link]]` mention. Exempts the thread
+  // from `pruneThreadIfOrphan` so an empty, freshly-created thread survives
+  // the next app reload.
+  origin?: 'manual'
 }
 
 export interface ThreadNoteRecord {
@@ -459,6 +464,29 @@ export async function ensureThreadNote(threadId: string): Promise<void> {
   })
 }
 
+// Create a thread directly (not via a `[[wiki-link]]`). The id is derived from
+// the title exactly the way wiki-linked and persona threads derive theirs
+// (`slugifyThread`), so typing `[[Same Title]]` later resolves to this thread
+// instead of a lookalike. On a slug collision the existing thread is returned
+// untouched.
+export async function createThread(title: string): Promise<string> {
+  const clean = title.trim()
+  const id = slugifyThread(clean)
+  if (!id) throw new Error('Thread needs a name')
+  const now = new Date().toISOString()
+  const existing = await db.threads.get(id)
+  await db.threads.put({
+    id,
+    title: existing?.title ?? clean,
+    normalizedTitle: existing?.normalizedTitle ?? clean.toLocaleLowerCase(),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+    origin: existing?.origin ?? 'manual',
+  })
+  await ensureThreadNote(id)
+  return id
+}
+
 const threadNoteSaveQueues = new Map<string, Promise<void>>()
 
 export function saveThreadNote(threadId: string, markdown: string): Promise<void> {
@@ -692,6 +720,9 @@ async function pruneThreadIfOrphan(threadId: string): Promise<void> {
   // text -- so the mention-count check alone would prune them the moment
   // they're created (before any note exists) and they'd never come back.
   if (await db.personas.where('threadId').equals(threadId).count()) return
+  // Threads the user started directly are kept even while empty -- they were
+  // created deliberately, not discovered from journal text.
+  if ((await db.threads.get(threadId))?.origin === 'manual') return
   const note = await db.threadNotes.get(threadId)
   if (note && hasMeaningfulThreadNote(note.markdown)) return
   await db.threads.delete(threadId)

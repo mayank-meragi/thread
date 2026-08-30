@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpenText, ListPlus, PanelRight, Search } from 'lucide-react'
+import { BookOpenText, GitBranch, ListPlus, PanelRight, Search } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useNavigate } from 'react-router-dom'
-import { db } from '../db'
+import { createThread, db } from '../db'
 import { formatDay } from '../lib/dates'
 import { searchDays } from '../lib/search'
 
@@ -27,6 +27,7 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
   const inputRef = useRef<HTMLInputElement>(null)
   const [rawValue, setRawValue] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(0)
+  const [caretBump, setCaretBump] = useState(0)
 
   const days = useLiveQuery(() => db.days.orderBy('date').reverse().toArray(), [], [])
   const threads = useLiveQuery(() => db.threads.orderBy('updatedAt').reverse().toArray(), [], [])
@@ -54,6 +55,14 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
     return () => { previousFocus?.focus() }
   }, [open])
 
+  useEffect(() => {
+    if (!caretBump) return
+    const input = inputRef.current
+    if (!input) return
+    input.focus()
+    input.setSelectionRange(input.value.length, input.value.length)
+  }, [caretBump])
+
   const mode: 'command' | 'search' = rawValue.startsWith('>') ? 'command' : 'search'
   const query = mode === 'command' ? rawValue.slice(1) : rawValue
   const normalized = query.trim().toLocaleLowerCase()
@@ -67,7 +76,35 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
     close()
   }
 
+  const openNewThread = async (title: string) => {
+    const id = await createThread(title)
+    go(`/thread/${id}`)
+  }
+
+  // Seed the input with a `>` command and park the caret at the end, so the
+  // user can keep typing (e.g. after picking "New thread"). The caret move is
+  // deferred to an effect so it runs after the controlled value has committed.
+  const seedCommand = (value: string) => {
+    setRawValue(value)
+    setCaretBump((count) => count + 1)
+  }
+
+  // Command mode: `>new thread <name>` short-circuits the action list to a
+  // single "create" item so a thread can be started without leaving the panel.
+  const newThreadMatch = mode === 'command' ? query.match(/^new thread\s+(.+)$/i) : null
+
   const commandItems = useMemo<OmniboxItem[]>(() => {
+    if (newThreadMatch) {
+      const name = newThreadMatch[1].trim()
+      return [{
+        id: 'new-thread-create',
+        icon: <GitBranch size={18} />,
+        iconClassName: 'command-icon-thread',
+        title: `Create thread "${name}"`,
+        subtitle: 'Press ↵ to open it',
+        onActivate: () => void openNewThread(name),
+      }]
+    }
     const actions: (OmniboxItem & { keywords: string })[] = [
       {
         id: 'capture',
@@ -86,6 +123,15 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
         subtitle: "Create it in today's outline",
         keywords: 'add task todo',
         onActivate: () => go('/tasks?create=1'),
+      },
+      {
+        id: 'new-thread',
+        icon: <GitBranch size={18} />,
+        iconClassName: 'command-icon-thread',
+        title: 'New thread',
+        subtitle: 'Start a fresh thread',
+        keywords: 'new thread create branch',
+        onActivate: () => seedCommand('>new thread '),
       },
       {
         id: 'search',
@@ -107,7 +153,7 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
         : []),
     ]
     return actions.filter((action) => !normalized || action.keywords.includes(normalized))
-  }, [normalized, onTogglePanel]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [normalized, onTogglePanel, newThreadMatch]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const dayHits = useMemo(() => searchDays(days, normalized), [days, normalized])
 
@@ -121,13 +167,27 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
         onActivate: () => go(`/thread/${thread.id}`),
       }))
     }
-    return dayHits.map((hit) => ({
+    const results: OmniboxItem[] = dayHits.map((hit) => ({
       id: `day-${hit.date}`,
       icon: <BookOpenText size={18} />,
       title: `${formatDay(hit.date).weekday}, ${formatDay(hit.date).full}`,
       subtitle: hit.matchLine,
       onActivate: () => go(`/?date=${hit.date}`),
     }))
+    // Fallback: unless the query already names an existing thread, offer to
+    // start one with that name.
+    const name = query.trim()
+    if (name && !threads.some((thread) => thread.normalizedTitle === normalized)) {
+      results.push({
+        id: 'create-thread',
+        icon: <GitBranch size={18} />,
+        iconClassName: 'command-icon-thread',
+        title: `Open new thread "${name}"`,
+        subtitle: 'Create a thread with this name',
+        onActivate: () => void openNewThread(name),
+      })
+    }
+    return results
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [normalized, dayHits, threads])
 
@@ -179,7 +239,7 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
 
         <div className="command-actions">
           {mode === 'search' && (
-            <div className="section-label"><span>{normalized ? 'Journal days' : 'Recent threads'}</span><small>{items.length}</small></div>
+            <div className="section-label"><span>{normalized ? 'Journal days' : 'Recent threads'}</span><small>{normalized ? dayHits.length : items.length}</small></div>
           )}
           {items.map((item, index) => (
             <button

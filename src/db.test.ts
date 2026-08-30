@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { addBlockTag, applyRemoteDay, createPropertyDefinition, createTag, db, markDaySynced, pruneOrphanThreads, removeBlockTag, saveDay, saveThreadNote, setBlockProperty, toggleTask, updateTagDefinition } from './db'
+import { addBlockTag, applyRemoteDay, createPropertyDefinition, createTag, createThread, db, markDaySynced, pruneOrphanThreads, removeBlockTag, saveDay, saveThreadNote, setBlockProperty, toggleTask, updateTagDefinition } from './db'
 
 const DATE = '2026-08-19'
 
@@ -201,6 +201,31 @@ describe('journal persistence', () => {
     await pruneOrphanThreads()
 
     expect(await db.threads.get('browser')).toBeDefined()
+  })
+
+  it('keeps a directly-created thread even while it is empty', async () => {
+    const id = await createThread('Redesign onboarding')
+    expect(id).toBe('redesign-onboarding')
+
+    await pruneOrphanThreads()
+
+    expect(await db.threads.get('redesign-onboarding')).toMatchObject({
+      title: 'Redesign onboarding',
+      origin: 'manual',
+    })
+  })
+
+  it('createThread returns the existing thread on a slug collision without clobbering it', async () => {
+    await saveDay(DATE, '- Discuss [[Browser]]')
+    const existing = await db.threads.get('browser')
+
+    const id = await createThread('browser')
+
+    expect(id).toBe('browser')
+    expect(await db.threads.get('browser')).toMatchObject({
+      title: 'Browser',
+      createdAt: existing!.createdAt,
+    })
   })
 
   it('cleans up existing orphan records and blank thread notes', async () => {
