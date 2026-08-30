@@ -855,7 +855,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 /* .form-error composes .banner.banner-error; this only adds spacing above the field it follows. */
 .form-error { margin-top: 12px !important; }
 .settings-actions { display: flex; align-items: center; gap: 9px; margin-top: 20px; flex-wrap: wrap; }
-.settings-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 37px; padding: 0 13px; border-radius: 9px; cursor: pointer; font-size: 12px; font-weight: 500; }
+.settings-actions button, .settings-actions a { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 37px; padding: 0 13px; border-radius: 9px; cursor: pointer; font-size: 12px; font-weight: 500; }
 .conflicts-card .settings-title svg { color: var(--warning); }
 .conflict-row { display: flex; flex-direction: column; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
 .conflict-day { font: 500 13px 'IBM Plex Mono', monospace; color: var(--ink); }
@@ -1057,3 +1057,125 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* Query blocks -- a ```thread-query fenced block renders a live results view
+   (a ProseMirror widget decoration) right after its still-editable source. */
+.query-block-view { display: block; margin: 6px 0 14px; }
+
+/* "Hide query" collapses the CodeMirror editor but keeps the code block's own
+   toolbar (language label + copy) visible as a handle. */
+.milkdown-code-block.qb-code-collapsed .cm-editor,
+.milkdown-code-block.qb-code-collapsed .codemirror-host { display: none; }
+.milkdown-code-block.qb-code-collapsed { margin-bottom: 0; }
+
+.query-block-result {
+  border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+  background: var(--paper);
+}
+.query-block-result.is-error { border-color: var(--warning, #c26); }
+
+.query-block-meta {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 5px 6px 5px 10px; border-bottom: 1px solid var(--line);
+  background: var(--sidebar);
+}
+.query-block-summary {
+  color: var(--muted); font: 500 10px/1.4 'IBM Plex Mono', monospace;
+  letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.query-block-result.is-error .query-block-summary { color: var(--warning, #c26); }
+
+.query-block-toggle {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 7px; border: 1px solid transparent; border-radius: 5px;
+  background: transparent; color: var(--muted); cursor: pointer;
+  font: 500 11px/1 inherit;
+}
+.query-block-toggle:hover { background: var(--control-hover); color: var(--ink); }
+.query-block-toggle[aria-pressed='false'] { color: var(--ink-soft); }
+
+.query-block-empty { padding: 10px; color: var(--muted); font-size: 13px; }
+.query-block-errorbody { padding: 9px 10px; color: var(--ink-soft); font-size: 13px; }
+.query-block-list { margin: 0; padding: 6px 10px; list-style: none; display: grid; gap: 2px; }
+.query-block-list a, .query-block-table a { color: var(--ink); }
+.query-block-list a:hover, .query-block-table a:hover { text-decoration: underline; }
+.query-block-table-wrap { overflow-x: auto; }
+.query-block-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.query-block-table th {
+  padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--line);
+  color: var(--muted); font: 500 10px/1 'IBM Plex Mono', monospace;
+  letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+}
+.query-block-table td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.query-block-table tr:last-child td { border-bottom: 0; }
+.query-block-error {
+  margin: 4px 0 14px; padding: 8px 10px; border-radius: 6px;
+  border: 1px solid var(--warning, #c07); background: var(--control);
+  color: var(--ink-soft); font-size: 13px;
+}
+
+/* Editable result cells / list chips (the EDITABLE clause). Inputs sit flush
+   with the surrounding text and only reveal a border on hover or focus. */
+.query-block-table td.is-editable { padding: 2px 4px; }
+.query-block-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin: 2px 8px 2px 0; font-size: 12px; color: var(--ink-soft);
+}
+.query-block-chip-label {
+  color: var(--muted); font: 500 10px/1 'IBM Plex Mono', monospace;
+  letter-spacing: .04em; text-transform: uppercase;
+}
+.query-block-result :is(td.is-editable, .query-block-chip) :is(input, select, textarea) {
+  width: 100%; min-width: 60px; box-sizing: border-box;
+  padding: 4px 6px; border: 1px solid transparent; border-radius: 5px;
+  background: transparent; color: var(--ink); font: inherit; font-size: 13px;
+}
+.query-block-result :is(td.is-editable, .query-block-chip) :is(input, select):hover {
+  border-color: var(--line);
+}
+.query-block-result :is(td.is-editable, .query-block-chip) :is(input, select, textarea):focus {
+  outline: none; border-color: var(--outline-muted); background: var(--paper);
+}
+.query-block-result .query-block-chip .property-boolean,
+.query-block-result td.is-editable .property-boolean { font-size: 12px; }
+
+/* Documentation pages (Settings -> Documentation). */
+.docs-page .docs-lead { font-size: 15px; line-height: 1.6; color: var(--ink-soft); }
+.docs-page .docs-body > p,
+.docs-page .docs-body > ul { line-height: 1.65; color: var(--ink-soft); }
+.docs-page .docs-body > ul { padding-left: 20px; display: grid; gap: 4px; }
+.docs-page h2 { margin: 34px 0 10px; }
+.docs-page h3 { margin: 22px 0 8px; font: 600 13px 'IBM Plex Mono', monospace; letter-spacing: .02em; color: var(--ink); }
+.docs-page code {
+  padding: 1px 5px; border-radius: 4px; background: var(--control);
+  font: 500 12px/1.5 'IBM Plex Mono', monospace; color: var(--ink);
+}
+.docs-page a { color: var(--thread); }
+.docs-page a:hover { text-decoration: underline; }
+
+.docs-code {
+  margin: 10px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--paper); overflow-x: auto;
+  font: 500 12.5px/1.6 'IBM Plex Mono', monospace; color: var(--ink); white-space: pre;
+}
+.docs-code-fence { color: var(--muted); }
+
+.docs-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+.docs-table th, .docs-table td {
+  padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top;
+}
+.docs-table th {
+  color: var(--muted); font: 500 10px/1 'IBM Plex Mono', monospace;
+  letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+}
+.docs-table tr:last-child td { border-bottom: 0; }
+
+.docs-index { display: grid; gap: 10px; margin-top: 8px; }
+.docs-index-card {
+  display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink);
+}
+.docs-index-card:hover { border-color: var(--outline-muted); text-decoration: none; }
+.docs-index-card strong { display: block; font-size: 14px; }
+.docs-index-card span { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }

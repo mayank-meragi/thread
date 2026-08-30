@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, ensureThreadNote, saveThreadNote } from '../db'
+import { parseThreadDocument } from '../lib/threadDocument'
 import { MarkdownEditor } from './MarkdownEditor'
 
 export function ThreadComposer({ threadId, title }: { threadId: string; title: string }) {
@@ -17,6 +18,10 @@ export function ThreadComposer({ threadId, title }: { threadId: string; title: s
 
   if (!note) return <div className="thread-composer-loading">Opening thread notes…</div>
 
+  // The editor never sees the `<!-- thread-metadata -->` envelope -- it edits
+  // prose only. saveThreadNote re-attaches the current metadata on the way back.
+  const body = parseThreadDocument(note.markdown).markdown
+
   return (
     <details className="thread-composer projection-disclosure" open>
       <summary className="thread-composer-label">
@@ -27,7 +32,7 @@ export function ThreadComposer({ threadId, title }: { threadId: string; title: s
         <MarkdownEditor
           key={threadId}
           day={`thread:${threadId}`}
-          initialValue={note.markdown}
+          initialValue={body}
           onChange={handleChange}
           ariaLabel={`${title} thread notes editor`}
           loadingLabel="Opening thread notes…"

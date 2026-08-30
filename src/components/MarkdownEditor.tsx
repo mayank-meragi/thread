@@ -24,6 +24,7 @@ import {
   semanticPrefixPlugin,
 } from '../lib/blockKinds'
 import { inlineSuggestionsPlugin } from '../lib/inlineSuggestions'
+import { createQueryBlockPlugin } from '../lib/queryBlockPlugin'
 import type { BlockConversionKind } from '../lib/suggestions'
 import { editorLinksToWiki, wikiLinkInputRule, wikiLinkInteractionPlugin, wikiLinksToEditor } from '../lib/wikilinks'
 import { editorLinksToTags, tagLinkInputRule, tagLinksToEditor } from '../lib/taglinks'
@@ -110,8 +111,10 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
         shouldAppend: () => false,
       }))
     })
+    const queryBlocks = createQueryBlockPlugin()
     crepe.editor.use(wikiLinkInputRule)
     crepe.editor.use(tagLinkInputRule)
+    crepe.editor.use(queryBlocks.plugin)
     crepe.editor.use(inlineSuggestionsPlugin({
       getThreads: async () => {
         const threads = await db.threads.orderBy('updatedAt').reverse().toArray()
@@ -420,6 +423,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       window.removeEventListener('thread:block-metadata-update', refreshBlockMetadata)
       runToolbarActionRef.current = () => undefined
       document.body.classList.remove('mobile-editor-active')
+      queryBlocks.dispose()
       void crepe.destroy()
       root.replaceChildren()
     }

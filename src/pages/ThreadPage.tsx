@@ -8,6 +8,7 @@ import { useOpenTab } from '../lib/tabsApi'
 import { openBlockInspector, openTaskInspector } from '../lib/inspectorTarget'
 import type { OutlineBlock } from '../lib/outline'
 import { ThreadComposer } from '../components/ThreadComposer'
+import { ThreadProperties } from '../components/ThreadProperties'
 import { TaskBoard } from '../components/TaskBoard'
 import { TaskBranch } from './TasksPage'
 import type { TaskDisplayMode } from '../components/TaskRow'
@@ -107,6 +108,8 @@ export function ThreadPage() {
         <div className="thread-mark"><GitBranch size={21} /></div>
         <div><div className="eyebrow">Living thread</div><h1>{thread.title}</h1></div>
       </header>
+
+      <ThreadProperties threadId={thread.id} />
 
       <ThreadComposer key={thread.id} threadId={thread.id} title={thread.title} />
 

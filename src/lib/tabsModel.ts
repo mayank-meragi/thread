@@ -9,16 +9,22 @@ export const CONTEXT_RAIL_POSITION: EdgePosition = 'right'
 
 export const CHAT_PANEL_ID = 'chat-panel'
 
-const STATIC_TAB_PATHS = ['/tasks', '/search', '/settings']
+const STATIC_TAB_PATHS = ['/tasks', '/search', '/settings', '/docs']
 
 export function isWorkingPath(path: string): boolean {
   const pathname = path.split('?')[0] || '/'
-  return pathname === '/' || pathname.startsWith('/thread/') || STATIC_TAB_PATHS.includes(pathname)
+  return pathname === '/'
+    || pathname.startsWith('/thread/')
+    || pathname.startsWith('/docs/')
+    || STATIC_TAB_PATHS.includes(pathname)
 }
 
 export function tabIdForPath(path: string): string {
   const pathname = path.split('?')[0] || '/'
-  return pathname === '/' ? TODAY_TAB_ID : pathname
+  if (pathname === '/') return TODAY_TAB_ID
+  // Every doc shares one tab.
+  if (pathname.startsWith('/docs/')) return '/docs'
+  return pathname
 }
 
 export function isGridGroup(group: DockviewGroupPanel): boolean {

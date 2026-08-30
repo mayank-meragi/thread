@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { addBlockTag, applyRemoteDay, createPropertyDefinition, createTag, createThread, db, markDaySynced, pruneOrphanThreads, removeBlockTag, saveDay, saveThreadNote, setBlockProperty, toggleTask, updateTagDefinition } from './db'
+import { addBlockTag, applyRemoteDay, createPropertyDefinition, createTag, createThread, db, ensureThreadNote, markDaySynced, pruneOrphanThreads, removeBlockTag, removeThreadProperty, saveDay, saveThreadNote, setBlockProperty, setThreadProperty, toggleTask, updateTagDefinition } from './db'
 
 const DATE = '2026-08-19'
 
@@ -237,6 +237,44 @@ describe('journal persistence', () => {
 
     expect(await db.threads.get('thi')).toBeUndefined()
     expect(await db.threadNotes.get('thi')).toBeUndefined()
+  })
+
+  it('stores thread properties in the note envelope and the threadProperties index', async () => {
+    await createThread('Browser')
+    await setThreadProperty('browser', 'priority', 'high')
+    await setThreadProperty('browser', 'estimate-minutes', 90)
+
+    const note = await db.threadNotes.get('browser')
+    expect(note!.markdown.startsWith('<!-- thread-metadata')).toBe(true)
+    expect(note!.metadata!.properties).toEqual({ priority: 'high', 'estimate-minutes': 90 })
+    const rows = await db.threadProperties.where('threadId').equals('browser').toArray()
+    expect(rows.map((row) => [row.propertyId, row.value]).sort()).toEqual([
+      ['estimate-minutes', 90],
+      ['priority', 'high'],
+    ])
+  })
+
+  it('editing the thread note body preserves its properties', async () => {
+    await createThread('Browser')
+    await setThreadProperty('browser', 'priority', 'high')
+
+    await saveThreadNote('browser', '- a fresh line of prose')
+
+    const note = await db.threadNotes.get('browser')
+    expect(note!.metadata!.properties).toEqual({ priority: 'high' })
+    expect(note!.markdown).toContain('- a fresh line of prose')
+  })
+
+  it('removing the last thread property drops the envelope entirely', async () => {
+    await createThread('Browser')
+    await ensureThreadNote('browser')
+    await setThreadProperty('browser', 'priority', 'high')
+    await removeThreadProperty('browser', 'priority')
+
+    const note = await db.threadNotes.get('browser')
+    expect(note!.markdown.startsWith('<!-- thread-metadata')).toBe(false)
+    expect(note!.metadata!.properties).toEqual({})
+    expect(await db.threadProperties.where('threadId').equals('browser').count()).toBe(0)
   })
 
   it('completes a nested task even when its saved line number is stale', async () => {

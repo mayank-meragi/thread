@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Bot, Check, GitBranch, LoaderCircle, Palette, Plus, ShieldCheck, Trash2, Unplug, Users, Wand2 } from 'lucide-react'
+import { AlertTriangle, BookOpen, Bot, Check, GitBranch, LoaderCircle, Palette, Plus, ShieldCheck, Trash2, Unplug, Users, Wand2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
 import { generateText } from 'ai'
@@ -407,6 +407,14 @@ export function SettingsPage() {
             <button className="secondary-button" onClick={() => setCreatingPersona(true)}><Plus size={16} /> New persona</button>
           </div>
         )}
+      </section>
+
+      <section className="settings-card">
+        <div className="settings-title"><BookOpen size={20} /><div><h2>Documentation</h2><p>Reference guides for Thread’s features.</p></div></div>
+        <div className="settings-actions">
+          <a className="secondary-button" href="#/docs/query-language">Query language</a>
+          <a className="text-button" href="#/docs">All docs</a>
+        </div>
       </section>
     </article>
   )

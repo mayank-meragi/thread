@@ -272,7 +272,7 @@ export function ContextualInspector() {
               {orderedDefinitions.map((definition) => (
                 <PropertyField
                   key={`${definition.id}:${JSON.stringify(values.get(definition.id))}`}
-                  blockId={blockId}
+                  target={{ kind: 'block', blockId }}
                   definition={definition}
                   value={values.get(definition.id)}
                   schema={schemaByProperty.get(definition.id)}

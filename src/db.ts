@@ -11,6 +11,7 @@ import {
   type TagDefinitionRecord,
 } from './lib/blockMetadata'
 import { normalizePropertyValue, parseDayDocument, type DayMetadata, type PropertyValue } from './lib/dayDocument'
+import { emptyThreadMetadata, hasThreadMetadataEnvelope, parseThreadDocument, serializeThreadDocument, type ThreadMetadata } from './lib/threadDocument'
 import { LOCAL_MARKER, REMOTE_MARKER, SEPARATOR_MARKER, type MergeConflict } from './lib/conflictMerge'
 import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, insertPersonaNote, parseOutline, slugifyThread, type BlockKind, type OutlineBlock, type ParsedMention } from './lib/outline'
 import { parseTaskDate, stripMatchedText } from './lib/taskDates'
@@ -50,12 +51,30 @@ export interface ThreadRecord {
 export interface ThreadNoteRecord {
   threadId: string
   markdown: string
+  // Structured thread-level properties, parsed out of the `<!-- thread-metadata -->`
+  // envelope at the head of `markdown`. `markdown` still stores the full string
+  // (envelope included) so sync stays byte-exact; this is the decoded view.
+  metadata?: ThreadMetadata
   blockCount: number
   updatedAt: string
   localRevision: number
   remoteSha?: string
   lastSyncedAt?: string
   lastSyncedMarkdown?: string
+  lastSyncedMetadata?: ThreadMetadata
+}
+
+// Derived index over `ThreadNoteRecord.metadata.properties` -- never the source
+// of truth. Rebuilt wholesale by `reindexThreadNote` whenever a thread note's
+// markdown changes (local edit or remote pull). `id` is `${threadId}:${propertyId}`.
+export interface ThreadPropertyRecord {
+  id: string
+  threadId: string
+  propertyId: string
+  value: PropertyValue
+  source: PropertySource
+  sourceTagId?: string
+  updatedAt: string
 }
 
 export interface MentionRecord {
@@ -179,6 +198,7 @@ class ThreadDatabase extends Dexie {
   revisions!: EntityTable<DayRevisionRecord, 'id'>
   tasks!: EntityTable<TaskRecord, 'id'>
   threadNotes!: EntityTable<ThreadNoteRecord, 'threadId'>
+  threadProperties!: EntityTable<ThreadPropertyRecord, 'id'>
   propertyDefinitions!: EntityTable<PropertyDefinitionRecord, 'id'>
   blockProperties!: EntityTable<BlockPropertyRecord, 'id'>
   tagDefinitions!: EntityTable<TagDefinitionRecord, 'id'>
@@ -375,6 +395,27 @@ class ThreadDatabase extends Dexie {
       chatSessions: 'id, personaId, updatedAt, [personaId+updatedAt]',
       chatMessages: 'id, sessionId, createdAt, [sessionId+createdAt]',
     })
+    this.version(12).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, kind, blockId, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, scope, aggregateId, detectedAt, resolvedAt',
+      blocks: 'id, day, parentId, kind, [day+order]',
+      occurrences: 'id, threadId, day, rootBlockId, [threadId+day]',
+      viewState: 'key, view, blockId, collapsed',
+      revisions: 'id, day, archivedAt, [day+localRevision]',
+      tasks: 'id, blockId, day, status, parentTaskId, dueDate, startDate, priority, [day+order], [status+dueDate]',
+      threadNotes: 'threadId, updatedAt',
+      threadProperties: 'id, threadId, propertyId, value, [threadId+propertyId], [propertyId+value]',
+      propertyDefinitions: 'id, name, type, updatedAt',
+      blockProperties: 'id, blockId, day, propertyId, [blockId+propertyId], [propertyId+day]',
+      tagDefinitions: 'id, name, updatedAt',
+      blockTags: 'id, blockId, day, tagId, [blockId+tagId], [tagId+day]',
+      personas: 'id, threadId, updatedAt',
+      chatSessions: 'id, personaId, updatedAt, [personaId+updatedAt]',
+      chatMessages: 'id, sessionId, createdAt, [sessionId+createdAt]',
+    })
   }
 }
 
@@ -423,6 +464,15 @@ export async function initializeDatabase(today: string): Promise<void> {
     else await reindexDay(day)
   }
   await pruneOrphanThreads()
+  // Back-fill the threadProperties index from each note's envelope -- covers
+  // the v12 upgrade and any note pulled in while this code wasn't running.
+  for (const note of await db.threadNotes.toArray()) {
+    const metadata = note.metadata ?? parseThreadDocument(note.markdown).metadata
+    if (!note.metadata && metadata.properties && Object.keys(metadata.properties).length) {
+      await db.threadNotes.update(note.threadId, { metadata })
+    }
+    await reindexThreadNote(note.threadId, metadata)
+  }
   const { ensureGeneralPersona, repairPersonaThreads } = await import('./lib/personas')
   await ensureGeneralPersona()
   await repairPersonaThreads()
@@ -489,23 +539,56 @@ export async function createThread(title: string): Promise<string> {
 
 const threadNoteSaveQueues = new Map<string, Promise<void>>()
 
-export function saveThreadNote(threadId: string, markdown: string): Promise<void> {
+// Rebuilds the `threadProperties` index for one thread from its decoded
+// envelope. Mirrors `indexBlockMetadata` for day documents: wholesale
+// delete + bulkPut, never an incremental patch, so the index can't drift.
+async function reindexThreadNote(threadId: string, metadata: ThreadMetadata | undefined): Promise<void> {
+  await db.threadProperties.where('threadId').equals(threadId).delete()
+  const entries = Object.entries(metadata?.properties ?? {})
+  if (!entries.length) return
+  const now = new Date().toISOString()
+  await db.threadProperties.bulkPut(entries.map(([propertyId, value]) => ({
+    id: `${threadId}:${propertyId}`,
+    threadId,
+    propertyId,
+    value,
+    source: metadata?.propertySources?.[propertyId]?.source ?? 'explicit',
+    sourceTagId: metadata?.propertySources?.[propertyId]?.sourceTagId,
+    updatedAt: now,
+  })))
+}
+
+// `markdown` may arrive either as body-only text (from the editor, which never
+// sees the envelope) or as a full envelope+body string. When `explicitMetadata`
+// is passed (the property mutators do), it is authoritative even when empty —
+// otherwise a body-only write keeps whatever properties the note already had,
+// and an envelope-bearing string carries its own.
+export function saveThreadNote(threadId: string, markdown: string, explicitMetadata?: ThreadMetadata): Promise<void> {
   const queued = threadNoteSaveQueues.get(threadId) ?? Promise.resolve()
   const next = queued.catch(() => undefined).then(async () => {
     const previous = await db.threadNotes.get(threadId)
-    if (previous?.markdown === markdown) return
+    const incoming = parseThreadDocument(markdown)
+    const metadata = explicitMetadata
+      ?? (hasThreadMetadataEnvelope(markdown)
+        ? incoming.metadata
+        : previous?.metadata ?? emptyThreadMetadata())
+    const stored = serializeThreadDocument(incoming.markdown, metadata)
+    if (previous?.markdown === stored) return
     const now = new Date().toISOString()
-    await db.transaction('rw', [db.threadNotes, db.outbox], async () => {
+    await db.transaction('rw', [db.threadNotes, db.threadProperties, db.outbox], async () => {
       await db.threadNotes.put({
         threadId,
-        markdown,
-        blockCount: countMarkdownBlocks(markdown),
+        markdown: stored,
+        metadata,
+        blockCount: countMarkdownBlocks(incoming.markdown),
         updatedAt: now,
         localRevision: (previous?.localRevision ?? 0) + 1,
         remoteSha: previous?.remoteSha,
         lastSyncedAt: previous?.lastSyncedAt,
         lastSyncedMarkdown: previous?.lastSyncedMarkdown,
+        lastSyncedMetadata: previous?.lastSyncedMetadata,
       })
+      await reindexThreadNote(threadId, metadata)
       await db.outbox.put({
         key: `thread-note:${threadId}`,
         kind: 'thread-note',
@@ -520,6 +603,51 @@ export function saveThreadNote(threadId: string, markdown: string): Promise<void
   return next.finally(() => {
     if (threadNoteSaveQueues.get(threadId) === next) threadNoteSaveQueues.delete(threadId)
   })
+}
+
+// Thread-level counterparts to setBlockProperty / removeBlockProperty. They
+// funnel through saveThreadNote so there is exactly one write path (envelope
+// serialization, outbox enqueue, index rebuild, local-write event).
+export async function setThreadProperty(
+  threadId: string,
+  propertyId: string,
+  rawValue: unknown,
+  source: PropertySource = 'explicit',
+): Promise<void> {
+  let definition = await db.propertyDefinitions.get(propertyId)
+  if (!definition) {
+    const builtIn = BUILT_IN_PROPERTIES.find((item) => item.id === propertyId)
+    if (builtIn) {
+      const now = new Date().toISOString()
+      definition = { ...builtIn, createdAt: now, updatedAt: now }
+      await db.propertyDefinitions.put(definition)
+    }
+  }
+  if (!definition) throw new Error('This property definition no longer exists.')
+  const value = normalizePropertyValue(rawValue)
+  validatePropertyValue(definition, value)
+  const note = await db.threadNotes.get(threadId)
+  const body = note ? parseThreadDocument(note.markdown).markdown : '- '
+  const metadata: ThreadMetadata = note?.metadata
+    ? { ...note.metadata, properties: { ...note.metadata.properties }, propertySources: { ...note.metadata.propertySources } }
+    : emptyThreadMetadata()
+  metadata.properties[propertyId] = value
+  metadata.propertySources = { ...metadata.propertySources, [propertyId]: { source } }
+  await saveThreadNote(threadId, body, metadata)
+}
+
+export async function removeThreadProperty(threadId: string, propertyId: string): Promise<void> {
+  const note = await db.threadNotes.get(threadId)
+  if (!note?.metadata) return
+  const body = parseThreadDocument(note.markdown).markdown
+  const properties = { ...note.metadata.properties }
+  delete properties[propertyId]
+  const propertySources = { ...note.metadata.propertySources }
+  delete propertySources[propertyId]
+  const metadata: ThreadMetadata = { ...note.metadata, properties }
+  if (Object.keys(propertySources).length) metadata.propertySources = propertySources
+  else delete metadata.propertySources
+  await saveThreadNote(threadId, body, metadata)
 }
 
 async function indexAndStoreDay(record: DayRecord, previous?: DayRecord, options?: { queueOutbox?: boolean }): Promise<void> {
@@ -1223,23 +1351,27 @@ export async function markDaySynced(date: string, sha: string, syncedRevision: n
 // local edit is in flight, in which case only the new remote baseline is
 // recorded) and clears the outbox entry rather than re-queuing it.
 export async function applyMergedThreadNote(threadId: string, markdown: string, sha: string, syncedRevision: number): Promise<void> {
-  await db.transaction('rw', db.threadNotes, db.outbox, async () => {
+  const mergedMetadata = parseThreadDocument(markdown).metadata
+  await db.transaction('rw', db.threadNotes, db.threadProperties, db.outbox, async () => {
     const current = await db.threadNotes.get(threadId)
     if (!current) return
     const now = new Date().toISOString()
     if (current.localRevision !== syncedRevision) {
-      await db.threadNotes.update(threadId, { remoteSha: sha, lastSyncedAt: now, lastSyncedMarkdown: markdown })
+      await db.threadNotes.update(threadId, { remoteSha: sha, lastSyncedAt: now, lastSyncedMarkdown: markdown, lastSyncedMetadata: mergedMetadata })
       return
     }
     await db.threadNotes.update(threadId, {
       markdown,
-      blockCount: countMarkdownBlocks(markdown),
+      metadata: mergedMetadata,
+      blockCount: countMarkdownBlocks(parseThreadDocument(markdown).markdown),
       updatedAt: now,
       localRevision: current.localRevision + 1,
       remoteSha: sha,
       lastSyncedAt: now,
       lastSyncedMarkdown: markdown,
+      lastSyncedMetadata: mergedMetadata,
     })
+    await reindexThreadNote(threadId, mergedMetadata)
     await db.outbox.delete(`thread-note:${threadId}`)
   })
 }
@@ -1251,6 +1383,7 @@ export async function markThreadNoteSynced(threadId: string, sha: string, synced
       remoteSha: sha,
       lastSyncedAt: new Date().toISOString(),
       lastSyncedMarkdown: markdown,
+      lastSyncedMetadata: parseThreadDocument(markdown).metadata,
     })
     if (current && current.localRevision === syncedRevision) {
       await db.outbox.delete(`thread-note:${threadId}`)
