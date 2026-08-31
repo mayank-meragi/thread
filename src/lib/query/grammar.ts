@@ -1,4 +1,11 @@
 import {
+  CLAUSE_KEYWORDS,
+  LOGIC_KEYWORDS,
+  OPERATORS,
+  RESERVED,
+  SOURCE_NAMES,
+} from './keywords'
+import {
   QueryParseError,
   type ComparisonOp,
   type Expr,
@@ -6,6 +13,7 @@ import {
   type Literal,
   type Query,
   type SelectClause,
+  type SelectColumn,
   type SortDir,
   type SourceName,
 } from './types'
@@ -22,8 +30,6 @@ interface Token {
   pos: number
 }
 
-const OPERATORS = ['>=', '<=', '!=', '=', '>', '<']
-
 function tokenize(src: string): Token[] {
   const tokens: Token[] = []
   let i = 0
@@ -39,7 +45,7 @@ function tokenize(src: string): Token[] {
         value += src[j]
         j += 1
       }
-      if (j >= src.length) throw new QueryParseError('Unterminated string literal.', i)
+      if (j >= src.length) throw new QueryParseError('Unterminated string literal — add a closing quote.', i, src.length - i)
       tokens.push({ type: 'string', value, pos: i })
       i = j + 1
       continue
@@ -69,7 +75,7 @@ function tokenize(src: string): Token[] {
     const identMatch = /^[A-Za-z_][A-Za-z0-9_.-]*/.exec(src.slice(i))
     if (identMatch) { tokens.push({ type: 'ident', value: identMatch[0], pos: i }); i += identMatch[0].length; continue }
 
-    throw new QueryParseError(`Unexpected character ${JSON.stringify(ch)}.`, i)
+    throw new QueryParseError(`Unexpected character ${JSON.stringify(ch)}.`, i, 1)
   }
   tokens.push({ type: 'eof', value: '', pos: src.length })
   return tokens
@@ -79,7 +85,17 @@ function tokenize(src: string): Token[] {
 // Parser (recursive descent)
 // ---------------------------------------------------------------------------
 
-const CLAUSE_KEYWORDS = new Set(['from', 'where', 'editable', 'sort', 'limit'])
+// Words that end a field position: a following clause, FROM, or a connective.
+const FIELD_BOUNDARY = new Set<string>(['from', ...CLAUSE_KEYWORDS, ...LOGIC_KEYWORDS])
+// Words that end a WHERE term (NOT still starts one, so it's excluded here).
+const TERM_BOUNDARY = new Set<string>(['and', 'or', 'from', ...CLAUSE_KEYWORDS])
+
+// Character span of a token, for error underlining. EOF has no span.
+function tokenSpan(token: Token): number {
+  if (token.type === 'eof') return 0
+  if (token.type === 'string') return Math.max(token.value.length + 2, 1)
+  return Math.max(token.value.length, 1)
+}
 
 class Parser {
   private tokens: Token[]
@@ -109,8 +125,13 @@ class Parser {
 
   private expectKeyword(word: string): void {
     if (!this.eatKeyword(word)) {
-      throw new QueryParseError(`Expected ${word.toUpperCase()}.`, this.peek().pos)
+      const token = this.peek()
+      throw new QueryParseError(`Expected ${word.toUpperCase()}, found ${this.describe(token)}.`, token.pos, tokenSpan(token))
     }
+  }
+
+  private fail(message: string, token: Token = this.peek()): never {
+    throw new QueryParseError(message, token.pos, tokenSpan(token))
   }
 
   parse(): Query {
@@ -119,13 +140,21 @@ class Parser {
     const source = this.parseSource()
     const query: Query = { select, source }
 
-    if (this.eatKeyword('where')) query.where = this.parseExpr()
-    if (this.eatKeyword('editable')) query.editable = this.parseFieldList()
-    if (this.eatKeyword('sort')) query.sort = this.parseSort()
-    if (this.eatKeyword('limit')) query.limit = this.parseLimit()
-
-    if (this.peek().type !== 'eof') {
-      throw new QueryParseError(`Unexpected ${this.describe(this.peek())}.`, this.peek().pos)
+    // WHERE / EDITABLE / SORT / LIMIT may appear in any order, each at most once.
+    const seen = new Set<string>()
+    while (this.peek().type !== 'eof') {
+      const token = this.peek()
+      const clause = token.type === 'ident' ? token.value.toLowerCase() : ''
+      if (!CLAUSE_KEYWORDS.has(clause)) {
+        this.fail(`Unexpected ${this.describe(token)}. Expected a clause (WHERE, EDITABLE, SORT, LIMIT) or end of query.`, token)
+      }
+      if (seen.has(clause)) this.fail(`Duplicate ${clause.toUpperCase()} clause.`, token)
+      seen.add(clause)
+      this.next()
+      if (clause === 'where') query.where = this.parseExpr()
+      else if (clause === 'editable') query.editable = this.parseFieldList()
+      else if (clause === 'sort') query.sort = this.parseSort()
+      else query.limit = this.parseLimit()
     }
     return query
   }
@@ -138,21 +167,42 @@ class Parser {
   private parseSelect(): SelectClause {
     if (this.eatKeyword('list')) {
       // Extra fields are optional for LIST; they render as chips beside each item.
-      return { kind: 'list', columns: this.startsField() ? this.parseFieldList() : [] }
+      return { kind: 'list', columns: this.startsField() ? this.parseSelectColumns() : [] }
     }
     if (this.eatKeyword('table')) {
-      return { kind: 'table', columns: this.parseFieldList() }
+      return { kind: 'table', columns: this.parseSelectColumns() }
     }
-    throw new QueryParseError('A query must start with LIST or TABLE.', this.peek().pos)
+    this.fail('A query must start with LIST or TABLE.')
   }
 
-  // Is the next token the start of a field name (not a clause keyword)?
+  // Is the next token the start of a field name (not a clause / connective)?
   private startsField(): boolean {
     const token = this.peek()
     if (token.type === 'string') return true
     if (token.type !== 'ident') return false
-    const lower = token.value.toLowerCase()
-    return !CLAUSE_KEYWORDS.has(lower) && !['and', 'or', 'not'].includes(lower)
+    return !FIELD_BOUNDARY.has(token.value.toLowerCase())
+  }
+
+  // A comma-separated column list where each column may carry `AS <alias>`.
+  private parseSelectColumns(): SelectColumn[] {
+    const columns: SelectColumn[] = [this.parseSelectColumn()]
+    while (this.peek().type === 'punct' && this.peek().value === ',') {
+      this.next()
+      columns.push(this.parseSelectColumn())
+    }
+    return columns
+  }
+
+  private parseSelectColumn(): SelectColumn {
+    const { name } = this.parseField()
+    if (!this.eatKeyword('as')) return { name }
+    const token = this.peek()
+    if (token.type === 'string') { this.next(); return { name, alias: token.value } }
+    if (token.type === 'ident' && !RESERVED.has(token.value.toLowerCase())) {
+      this.next()
+      return { name, alias: token.value }
+    }
+    return this.fail('Expected a column name after AS.', token)
   }
 
   private parseFieldList(): FieldRef[] {
@@ -166,11 +216,11 @@ class Parser {
 
   private parseSource(): SourceName {
     const token = this.peek()
-    if (token.type === 'ident' && (token.value.toLowerCase() === 'threads' || token.value.toLowerCase() === 'tags')) {
+    if (token.type === 'ident' && SOURCE_NAMES.has(token.value.toLowerCase())) {
       this.next()
       return token.value.toLowerCase() as SourceName
     }
-    throw new QueryParseError('FROM must name a source: threads or tags.', token.pos)
+    return this.fail('FROM must name a source: threads or tags.', token)
   }
 
   private parseSort(): { field: FieldRef; dir: SortDir } {
@@ -184,7 +234,7 @@ class Parser {
   private parseLimit(): number {
     const token = this.peek()
     if (token.type !== 'number' || !/^\d+$/.test(token.value)) {
-      throw new QueryParseError('LIMIT expects a whole number.', token.pos)
+      return this.fail('LIMIT expects a whole number.', token)
     }
     this.next()
     return Number(token.value)
@@ -197,11 +247,11 @@ class Parser {
       return { name: token.value }
     }
     if (token.type !== 'ident') {
-      throw new QueryParseError('Expected a field name.', token.pos)
+      this.fail(`Expected a field name, found ${this.describe(token)}.`, token)
     }
     const lower = token.value.toLowerCase()
-    if (CLAUSE_KEYWORDS.has(lower) || ['and', 'or', 'not'].includes(lower)) {
-      throw new QueryParseError(`${token.value.toUpperCase()} is a reserved word; quote it to use it as a value.`, token.pos)
+    if (RESERVED.has(lower)) {
+      this.fail(`${token.value.toUpperCase()} is a reserved word; quote it to use it as a field name.`, token)
     }
     this.next()
     return { name: token.value.replace(/^prop\./i, '') }
@@ -223,12 +273,7 @@ class Parser {
     const token = this.peek()
     if (token.type === 'eof') return false
     if (token.type === 'punct') return token.value === '('
-    if (token.type === 'ident') {
-      const lower = token.value.toLowerCase()
-      if (lower === 'or') return false
-      if (CLAUSE_KEYWORDS.has(lower)) return false
-      return true
-    }
+    if (token.type === 'ident') return !TERM_BOUNDARY.has(token.value.toLowerCase())
     return false
   }
 
@@ -258,7 +303,7 @@ class Parser {
       this.next()
       const expr = this.parseExpr()
       if (!(this.peek().type === 'punct' && this.peek().value === ')')) {
-        throw new QueryParseError('Expected a closing parenthesis.', this.peek().pos)
+        this.fail(`Expected a closing parenthesis, found ${this.describe(this.peek())}.`)
       }
       this.next()
       return { kind: 'group', expr }
@@ -295,7 +340,7 @@ class Parser {
       this.next()
       return { type: 'string', value: token.value }
     }
-    throw new QueryParseError('Expected a value after the operator.', token.pos)
+    return this.fail(`Expected a value after the operator, found ${this.describe(token)}.`, token)
   }
 }
 

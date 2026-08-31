@@ -183,18 +183,25 @@ export function runQuery(
 
   if (typeof query.limit === 'number') rows = rows.slice(0, Math.max(0, query.limit))
 
+  // `columnFields` resolves cell values and matches editable properties;
+  // `columns` is only what the header shows (the alias when one was given).
+  const selected = query.select.columns
+  const columnFields = query.select.kind === 'table'
+    ? selected.map((column) => column.name)
+    : [DEFAULT_LIST_FIELD[query.source], ...selected.map((column) => column.name)]
   const columns = query.select.kind === 'table'
-    ? query.select.columns.map((column) => column.name)
-    : [DEFAULT_LIST_FIELD[query.source], ...query.select.columns.map((column) => column.name)]
+    ? selected.map((column) => column.alias ?? column.name)
+    : [DEFAULT_LIST_FIELD[query.source], ...selected.map((column) => column.alias ?? column.name)]
 
   const resultRows: ResultRow[] = rows.map((row) => ({
     id: row.id,
     link: row.link,
-    cells: columns.map((name) => resolveField(row, name) ?? null),
+    cells: columnFields.map((name) => resolveField(row, name) ?? null),
   }))
 
   return {
     columns,
+    columnFields,
     rows: resultRows,
     editable: (query.editable ?? []).map((field) => slugifyField(field.name)),
   }

@@ -8,9 +8,16 @@ export interface FieldRef {
   name: string
 }
 
+// A column in a LIST/TABLE selector. `alias` (set via `AS`) is the header text;
+// `name` is still what the value is resolved from.
+export interface SelectColumn {
+  name: string
+  alias?: string
+}
+
 export type SelectClause =
-  | { kind: 'list'; columns: FieldRef[] }
-  | { kind: 'table'; columns: FieldRef[] }
+  | { kind: 'list'; columns: SelectColumn[] }
+  | { kind: 'table'; columns: SelectColumn[] }
 
 export type ComparisonOp = '=' | '!=' | '>' | '<' | '>=' | '<=' | 'contains'
 
@@ -42,10 +49,14 @@ export interface Query {
 
 export class QueryParseError extends Error {
   position: number
-  constructor(message: string, position: number) {
+  // Length of the offending span starting at `position` (0 when unknown, e.g.
+  // at end of input). Lets a caller underline the exact text later on.
+  length: number
+  constructor(message: string, position: number, length = 0) {
     super(message)
     this.name = 'QueryParseError'
     this.position = position
+    this.length = length
   }
 }
 
@@ -64,7 +75,11 @@ export interface ResultRow {
 }
 
 export interface RunResult {
+  // Display headers — the alias when a column set one, otherwise the field name.
   columns: string[]
+  // Underlying field name per column, positionally parallel to `columns`. Cell
+  // lookup and editable-property matching use this, not the (aliasable) header.
+  columnFields: string[]
   rows: ResultRow[]
   // Slugified names of the fields the query marked `EDITABLE`.
   editable: string[]

@@ -1,14 +1,12 @@
-import { LanguageDescription } from '@codemirror/language'
-import type { LanguageSupport } from '@codemirror/language'
+import { LanguageDescription, LanguageSupport, StreamLanguage } from '@codemirror/language'
 import { QUERY_BLOCK_LANGUAGE } from './queryBlockPlugin'
+import { tqlStreamParser } from './query/highlight'
 
-// Registers `tql` in the code-block language dropdown. There is no CodeMirror
-// grammar for the query DSL, so `load` resolves to no extensions — the block is
-// rendered as plain text. `CodeMirrorBlock.updateLanguage()` only reconfigures
-// the language compartment on a truthy resolve, and an empty extension array is
-// a valid (no-op) configuration.
+// Registers `tql` in the code-block language dropdown and gives it syntax
+// highlighting via a small StreamLanguage (see `query/highlight.ts`). The parser
+// there shares its keyword tables with the real query parser.
 export const queryLanguageDescription = LanguageDescription.of({
   name: QUERY_BLOCK_LANGUAGE,
   alias: [QUERY_BLOCK_LANGUAGE],
-  load: async () => [] as unknown as LanguageSupport,
+  load: async () => new LanguageSupport(StreamLanguage.define(tqlStreamParser)),
 })

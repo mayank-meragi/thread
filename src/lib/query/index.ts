@@ -7,5 +7,6 @@ export {
   type ResultRow,
   type Row,
   type RunResult,
+  type SelectColumn,
   type SourceName,
 } from './types'

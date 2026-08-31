@@ -36,7 +36,7 @@ export function QueryLanguageDoc() {
       <ul>
         <li>Keywords (<code>FROM</code>, <code>WHERE</code>, <code>AND</code>, …) are case-insensitive.</li>
         <li>Everything after <code>FROM &lt;source&gt;</code> is optional.</li>
-        <li>Clauses must appear in the order shown.</li>
+        <li>The <code>WHERE</code>, <code>EDITABLE</code>, <code>SORT</code> and <code>LIMIT</code> clauses may appear in any order, each at most once.</li>
       </ul>
 
       <h2>SELECT — what to show</h2>
@@ -55,11 +55,16 @@ export function QueryLanguageDoc() {
             <td><code>TABLE field, field, …</code></td>
             <td>A table with one column per field, in the order given. The first column links to the row.</td>
           </tr>
+          <tr>
+            <td><code>field AS name</code></td>
+            <td>Renames a column. <code>name</code> is a bare word or a quoted string and becomes the table header (or the chip label in a <code>LIST</code>); the value is still read from <code>field</code>.</td>
+          </tr>
         </tbody>
       </table>
       <Q>{`LIST FROM threads WHERE type = Trip`}</Q>
       <Q>{`LIST rating, status FROM threads WHERE type = Trip`}</Q>
       <Q>{`TABLE title, rating, updated FROM threads WHERE type = Trip`}</Q>
+      <Q>{`TABLE title AS "Trip", start AS "Leaves on" FROM threads WHERE type = Trip`}</Q>
 
       <h2>FROM — the source</h2>
       <p>Exactly one source per query.</p>

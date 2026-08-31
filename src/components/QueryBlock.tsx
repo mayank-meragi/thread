@@ -95,11 +95,11 @@ export function QueryBlock({ source }: { source: string }) {
   // source is `threads`, and the name maps to a real (non-hidden) property.
   const editableDefFor = useMemo(() => {
     const wanted = result && !('error' in result) ? new Set(result.editable) : new Set<string>()
-    return (columnName: string): PropertyDefinitionRecord | null => {
+    return (fieldName: string): PropertyDefinitionRecord | null => {
       if (parsed.query?.source !== 'threads') return null
-      const slug = slugifyField(columnName)
+      const slug = slugifyField(fieldName)
       if (!wanted.has(slug) || READONLY_FIELDS.has(slug)) return null
-      return propertyDefs.find((def) => !def.hidden && (def.id === columnName || slugifyField(def.name) === slug)) ?? null
+      return propertyDefs.find((def) => !def.hidden && (def.id === fieldName || slugifyField(def.name) === slug)) ?? null
     }
   }, [result, parsed.query?.source, propertyDefs])
 
@@ -162,9 +162,9 @@ export function QueryBlock({ source }: { source: string }) {
               <a href={row.link}>{formatCell(row.cells[0])}</a>
               {result.columns.slice(1).map((column, i) => {
                 const cell = row.cells[i + 1]
-                const def = editableDefFor(column)
+                const def = editableDefFor(result.columnFields[i + 1])
                 return (
-                  <span className="query-block-chip" key={column}>
+                  <span className="query-block-chip" key={i}>
                     <span className="query-block-chip-label">{column}</span>
                     {def ? editControl(row.id, def, cell as PropertyValue | undefined) : formatCell(cell)}
                   </span>
@@ -177,16 +177,15 @@ export function QueryBlock({ source }: { source: string }) {
         <div className="query-block-table-wrap">
           <table className="query-block-table">
             <thead>
-              <tr>{result.columns.map((column) => <th key={column}>{column}</th>)}</tr>
+              <tr>{result.columns.map((column, index) => <th key={index}>{column}</th>)}</tr>
             </thead>
             <tbody>
               {result.rows.map((row) => (
                 <tr key={row.id}>
                   {row.cells.map((cell, index) => {
-                    const column = result.columns[index]
-                    const def = editableDefFor(column)
+                    const def = editableDefFor(result.columnFields[index])
                     return (
-                      <td key={column ?? index} className={def ? 'is-editable' : undefined}>
+                      <td key={index} className={def ? 'is-editable' : undefined}>
                         {def
                           ? editControl(row.id, def, cell as PropertyValue | undefined)
                           : index === 0

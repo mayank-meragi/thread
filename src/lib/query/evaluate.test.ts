@@ -114,6 +114,25 @@ describe('runQuery — shaping', () => {
     expect(result.editable).toEqual(['due-date', 'priority'])
   })
 
+  it('uses AS aliases for headers while still resolving from the real field', () => {
+    const result = runQuery(
+      parseQuery('TABLE title AS "Name", priority AS "P" FROM threads WHERE id = beta'),
+      { rows, propertyDefs },
+    )
+    expect(result.columns).toEqual(['Name', 'P'])
+    expect(result.columnFields).toEqual(['title', 'priority'])
+    expect(result.rows[0].cells).toEqual(['Beta draft', 'low'])
+  })
+
+  it('keeps an aliased column editable via its underlying field', () => {
+    const result = runQuery(
+      parseQuery('TABLE title, priority AS "P" FROM threads EDITABLE priority'),
+      { rows, propertyDefs },
+    )
+    expect(result.editable).toEqual(['priority'])
+    expect(result.columnFields[1]).toBe('priority')
+  })
+
   it('has an empty editable list when the clause is absent', () => {
     expect(runQuery(parseQuery('LIST FROM threads'), { rows, propertyDefs }).editable).toEqual([])
   })

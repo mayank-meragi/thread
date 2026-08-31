@@ -28,8 +28,30 @@ describe('parseQuery', () => {
     expect(() => parseQuery('TABLE editable FROM threads')).toThrow(/reserved word/)
   })
 
-  it('rejects a clause after EDITABLE that is out of order', () => {
-    expect(() => parseQuery('TABLE title FROM threads SORT title EDITABLE title')).toThrow(QueryParseError)
+  it('accepts clauses in any order', () => {
+    const query = parseQuery('TABLE title FROM threads SORT title DESC WHERE type = Trip LIMIT 3')
+    expect(query.where).toMatchObject({ kind: 'compare', field: { name: 'type' } })
+    expect(query.sort).toEqual({ field: { name: 'title' }, dir: 'desc' })
+    expect(query.limit).toBe(3)
+  })
+
+  it('rejects a repeated clause', () => {
+    expect(() => parseQuery('TABLE title FROM threads SORT title SORT updated')).toThrow(/Duplicate SORT/)
+  })
+
+  it('parses AS aliases on TABLE and LIST columns', () => {
+    expect(parseQuery('TABLE title AS "Name", start_date AS Started FROM threads').select).toEqual({
+      kind: 'table',
+      columns: [{ name: 'title', alias: 'Name' }, { name: 'start_date', alias: 'Started' }],
+    })
+    expect(parseQuery('LIST rating AS Score FROM threads').select).toEqual({
+      kind: 'list',
+      columns: [{ name: 'rating', alias: 'Score' }],
+    })
+  })
+
+  it('rejects AS with no name', () => {
+    expect(() => parseQuery('TABLE title AS FROM threads')).toThrow(/column name after AS/)
   })
 
   it('parses TABLE columns', () => {
