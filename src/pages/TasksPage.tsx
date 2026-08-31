@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlignJustify, ChevronDown, Check, Kanban, List, Plus, Search } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
@@ -60,15 +60,25 @@ function matchesView(task: TaskRecord, view: TaskView, today: string): boolean {
   }
 }
 
-function useIsMobile(): boolean {
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches)
+// The Tasks page lives in a dockview panel that resizes independently of the
+// window, so "mobile" here means "this panel is narrow", measured off the page
+// element -- matching the `@container panel (max-width: 760px)` CSS. The window
+// width is only a first-paint guess until the ResizeObserver reports the real
+// element width.
+function useIsNarrow(ref: React.RefObject<HTMLElement | null>, breakpoint = 760): boolean {
+  const [isNarrow, setIsNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth <= breakpoint)
   useEffect(() => {
-    const query = window.matchMedia('(max-width: 760px)')
-    const onChange = () => setIsMobile(query.matches)
-    query.addEventListener('change', onChange)
-    return () => query.removeEventListener('change', onChange)
-  }, [])
-  return isMobile
+    const el = ref.current
+    if (!el) return
+    const update = (width: number) => setIsNarrow(width <= breakpoint)
+    update(el.getBoundingClientRect().width)
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) update(entry.contentRect.width)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ref, breakpoint])
+  return isNarrow
 }
 
 export function TasksPage() {
@@ -81,7 +91,8 @@ export function TasksPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [mobileViewOpen, setMobileViewOpen] = useState(false)
   const [mobileQuickAddOpen, setMobileQuickAddOpen] = useState(false)
-  const isMobile = useIsMobile()
+  const pageRef = useRef<HTMLElement>(null)
+  const isMobile = useIsNarrow(pageRef)
 
   const view = (params.get('view') as TaskView) || 'my-day'
   const priority = params.get('priority') || 'all'
@@ -161,7 +172,7 @@ export function TasksPage() {
   const currentView = TASK_VIEWS.find((item) => item.id === view) ?? TASK_VIEWS[0]
 
   return (
-    <article className="tasks-page">
+    <article className="tasks-page" ref={pageRef}>
       <header className="tasks-hero tasks-hero-compact">
         <div>
           <h1>Tasks</h1>

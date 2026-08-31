@@ -59,6 +59,18 @@ below against the new palette before shipping it.
   interactive sibling (e.g. inline outline toggles); the 44px hit area would swallow the neighbor's
   tap target — leave those as a known gap instead.
 
+## Responsive layout
+
+- **App chrome** (icon rail, title bar, mobile nav, editor toolbar, inspector sheet) collapses on
+  the **viewport** via `@media (max-width: 760px)` / `1100px` in `features.css`, mirrored in JS by
+  `window.matchMedia('(max-width: 760px)')`.
+- **Route-panel content** (the Tasks view, today-task rows) collapses on the **panel's** width, not
+  the viewport — dockview panels resize independently. `.route-panel` sets
+  `container: panel / inline-size`; the rules live in `@container panel (max-width: 760px)` /
+  `1100px`. `TasksPage` mirrors this in JS with a `ResizeObserver` on `.tasks-page`
+  (`useIsNarrow`), so the FAB + bottom-sheet quick-add appears whenever the panel is narrow, even in
+  a wide window. Keep the CSS `@container` threshold and the JS breakpoint in sync.
+
 ## State matrix
 
 | State | Visual | ARIA |

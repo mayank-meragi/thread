@@ -96,6 +96,8 @@ runs, median, p75, worst result, fixture size, and whether the run was cold or w
 - [ ] Context remains reachable when the context rail hides below 1280 px.
 - [ ] Tablet behavior near 1100 px does not clip task filters or primary controls.
 - [ ] The 760 px breakpoint switches cleanly between desktop and mobile navigation.
+- [ ] The Tasks view collapses on its **panel** width: docked narrow (~400 px) in a wide window it
+      shows the FAB + bottom-sheet quick-add and does not clip the quick-add or per-row status menu.
 - [ ] Mobile layout at 390 x 844 respects safe areas and the software keyboard.
 - [ ] The app restores after refresh, browser restart, offline restart, and an interrupted sync.
 - [ ] Light/dark themes do not change meaning, contrast, or focus visibility.

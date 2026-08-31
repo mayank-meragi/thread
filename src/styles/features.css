@@ -101,7 +101,11 @@
 .content-row { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; }
 .dockview-shell { flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; }
 .dockview-shell .dv-content-container { min-height: 0; }
-.route-panel { height: 100%; min-height: 0; overflow: auto; }
+/* container-type: inline-size lets the Tasks view (and other route pages) collapse
+   to their compact layout based on this panel's width -- dockview panels resize
+   independently of the viewport -- rather than the viewport width. See the
+   `@container panel` blocks near the bottom of this file. */
+.route-panel { height: 100%; min-height: 0; overflow: auto; container: panel / inline-size; }
 .dockview-theme-thread .dv-tabs-and-actions-container {
   padding: 0; border-bottom: 0;
   box-shadow: inset 0 -1px 0 var(--line);
@@ -627,6 +631,10 @@ a[href^="#/"] { -webkit-touch-callout: none; }
 .task-board-card-foot span { display: inline-flex; align-items: center; gap: 3px; }
 
 .task-row-swipe-wrap { position: relative; overflow: hidden; }
+/* overflow: hidden clips the swipe-action layer / row translate during a touch
+   swipe -- but it also clips the status control's open menu. Stop clipping while
+   that menu is open (it's never open mid-swipe). */
+.task-row-swipe-wrap:has(.task-status-menu) { overflow: visible; }
 .task-row-swipe-actions { position: absolute; inset: 0; z-index: 0; display: flex; align-items: stretch; justify-content: flex-end; gap: 1px; }
 .task-row-swipe-actions button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 84px; border: 0; background: var(--control); color: var(--ink-soft); font-size: 10px; font-weight: 600; }
 .task-row-swipe-actions button.danger { background: var(--danger-soft); color: var(--danger); }
@@ -981,9 +989,31 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .database-stat span { color: var(--muted); font-size: var(--text-meta); }
 .page-loading { padding: 80px 40px; color: var(--muted); font-size: 13px; }
 
-@media (max-width: 1100px) {
+/* Tasks-view layout keys off the route panel's width (see `.route-panel`), not
+   the viewport -- a docked panel can be narrow while the window is wide. On a
+   phone the panel width tracks the viewport, so these still fire there. */
+@container panel (max-width: 1100px) {
   .task-filter-select { flex: 1 1 120px; }
   .task-filter-select select { width: 100%; }
+}
+
+@container panel (max-width: 760px) {
+  .tasks-page { padding: 28px 16px 100px; }
+  .task-quick-add { grid-template-columns: auto minmax(0, 1fr) auto; padding-left: 12px; }
+  .task-quick-add input[type='date'], .task-quick-add select { display: none; }
+  .task-quick-add > button { padding: 0 10px; }
+  .task-vitals { position: sticky; top: 0; z-index: 6; overflow-x: auto; background: var(--paper); }
+  .task-vitals div { min-width: 92px; display: grid; gap: 3px; padding-right: 12px; }
+  .task-vitals div + div { padding-left: 12px; }
+  .task-controls-row { position: sticky; top: 52px; z-index: 6; padding-top: 4px; background: var(--paper); }
+  .task-search { flex-basis: 100%; }
+  .task-list-row { grid-template-columns: 17px 18px 25px minmax(0, 1fr); padding-left: calc(2px + var(--task-depth) * 15px); }
+  .task-row-progress { grid-column: 4; width: 90px; padding-bottom: 4px; }
+  .task-row-foot > span:first-child { display: none; }
+  .task-bulk-bar { top: 8px; flex-wrap: wrap; }
+  .task-bulk-bar strong { flex-basis: calc(100% - 80px); }
+  .today-task-row { grid-template-columns: 24px minmax(0, 1fr); padding: 7px 0; }
+  .today-task-meta { grid-column: 2; }
 }
 
 @media (max-width: 760px) {
@@ -1064,22 +1094,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .inspector-panel::before { top: 0; right: 0; bottom: auto; width: auto; height: 3px; background: linear-gradient(90deg, transparent, var(--thread), var(--idea), transparent); }
   .inspector-property > label { grid-template-columns: 88px minmax(0, 1fr); }
   .thread-editor .ProseMirror .task-metadata-row { flex-wrap: wrap; gap: 8px 15px; margin-left: 0; }
-  .today-task-row { grid-template-columns: 24px minmax(0, 1fr); padding: 7px 0; }
-  .today-task-meta { grid-column: 2; }
-  .tasks-page { padding: 28px 16px 100px; }
-  .task-quick-add { grid-template-columns: auto minmax(0, 1fr) auto; padding-left: 12px; }
-  .task-quick-add input[type='date'], .task-quick-add select { display: none; }
-  .task-quick-add > button { padding: 0 10px; }
-  .task-vitals { position: sticky; top: 0; z-index: 6; overflow-x: auto; background: var(--paper); }
-  .task-vitals div { min-width: 92px; display: grid; gap: 3px; padding-right: 12px; }
-  .task-vitals div + div { padding-left: 12px; }
-  .task-controls-row { position: sticky; top: 52px; z-index: 6; padding-top: 4px; background: var(--paper); }
-  .task-search { flex-basis: 100%; }
-  .task-list-row { grid-template-columns: 17px 18px 25px minmax(0, 1fr); padding-left: calc(2px + var(--task-depth) * 15px); }
-  .task-row-progress { grid-column: 4; width: 90px; padding-bottom: 4px; }
-  .task-row-foot > span:first-child { display: none; }
-  .task-bulk-bar { top: 8px; flex-wrap: wrap; }
-  .task-bulk-bar strong { flex-basis: calc(100% - 80px); }
+  /* Tasks-view + today-task layout rules moved to `@container panel (max-width: 760px)` above. */
   .field-grid { grid-template-columns: 1fr; gap: 0; }
   .theme-groups { grid-template-columns: 1fr; }
   .schema-create { grid-template-columns: auto minmax(0, 1fr); }
