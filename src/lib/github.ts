@@ -1,4 +1,4 @@
-import { applyMergedDay, applyMergedThreadNote, applyRemoteDay, db, hasOpenConflict, markConflictResolved, markDaySynced, markThreadNoteSynced, recordConflict, saveDay, type DayRecord, type ThreadNoteRecord } from '../db'
+import { applyMergedDay, applyMergedThreadNote, applyRemoteDay, applyRemoteThreadNote, db, hasOpenConflict, markConflictResolved, markDaySynced, markThreadNoteSynced, recordConflict, saveDay, saveThreadNote, type DayRecord, type ThreadNoteRecord } from '../db'
 import { emptyDayMetadata, parseDayDocument, serializeDayDocument } from './dayDocument'
 import { applyConflictResolutions, mergeMarkdown } from './conflictMerge'
 
@@ -299,6 +299,49 @@ export async function pullDay(date: string): Promise<void> {
     return
   }
   await recordConflict('day', date, merged.markdown, merged.conflicts)
+}
+
+// Thread-note counterpart to pullDay. Thread notes were previously push-only:
+// a browser only ever sent its own edits and never checked whether another
+// device had pushed a newer version of a note it already had locally, so it
+// could open the note editor on stale content. Same reconciliation shape as
+// pullDay: no unsynced local edit -> the remote copy simply becomes the local
+// one; a divergence -> three-way merge, and only a genuine overlapping-edit
+// conflict falls back to a recorded conflict resolved through the same
+// Settings UI.
+export async function pullThreadNote(threadId: string): Promise<void> {
+  const config = getGitHubConfig()
+  if (!config) return
+
+  const note = await db.threadNotes.get(threadId)
+  const path = `threads/${threadId}.md`
+
+  let remote: { content: string; sha: string } | null
+  try {
+    remote = await getRemoteFile(config, path)
+  } catch {
+    // Transient network/API failure -- don't disrupt the user over a
+    // background refresh; the next trigger retries.
+    return
+  }
+  if (!remote || remote.sha === note?.remoteSha) return
+
+  const pendingLocalEdit = await db.outbox.get(`thread-note:${threadId}`)
+  if (!pendingLocalEdit) {
+    await applyRemoteThreadNote(threadId, remote.content, remote.sha)
+    return
+  }
+  if (!note || note.markdown === remote.content) return
+
+  const merged = mergeMarkdown(note.lastSyncedMarkdown ?? null, note.markdown, remote.content)
+  if (merged.conflicts.length === 0) {
+    // Adopt the merged text as a new local edit and leave it queued; pushThreadNote's
+    // own SyncConflictError recovery reconciles the sha on the next cycle, by
+    // which point local already contains remote's side too.
+    await saveThreadNote(threadId, merged.markdown)
+    return
+  }
+  await recordConflict('thread-note', threadId, merged.markdown, merged.conflicts)
 }
 
 // A conflict's merged draft can already be stale by the time the user

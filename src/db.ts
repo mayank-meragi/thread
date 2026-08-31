@@ -1582,6 +1582,46 @@ export async function applyRemoteDay(date: string, markdown: string, sha: string
   }, previous, { queueOutbox: false })
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('thread:day-external-update', { detail: { day: date, markdown: document.markdown } }))
 }
+
+// Thread-note counterpart to applyRemoteDay: adopts a note exactly as fetched
+// from the remote repository. Never queues an outbox entry -- the content came
+// from the remote, so there is nothing to push back. `remoteMarkdown` is the
+// full serialized string (envelope included) and is stored verbatim so the
+// remoteSha it pairs with, and the merge base for any later divergence, stay
+// byte-exact.
+export async function applyRemoteThreadNote(threadId: string, remoteMarkdown: string, sha: string): Promise<void> {
+  const document = parseThreadDocument(remoteMarkdown)
+  const now = new Date().toISOString()
+  await db.transaction('rw', db.threadNotes, db.threadProperties, async () => {
+    const previous = await db.threadNotes.get(threadId)
+    if (previous?.markdown === remoteMarkdown) {
+      await db.threadNotes.update(threadId, {
+        remoteSha: sha,
+        lastSyncedAt: now,
+        lastSyncedMarkdown: remoteMarkdown,
+        lastSyncedMetadata: document.metadata,
+      })
+      return
+    }
+    await db.threadNotes.put({
+      threadId,
+      markdown: remoteMarkdown,
+      metadata: document.metadata,
+      blockCount: countMarkdownBlocks(document.markdown),
+      updatedAt: now,
+      localRevision: (previous?.localRevision ?? 0) + 1,
+      remoteSha: sha,
+      lastSyncedAt: now,
+      lastSyncedMarkdown: remoteMarkdown,
+      lastSyncedMetadata: document.metadata,
+    })
+    await reindexThreadNote(threadId, document.metadata)
+  })
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('thread:day-external-update', { detail: { day: `thread:${threadId}`, markdown: document.markdown } }))
+  }
+}
+
 export async function markConflictResolved(conflictId: string): Promise<void> {
   await db.conflicts.update(conflictId, { resolvedAt: new Date().toISOString() })
 }

@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { db, saveDay } from '../db'
-import { saveGitHubConfig, syncPending } from './github'
+import { db, saveDay, saveThreadNote } from '../db'
+import { pullThreadNote, saveGitHubConfig, syncPending } from './github'
 
 const DATE = '2026-08-19'
 
@@ -174,5 +174,106 @@ describe('three-way auto-merge', () => {
     ])
     // The un-conflicting "Notes" line isn't part of the conflict at all.
     expect(conflicts[0].conflicts[0].local).not.toContain('Notes')
+  })
+})
+
+// Thread notes used to be push-only -- a browser could open the note editor
+// on stale content and never learn another device had pushed a newer version.
+// pullThreadNote is the reconciliation path; same shape as pullDay.
+describe('pullThreadNote', () => {
+  const THREAD = 'redesign-onboarding'
+
+  it('adopts the remote note wholesale when there is no pending local edit', async () => {
+    await db.threadNotes.put({
+      threadId: THREAD,
+      markdown: '- local stale',
+      blockCount: 1,
+      updatedAt: new Date().toISOString(),
+      localRevision: 1,
+      remoteSha: 'old-sha',
+    })
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ content: base64('- remote wins'), sha: 'new-sha' }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await pullThreadNote(THREAD)
+
+    const note = await db.threadNotes.get(THREAD)
+    expect(note?.markdown).toBe('- remote wins')
+    expect(note?.remoteSha).toBe('new-sha')
+    expect(note?.lastSyncedMarkdown).toBe('- remote wins')
+    expect(await db.conflicts.count()).toBe(0)
+    expect(await db.outbox.get(`thread-note:${THREAD}`)).toBeUndefined()
+  })
+
+  it('is a no-op when the remote sha already matches the local record', async () => {
+    await db.threadNotes.put({
+      threadId: THREAD,
+      markdown: '- unchanged',
+      blockCount: 1,
+      updatedAt: new Date().toISOString(),
+      localRevision: 1,
+      remoteSha: 'same-sha',
+    })
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({ content: base64('- ignored'), sha: 'same-sha' }), { status: 200 }),
+    ))
+
+    await pullThreadNote(THREAD)
+
+    expect((await db.threadNotes.get(THREAD))?.markdown).toBe('- unchanged')
+  })
+
+  it('auto-merges a non-overlapping divergence against a pending local edit', async () => {
+    await db.threadNotes.put({
+      threadId: THREAD,
+      markdown: '- Intro\n- middle\n- Outro',
+      blockCount: 3,
+      updatedAt: new Date().toISOString(),
+      localRevision: 1,
+      remoteSha: 'base-sha',
+      lastSyncedMarkdown: '- Intro\n- middle\n- Outro',
+    })
+    // Local edits the first line -- queues an outbox entry.
+    await saveThreadNote(THREAD, '- Intro (mine)\n- middle\n- Outro')
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+    // Remote edits only the last line.
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({ content: base64('- Intro\n- middle\n- Outro (theirs)'), sha: 'remote-sha' }), { status: 200 }),
+    ))
+
+    await pullThreadNote(THREAD)
+
+    expect(await db.conflicts.count()).toBe(0)
+    const note = await db.threadNotes.get(THREAD)
+    expect(note?.markdown).toBe('- Intro (mine)\n- middle\n- Outro (theirs)')
+    // Merged text stays queued for the next push cycle.
+    expect(await db.outbox.get(`thread-note:${THREAD}`)).toBeDefined()
+  })
+
+  it('records a thread-note conflict when both sides changed the same line', async () => {
+    await db.threadNotes.put({
+      threadId: THREAD,
+      markdown: '- shared line',
+      blockCount: 1,
+      updatedAt: new Date().toISOString(),
+      localRevision: 1,
+      remoteSha: 'base-sha',
+      lastSyncedMarkdown: '- shared line',
+    })
+    await saveThreadNote(THREAD, '- shared line, my version')
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({ content: base64('- shared line, their version'), sha: 'remote-sha' }), { status: 200 }),
+    ))
+
+    await pullThreadNote(THREAD)
+
+    const conflicts = await db.conflicts.where('aggregateId').equals(THREAD).toArray()
+    expect(conflicts).toHaveLength(1)
+    expect(conflicts[0].scope).toBe('thread-note')
   })
 })

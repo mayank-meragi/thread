@@ -243,15 +243,39 @@ function DaySection({ date, isToday, registerSection, onActive, onChange, paramB
   const day = useLiveQuery(() => db.days.get(date), [date])
   const editorWrapRef = useRef<HTMLDivElement>(null)
   const [hasBeenVisible, setHasBeenVisible] = useState(false)
+  // Hold the editor back until the first remote pull for this day has settled,
+  // so it opens on already-reconciled content instead of racing the pull and
+  // producing a sync conflict if the user types against stale local content.
+  // Starts true when sync is off -- nothing to wait for.
+  const [remoteHydrated, setRemoteHydrated] = useState(() => !getGitHubConfig())
 
   useEffect(() => {
     void ensureDay(date)
   }, [date])
 
   useEffect(() => {
-    if (!hasBeenVisible || !getGitHubConfig()) return
-    void pullDay(date)
-  }, [hasBeenVisible, date])
+    if (remoteHydrated || !hasBeenVisible) return
+    if (!getGitHubConfig()) {
+      setRemoteHydrated(true)
+      return
+    }
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      setRemoteHydrated(true)
+    }
+    // Never let a slow or hanging request block editing outright; pullDay
+    // already swallows transient failures and resolves quickly, so this timer
+    // only covers a genuinely stuck round-trip. A pull that lands afterwards is
+    // absorbed by MarkdownEditor's own external-update guard.
+    const timer = window.setTimeout(finish, 2500)
+    void pullDay(date).finally(() => {
+      window.clearTimeout(timer)
+      finish()
+    })
+    return () => window.clearTimeout(timer)
+  }, [hasBeenVisible, date, remoteHydrated])
 
   const sectionRefEl = useRef<HTMLElement | null>(null)
   const combinedRef = useCallback((el: HTMLElement | null) => {
@@ -300,7 +324,7 @@ function DaySection({ date, isToday, registerSection, onActive, onChange, paramB
 
   const label = useMemo(() => formatDay(date), [date])
 
-  if (!day || day.date !== date) {
+  if (!day || day.date !== date || !remoteHydrated) {
     return <section ref={combinedRef} className="day-section day-section-loading" data-date={date}>Opening…</section>
   }
 
