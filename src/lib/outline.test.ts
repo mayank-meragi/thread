@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cleanMarkdownLine, extractThreadMentions, insertPersonaNote, parseOutline, slugifyThread } from './outline'
+import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, insertPersonaNote, parseOutline, slugifyThread } from './outline'
 
 describe('outline parsing', () => {
   it('normalizes thread names', () => {
@@ -61,6 +61,19 @@ describe('outline parsing', () => {
 
   it('turns a markdown block into a readable excerpt', () => {
     expect(cleanMarkdownLine('  - **Start** with [[Browser]]')).toBe('Start with Browser')
+  })
+
+  it('ignores a standalone image line (how resizable image blocks serialize)', () => {
+    const markdown = '- before [[Browser]]\n\n![1.20](assets/ab12cd.png)\n\n- after [[Browser]]'
+    const { blocks } = parseOutline(markdown, '2026-08-18')
+    expect(blocks.map((block) => block.plainText)).toEqual(['before Browser', 'after Browser'])
+
+    const mentions = extractThreadMentions(markdown, '2026-08-18')
+    expect(mentions.map((item) => item.excerpt)).toEqual(['before Browser', 'after Browser'])
+
+    // The image line is not counted as a block, so the DOM<->db.blocks count
+    // installBlockMetadataControls checks stays in step.
+    expect(countMarkdownBlocks(markdown)).toBe(2)
   })
 })
 

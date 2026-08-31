@@ -10,6 +10,7 @@ import { TextSelection } from '@milkdown/prose/state'
 import type { EditorView } from '@milkdown/prose/view'
 import '@milkdown/crepe/theme/common/style.css'
 import { db, setBlockProperty } from '../db'
+import { resolveRepoAssetURL, uploadRepoAsset } from '../lib/github'
 import { parseTaskDate, stripMatchedText } from '../lib/taskDates'
 import {
   activeOutlinePathPlugin,
@@ -93,7 +94,6 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       defaultValue: tagLinksToEditor(wikiLinksToEditor(initialValue.trim() ? initialValue : '- ')),
       features: {
         [Crepe.Feature.AI]: false,
-        [Crepe.Feature.ImageBlock]: false,
         [Crepe.Feature.Latex]: false,
         [Crepe.Feature.TopBar]: false,
       },
@@ -107,6 +107,14 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
         },
         [Crepe.Feature.CodeMirror]: {
           languages: [...codeMirrorLanguages, queryLanguageDescription],
+        },
+        [Crepe.Feature.ImageBlock]: {
+          // Images are committed to the connected data repo as assets and
+          // referenced by relative path; resolveRepoAssetURL maps that path
+          // back to something an <img> can load. Both fall back gracefully
+          // when no repo is connected (inline data: URI).
+          onUpload: uploadRepoAsset,
+          proxyDomURL: resolveRepoAssetURL,
         },
       },
     })
@@ -168,7 +176,12 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
 
     const markPointerMutation = (event: PointerEvent) => {
       const target = event.target instanceof Element ? event.target : null
-      if (target?.closest('input[type="checkbox"], .label.checked, .label.unchecked')) markUserMutation()
+      // Image-block controls (resize handle, caption toggle, the upload/link
+      // widget) mutate the document from inside their own node view without
+      // ever dispatching beforeinput/keydown on the editor root, so without
+      // this the resize/caption change is computed but `markdownUpdated`'s
+      // `!userMutationPending` guard drops it and it never persists.
+      if (target?.closest('input[type="checkbox"], .label.checked, .label.unchecked, .milkdown-image-block')) markUserMutation()
     }
     const markKeyboardMutation = (event: KeyboardEvent) => {
       if (event.key === 'Backspace' || event.key === 'Delete') {

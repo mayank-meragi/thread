@@ -21,10 +21,6 @@ export function ThreadComposer({ threadId, title }: { threadId: string; title: s
 
   useEffect(() => {
     if (remoteHydrated) return
-    if (!getGitHubConfig()) {
-      setRemoteHydrated(true)
-      return
-    }
     let done = false
     const finish = () => {
       if (done) return
@@ -32,9 +28,10 @@ export function ThreadComposer({ threadId, title }: { threadId: string; title: s
       setRemoteHydrated(true)
     }
     // Never let a slow or hanging request block editing outright; pullThreadNote
-    // already swallows transient failures and resolves quickly, so this timer
-    // only covers a genuinely stuck round-trip. A pull that lands afterwards is
-    // absorbed by MarkdownEditor's own external-update guard.
+    // already swallows transient failures (and no-ops instantly when GitHub
+    // isn't connected), so this timer only covers a genuinely stuck round-trip.
+    // A pull that lands afterwards is absorbed by MarkdownEditor's own
+    // external-update guard.
     const timer = window.setTimeout(finish, 2500)
     void pullThreadNote(threadId).finally(() => {
       window.clearTimeout(timer)

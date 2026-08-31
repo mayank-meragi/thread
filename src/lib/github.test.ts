@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db, saveDay, saveThreadNote } from '../db'
-import { pullThreadNote, saveGitHubConfig, syncPending } from './github'
+import { pullThreadNote, resolveRepoAssetURL, saveGitHubConfig, syncPending, uploadRepoAsset } from './github'
 
 const DATE = '2026-08-19'
 
@@ -275,5 +275,53 @@ describe('pullThreadNote', () => {
     const conflicts = await db.conflicts.where('aggregateId').equals(THREAD).toArray()
     expect(conflicts).toHaveLength(1)
     expect(conflicts[0].scope).toBe('thread-note')
+  })
+})
+
+// Editor images are committed to the data repo under a content-addressed
+// assets/ path; the markdown only stores that relative path.
+describe('repo image assets', () => {
+  it('uploads a file to a content-addressed assets/ path and returns it', async () => {
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+    const calls: Array<{ url: string; method: string; body?: string }> = []
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, method: init?.method ?? 'GET', body: init?.body as string | undefined })
+      if ((init?.method ?? 'GET') === 'GET') return new Response('', { status: 404 })
+      return new Response(JSON.stringify({ content: { sha: 'asset-sha' } }), { status: 201 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const file = new File([new Uint8Array([1, 2, 3, 4])], 'pasted.png', { type: 'image/png' })
+    const src = await uploadRepoAsset(file)
+
+    expect(src).toMatch(/^assets\/[0-9a-f]{64}\.png$/)
+    const put = calls.find((call) => call.method === 'PUT')!
+    expect(put.url).toBe(`https://api.github.com/repos/owner/repo/contents/${src}`)
+    expect(JSON.parse(put.body!).content).toBe(btoa(String.fromCharCode(1, 2, 3, 4)))
+  })
+
+  it('skips the upload when the same bytes are already in the repo', async () => {
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if ((init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ sha: 'already-here' }), { status: 200 })
+      }
+      throw new Error('should not PUT an asset that already exists')
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const file = new File([new Uint8Array([9, 9, 9])], 'again.png', { type: 'image/png' })
+    const src = await uploadRepoAsset(file)
+
+    expect(src).toMatch(/^assets\/[0-9a-f]{64}\.png$/)
+    expect(fetchMock.mock.calls.every(([, init]) => (init?.method ?? 'GET') === 'GET')).toBe(true)
+  })
+
+  it('passes an absolute image URL straight through without fetching', () => {
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('no fetch for absolute URLs') }))
+
+    expect(resolveRepoAssetURL('https://example.com/cat.png')).toBe('https://example.com/cat.png')
+    expect(resolveRepoAssetURL('data:image/png;base64,AAAA')).toBe('data:image/png;base64,AAAA')
   })
 })

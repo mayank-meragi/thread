@@ -383,3 +383,104 @@ export async function resolveConflict(
 
   await markConflictResolved(conflictId)
 }
+
+// --- Editor image assets -----------------------------------------------------
+//
+// Images inserted in the editor are committed to the connected data repo under
+// `assets/<sha256>.<ext>` (content-addressed: identical bytes always land at
+// the same path, so re-uploading the same file is a no-op and there are no
+// name collisions). The markdown stores just that relative path; the editor
+// resolves it back to something an <img> can load via `resolveRepoAssetURL`.
+// With no repo connected, `uploadRepoAsset` falls back to an inline data: URI
+// so local-only notes still get images.
+
+const assetURLCache = new Map<string, string>()
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunk = 0x8000
+  for (let index = 0; index < bytes.length; index += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunk))
+  }
+  return btoa(binary)
+}
+
+function fileToDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read image file.'))
+    reader.readAsDataURL(file)
+  })
+}
+
+async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', buffer)
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function assetExtension(file: File): string {
+  const fromName = file.name.match(/\.([a-zA-Z0-9]+)$/)?.[1]?.toLowerCase()
+  if (fromName) return fromName
+  const fromType = file.type.split('/')[1]?.toLowerCase()
+  return fromType === 'jpeg' ? 'jpg' : fromType || 'bin'
+}
+
+function isAbsoluteAssetURL(src: string): boolean {
+  return /^(https?:|data:|blob:)/i.test(src)
+}
+
+// Called by Crepe's ImageBlock `onUpload`. Returns the string stored as the
+// image's markdown src.
+export async function uploadRepoAsset(file: File): Promise<string> {
+  const config = getGitHubConfig()
+  if (!config) return fileToDataURL(file)
+
+  const buffer = await file.arrayBuffer()
+  const hash = await sha256Hex(buffer)
+  const path = `assets/${hash}.${assetExtension(file)}`
+
+  const existing = await fetch(
+    `${API}/repos/${config.repo}/contents/${path}?ref=${encodeURIComponent(config.branch)}`,
+    { headers: headers(config.token) },
+  )
+  if (existing.ok) return path
+  if (existing.status !== 404) throw new Error(`Could not check ${path} (${existing.status}).`)
+
+  const response = await fetch(`${API}/repos/${config.repo}/contents/${path}`, {
+    method: 'PUT',
+    headers: headers(config.token),
+    body: JSON.stringify({
+      message: `Add ${path}`,
+      content: bytesToBase64(new Uint8Array(buffer)),
+      branch: config.branch,
+    }),
+  })
+  if (!response.ok) throw new Error(`Could not upload ${path} (${response.status}).`)
+  return path
+}
+
+// Called by Crepe's ImageBlock `proxyDomURL`. Absolute URLs (external images,
+// data: URIs from the offline fallback) pass straight through; a repo-relative
+// path is fetched through the Contents API -- which carries the token, so it
+// works for private repos where raw.githubusercontent.com would not -- and
+// handed to the <img> as an object URL.
+export function resolveRepoAssetURL(src: string): string | Promise<string> {
+  if (!src || isAbsoluteAssetURL(src)) return src
+  const cached = assetURLCache.get(src)
+  if (cached) return cached
+
+  const config = getGitHubConfig()
+  if (!config) return src
+
+  return (async () => {
+    const response = await fetch(
+      `${API}/repos/${config.repo}/contents/${src}?ref=${encodeURIComponent(config.branch)}`,
+      { headers: { ...headers(config.token), Accept: 'application/vnd.github.raw' } },
+    )
+    if (!response.ok) throw new Error(`Could not load ${src} (${response.status}).`)
+    const objectURL = URL.createObjectURL(await response.blob())
+    assetURLCache.set(src, objectURL)
+    return objectURL
+  })()
+}

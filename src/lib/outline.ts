@@ -53,6 +53,13 @@ export function slugifyThread(title: string): string {
     .replace(/(^-|-$)/g, '')
 }
 
+// A line that is nothing but a Markdown image (`![alt](src)`), i.e. how the
+// editor's resizable image blocks serialize. These carry no outline / mention
+// / task semantics and must not be indexed as stray "thought" blocks -- a
+// phantom block would also desync the DOM<->db.blocks count that
+// installBlockMetadataControls relies on.
+export const BARE_IMAGE_LINE = /^\s*!\[[^\]]*\]\([^)]*\)\s*$/
+
 export function cleanMarkdownLine(line: string): string {
   return line
     .replace(/\\(\[|\]|=|!|\?)/g, '$1')
@@ -96,7 +103,7 @@ export function extractThreadMentions(markdown: string, day: string): ParsedMent
   const contextStack: Array<{ indent: number; threads: Array<{ id: string; title: string }> }> = []
 
   markdown.split('\n').forEach((rawLine, line) => {
-    if (!rawLine.trim()) return
+    if (!rawLine.trim() || BARE_IMAGE_LINE.test(rawLine)) return
     const indent = rawLine.match(/^\s*/)?.[0].length ?? 0
     while (contextStack.length && contextStack.at(-1)!.indent >= indent) contextStack.pop()
 
@@ -143,7 +150,7 @@ export function extractThreadMentions(markdown: string, day: string): ParsedMent
 }
 
 export function countMarkdownBlocks(markdown: string): number {
-  return markdown.split('\n').filter((line) => line.trim().length > 0).length
+  return markdown.split('\n').filter((line) => line.trim().length > 0 && !BARE_IMAGE_LINE.test(line)).length
 }
 
 export function parseOutline(markdown: string, day: string, idsByPath?: ReadonlyMap<string, string>): {
@@ -156,7 +163,7 @@ export function parseOutline(markdown: string, day: string, idsByPath?: Readonly
   const siblingCounts = new Map<string, number>()
 
   markdown.split('\n').forEach((rawLine, order) => {
-    if (!rawLine.trim()) return
+    if (!rawLine.trim() || BARE_IMAGE_LINE.test(rawLine)) return
     const item = rawLine.match(/^(\s*)(?:(?:[-*+]|\d+\.)\s+)(.*)$/)
     const indent = item?.[1].length ?? 0
     const content = item?.[2] ?? rawLine.trim()
