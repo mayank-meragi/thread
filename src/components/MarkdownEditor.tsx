@@ -117,7 +117,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
     crepe.editor.use(queryBlocks.plugin)
     crepe.editor.use(inlineSuggestionsPlugin({
       getThreads: async () => {
-        const threads = await db.threads.orderBy('updatedAt').reverse().toArray()
+        const threads = await db.threads.orderBy('updatedAt').reverse().filter((thread) => !thread.isTemplate).toArray()
         return threads.map(({ id, title, updatedAt }) => ({ id, title, updatedAt }))
       },
       getTags: async () => {

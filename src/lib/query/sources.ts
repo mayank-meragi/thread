@@ -9,11 +9,14 @@ export async function loadSource(name: SourceName): Promise<Row[]> {
 }
 
 async function loadThreads(): Promise<Row[]> {
-  const [threads, threadProperties, defs] = await Promise.all([
+  const [allThreads, threadProperties, defs] = await Promise.all([
     db.threads.toArray(),
     db.threadProperties.toArray(),
     db.propertyDefinitions.toArray(),
   ])
+  // Templates are threads with `isTemplate` set -- they are scaffolding, not
+  // real threads, so `FROM threads` excludes them.
+  const threads = allThreads.filter((thread) => !thread.isTemplate)
   const nameById = new Map(defs.map((def) => [def.id, slugifyField(def.name)]))
   const byThread = new Map<string, typeof threadProperties>()
   for (const property of threadProperties) {

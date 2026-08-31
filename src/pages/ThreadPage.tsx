@@ -7,6 +7,7 @@ import { formatDay } from '../lib/dates'
 import { useOpenTab } from '../lib/tabsApi'
 import { openBlockInspector, openTaskInspector } from '../lib/inspectorTarget'
 import type { OutlineBlock } from '../lib/outline'
+import { EditableThreadTitle } from '../components/EditableThreadTitle'
 import { ThreadComposer } from '../components/ThreadComposer'
 import { ThreadProperties } from '../components/ThreadProperties'
 import { TaskBoard } from '../components/TaskBoard'
@@ -106,10 +107,13 @@ export function ThreadPage() {
       <Link to="/" className="back-link"><ArrowLeft size={15} /> Today</Link>
       <header className="thread-heading">
         <div className="thread-mark"><GitBranch size={21} /></div>
-        <div><div className="eyebrow">Living thread</div><h1>{thread.title}</h1></div>
+        <div>
+          <div className="eyebrow">{thread.isTemplate ? 'Template' : 'Living thread'}</div>
+          <EditableThreadTitle threadId={thread.id} title={thread.title} />
+        </div>
       </header>
 
-      <ThreadProperties threadId={thread.id} />
+      <ThreadProperties threadId={thread.id} isTemplate={!!thread.isTemplate} />
 
       <ThreadComposer key={thread.id} threadId={thread.id} title={thread.title} />
 

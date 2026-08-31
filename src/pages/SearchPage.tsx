@@ -9,7 +9,11 @@ import { searchDays } from '../lib/search'
 export function SearchPage() {
   const [query, setQuery] = useState('')
   const days = useLiveQuery(() => db.days.orderBy('date').reverse().toArray(), [], [])
-  const threads = useLiveQuery(() => db.threads.orderBy('updatedAt').reverse().toArray(), [], [])
+  const threads = useLiveQuery(
+    () => db.threads.orderBy('updatedAt').reverse().filter((thread) => !thread.isTemplate).toArray(),
+    [],
+    [],
+  )
   const normalized = query.trim().toLocaleLowerCase()
   const results = useMemo(() => searchDays(days, normalized), [days, normalized])
 

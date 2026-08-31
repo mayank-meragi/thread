@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpenText, GitBranch, ListPlus, PanelRight, Search } from 'lucide-react'
+import { BookOpenText, FileText, GitBranch, ListPlus, PanelRight, Search } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useNavigate } from 'react-router-dom'
-import { createThread, db } from '../db'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { applyThreadTemplate, createThread, db } from '../db'
 import { formatDay } from '../lib/dates'
 import { searchDays } from '../lib/search'
 
@@ -24,13 +24,24 @@ interface OmniboxItem {
 
 export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxProps) {
   const navigate = useNavigate()
+  const location = useLocation()
+  // The outer router location tracks the active dockview panel, so this is the
+  // thread currently on screen (if any).
+  const activeThreadId = (() => {
+    const match = location.pathname.match(/^\/thread\/(.+)$/)
+    return match ? decodeURIComponent(match[1]) : null
+  })()
   const inputRef = useRef<HTMLInputElement>(null)
   const [rawValue, setRawValue] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(0)
   const [caretBump, setCaretBump] = useState(0)
 
   const days = useLiveQuery(() => db.days.orderBy('date').reverse().toArray(), [], [])
-  const threads = useLiveQuery(() => db.threads.orderBy('updatedAt').reverse().toArray(), [], [])
+  const allThreads = useLiveQuery(() => db.threads.orderBy('updatedAt').reverse().toArray(), [], [])
+  // Templates are threads with `isTemplate` set -- kept out of the normal
+  // thread lists, offered only to the "Apply template" command.
+  const threads = allThreads.filter((thread) => !thread.isTemplate)
+  const templates = allThreads.filter((thread) => thread.isTemplate)
 
   // Reset the input whenever the omnibox opens (or is re-triggered into a
   // different mode while already open), seeded from initialMode. Adjusted
@@ -81,6 +92,16 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
     go(`/thread/${id}`)
   }
 
+  const runTemplate = async (templateId: string) => {
+    if (!activeThreadId) return
+    try {
+      await applyThreadTemplate(activeThreadId, templateId)
+    } catch (error) {
+      console.error(error)
+    }
+    close()
+  }
+
   // Seed the input with a `>` command and park the caret at the end, so the
   // user can keep typing (e.g. after picking "New thread"). The caret move is
   // deferred to an effect so it runs after the controlled value has committed.
@@ -92,8 +113,43 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
   // Command mode: `>new thread <name>` short-circuits the action list to a
   // single "create" item so a thread can be started without leaving the panel.
   const newThreadMatch = mode === 'command' ? query.match(/^new thread\s+(.+)$/i) : null
+  // `>apply template <filter>` -- narrows the action list to matching templates,
+  // applied to the thread currently open.
+  const templateMatch = mode === 'command' ? query.match(/^apply template\s*(.*)$/i) : null
 
   const commandItems = useMemo<OmniboxItem[]>(() => {
+    if (templateMatch) {
+      if (!activeThreadId) {
+        return [{
+          id: 'apply-template-no-thread',
+          icon: <FileText size={18} />,
+          iconClassName: 'command-icon-thread',
+          title: 'Open a thread first',
+          subtitle: 'Apply template needs a thread on screen',
+          onActivate: () => {},
+        }]
+      }
+      const filter = templateMatch[1].trim().toLocaleLowerCase()
+      const matches = templates.filter((template) => !filter || template.normalizedTitle.includes(filter))
+      if (matches.length === 0) {
+        return [{
+          id: 'apply-template-empty',
+          icon: <FileText size={18} />,
+          iconClassName: 'command-icon-thread',
+          title: 'No templates yet',
+          subtitle: 'Open a thread and choose “Use as template”',
+          onActivate: () => go('/templates'),
+        }]
+      }
+      return matches.map((template) => ({
+        id: `apply-template-${template.id}`,
+        icon: <FileText size={18} />,
+        iconClassName: 'command-icon-thread',
+        title: `Apply "${template.title}"`,
+        subtitle: 'Copy its body and properties · ↵ to apply',
+        onActivate: () => void runTemplate(template.id),
+      }))
+    }
     if (newThreadMatch) {
       const name = newThreadMatch[1].trim()
       return [{
@@ -134,6 +190,23 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
         onActivate: () => seedCommand('>new thread '),
       },
       {
+        id: 'apply-template',
+        icon: <FileText size={18} />,
+        iconClassName: 'command-icon-thread',
+        title: 'Apply template',
+        subtitle: activeThreadId ? 'Drop a template onto this thread' : 'Open a thread first',
+        keywords: 'apply template scaffold snippet',
+        onActivate: () => activeThreadId ? seedCommand('>apply template ') : go('/templates'),
+      },
+      {
+        id: 'manage-templates',
+        icon: <FileText size={18} />,
+        title: 'Manage templates',
+        subtitle: 'Create and edit thread templates',
+        keywords: 'manage templates edit',
+        onActivate: () => go('/templates'),
+      },
+      {
         id: 'search',
         icon: <Search size={18} />,
         title: 'Find anything',
@@ -153,7 +226,7 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
         : []),
     ]
     return actions.filter((action) => !normalized || action.keywords.includes(normalized))
-  }, [normalized, onTogglePanel, newThreadMatch]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [normalized, onTogglePanel, newThreadMatch, templateMatch, templates, activeThreadId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const dayHits = useMemo(() => searchDays(days, normalized), [days, normalized])
 

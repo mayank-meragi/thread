@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { addBlockTag, applyRemoteDay, createPropertyDefinition, createTag, createThread, db, ensureThreadNote, markDaySynced, pruneOrphanThreads, removeBlockTag, removeThreadProperty, saveDay, saveThreadNote, setBlockProperty, setThreadProperty, toggleTask, updateTagDefinition } from './db'
+import { addBlockTag, applyRemoteDay, applyThreadTemplate, createPropertyDefinition, createTag, createThread, db, ensureThreadNote, markDaySynced, pruneOrphanThreads, removeBlockTag, removeThreadProperty, renameThread, saveDay, saveThreadNote, setBlockProperty, setThreadIsTemplate, setThreadProperty, toggleTask, updateTagDefinition } from './db'
+import { parseThreadDocument } from './lib/threadDocument'
 
 const DATE = '2026-08-19'
 
@@ -322,5 +323,119 @@ describe('sync races', () => {
     expect((await db.days.get(DATE))?.markdown).toBe('- written on another device')
     expect((await db.days.get(DATE))?.remoteSha).toBe('remote-sha')
     expect(await db.outbox.get(`day:${DATE}`)).toBeUndefined()
+  })
+})
+
+describe('renameThread', () => {
+  it('updates the title without changing the slug or touching notes/properties', async () => {
+    const id = await createThread('Old Name')
+    const property = await createPropertyDefinition({ name: 'Status', type: 'text' })
+    await setThreadProperty(id, property.id, 'active')
+    await saveThreadNote(id, '- keep this body')
+
+    await renameThread(id, '  New Name  ')
+
+    const thread = await db.threads.get(id)
+    expect(thread?.id).toBe(id)
+    expect(thread?.title).toBe('New Name')
+    expect(thread?.normalizedTitle).toBe('new name')
+    expect(parseThreadDocument((await db.threadNotes.get(id))!.markdown).markdown).toContain('keep this body')
+    expect(await db.threadProperties.get(`${id}:${property.id}`)).toMatchObject({ value: 'active' })
+  })
+
+  it('refreshes the denormalised title on mentions and occurrences', async () => {
+    const id = await createThread('Alpha')
+    await db.mentions.put({ id: 'm1', threadId: id, title: 'Alpha', day: DATE, line: 0, blockId: 'b1', excerpt: 'x', kind: 'thought', checked: false })
+    await db.occurrences.put({ id: 'o1', threadId: id, title: 'Alpha', day: DATE, rootBlockId: 'b1', order: 0 })
+
+    await renameThread(id, 'Beta')
+
+    expect((await db.mentions.get('m1'))?.title).toBe('Beta')
+    expect((await db.occurrences.get('o1'))?.title).toBe('Beta')
+  })
+
+  it('rejects an empty title and no-ops when unchanged', async () => {
+    const id = await createThread('Same')
+    await expect(renameThread(id, '   ')).rejects.toThrow()
+    const before = await db.threads.get(id)
+    await renameThread(id, 'Same')
+    expect((await db.threads.get(id))?.updatedAt).toBe(before?.updatedAt)
+  })
+})
+
+describe('per-thread property assignment', () => {
+  it('assigns a blank property to one thread only, and removes it cleanly', async () => {
+    const a = await createThread('Thread A')
+    const b = await createThread('Thread B')
+    const property = await createPropertyDefinition({ name: 'Priority', type: 'text' })
+
+    // Assigning with a null value keeps the property attached but blank.
+    await setThreadProperty(a, property.id, null)
+
+    expect(await db.threadProperties.get(`${a}:${property.id}`)).toMatchObject({ value: null })
+    expect(await db.threadProperties.where('threadId').equals(b).count()).toBe(0)
+
+    // A later value edit updates the same assignment in place.
+    await setThreadProperty(a, property.id, 'high')
+    expect(await db.threadProperties.get(`${a}:${property.id}`)).toMatchObject({ value: 'high' })
+
+    await removeThreadProperty(a, property.id)
+    expect(await db.threadProperties.get(`${a}:${property.id}`)).toBeUndefined()
+  })
+})
+
+describe('thread templates', () => {
+  it('toggles isTemplate and keeps a marked thread from being pruned as an orphan', async () => {
+    // A thread discovered from journal text (no `origin: 'manual'`), so only
+    // the isTemplate flag can save it from the orphan sweep.
+    const now = new Date().toISOString()
+    await db.threads.put({ id: 'weekly-review', title: 'Weekly Review', normalizedTitle: 'weekly review', createdAt: now, updatedAt: now })
+    await ensureThreadNote('weekly-review')
+
+    await setThreadIsTemplate('weekly-review', true)
+    expect((await db.threads.get('weekly-review'))?.isTemplate).toBe(true)
+
+    await pruneOrphanThreads()
+    expect(await db.threads.get('weekly-review')).toBeDefined()
+
+    await setThreadIsTemplate('weekly-review', false)
+    expect((await db.threads.get('weekly-review'))?.isTemplate).toBeUndefined()
+    await pruneOrphanThreads()
+    expect(await db.threads.get('weekly-review')).toBeUndefined()
+  })
+
+  it('replaces an empty thread body and copies the template thread properties', async () => {
+    const templateId = await createThread('Kickoff template')
+    await setThreadIsTemplate(templateId, true)
+    const property = await createPropertyDefinition({ name: 'Stage', type: 'text' })
+    await saveThreadNote(templateId, '- [ ] Define scope\n- Context: ')
+    await setThreadProperty(templateId, property.id, 'planning')
+
+    const threadId = await createThread('Project X')
+    await applyThreadTemplate(threadId, templateId)
+
+    const body = parseThreadDocument((await db.threadNotes.get(threadId))!.markdown).markdown
+    expect(body.startsWith('- [ ] Define scope')).toBe(true)
+    expect(await db.threadProperties.get(`${threadId}:${property.id}`)).toMatchObject({ value: 'planning' })
+  })
+
+  it('appends to a non-empty body and never clobbers an explicit property', async () => {
+    const property = await createPropertyDefinition({ name: 'Owner', type: 'text' })
+
+    const templateId = await createThread('Handoff template')
+    await setThreadIsTemplate(templateId, true)
+    await saveThreadNote(templateId, '- Handoff checklist')
+    await setThreadProperty(templateId, property.id, 'someone-else')
+
+    const threadId = await createThread('Project Y')
+    await saveThreadNote(threadId, '- existing note')
+    await setThreadProperty(threadId, property.id, 'me')
+
+    await applyThreadTemplate(threadId, templateId)
+
+    const body = parseThreadDocument((await db.threadNotes.get(threadId))!.markdown).markdown
+    expect(body).toContain('existing note')
+    expect(body).toContain('Handoff checklist')
+    expect(await db.threadProperties.get(`${threadId}:${property.id}`)).toMatchObject({ value: 'me' })
   })
 })

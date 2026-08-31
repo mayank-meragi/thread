@@ -3,7 +3,6 @@ import { Check, Trash2 } from 'lucide-react'
 import {
   createPropertyDefinition,
   removeBlockProperty,
-  removeThreadProperty,
   setBlockProperty,
   setThreadProperty,
   type PropertyDefinitionRecord,
@@ -11,6 +10,7 @@ import {
   type PropertyValue,
   type TagDefinitionRecord,
 } from '../../db'
+import { PROPERTY_TYPES } from './propertyTypes'
 
 // A property field edits either a block's property or a thread's property; the
 // control and validation are identical, only the mutation differs.
@@ -21,19 +21,12 @@ export type PropertyTarget =
 function writeProperty(target: PropertyTarget, propertyId: string, next: PropertyValue): Promise<void> {
   const clear = next === '' || next === null || (Array.isArray(next) && next.length === 0)
   if (target.kind === 'thread') {
-    return clear ? removeThreadProperty(target.threadId, propertyId) : setThreadProperty(target.threadId, propertyId, next)
+    // A property stays assigned to a thread until it is explicitly removed --
+    // a blank value is stored as `null`, not a delete.
+    return setThreadProperty(target.threadId, propertyId, clear ? null : next)
   }
   return clear ? removeBlockProperty(target.blockId, propertyId) : setBlockProperty(target.blockId, propertyId, next)
 }
-
-const PROPERTY_TYPES: Array<{ value: PropertyType; label: string }> = [
-  { value: 'text', label: 'Text' },
-  { value: 'rich_text', label: 'Long text' },
-  { value: 'number', label: 'Number' },
-  { value: 'boolean', label: 'Checkbox' },
-  { value: 'date', label: 'Date' },
-  { value: 'url', label: 'URL' },
-]
 
 // Just the input control for one property value — no label, no remove button.
 // Owns its own draft state and writes through `writeProperty`. Reused by the
@@ -93,15 +86,21 @@ export function PropertyField({
   value,
   schema,
   onError,
+  onRemove,
 }: {
   target: PropertyTarget
   definition: PropertyDefinitionRecord
   value: PropertyValue | undefined
   schema?: { tag: TagDefinitionRecord; required: boolean }
   onError: (message: string | null) => void
+  // When set, the trash button un-assigns the property from its entity (used by
+  // thread properties, where a blank value stays assigned). When omitted, the
+  // trash button just clears the value and only shows once a value is present.
+  onRemove?: () => void
 }) {
   const clear = () => {
     onError(null)
+    if (onRemove) { onRemove(); return }
     void writeProperty(target, definition.id, '').catch((caught) => onError(caught instanceof Error ? caught.message : String(caught)))
   }
 
@@ -111,12 +110,12 @@ export function PropertyField({
         <span>{definition.name}{schema && <small className="property-schema-source">#{schema.tag.name}{schema.required ? ' · required' : ''}</small>}</span>
         <PropertyControl target={target} definition={definition} value={value} onError={onError} />
       </label>
-      {value !== undefined && <button type="button" className="tap-target-sm property-remove" aria-label={`Remove ${definition.name}`} onClick={clear}><Trash2 size={13} /></button>}
+      {(onRemove || value !== undefined) && <button type="button" className="tap-target-sm property-remove" aria-label={`Remove ${definition.name}`} onClick={clear}><Trash2 size={13} /></button>}
     </div>
   )
 }
 
-export function NewPropertyForm({ onDone, onError }: { onDone: () => void; onError: (message: string | null) => void }) {
+export function NewPropertyForm({ onDone, onError }: { onDone: (created?: PropertyDefinitionRecord) => void; onError: (message: string | null) => void }) {
   const [name, setName] = useState('')
   const [type, setType] = useState<PropertyType>('text')
   return (
@@ -124,14 +123,14 @@ export function NewPropertyForm({ onDone, onError }: { onDone: () => void; onErr
       event.preventDefault()
       if (!name.trim()) return
       onError(null)
-      void createPropertyDefinition({ name, type }).then(onDone).catch((caught) => onError(caught instanceof Error ? caught.message : String(caught)))
+      void createPropertyDefinition({ name, type }).then((created) => onDone(created)).catch((caught) => onError(caught instanceof Error ? caught.message : String(caught)))
     }}>
       <input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Property name" aria-label="Property name" />
       <select value={type} onChange={(event) => setType(event.target.value as PropertyType)} aria-label="Property type">
         {PROPERTY_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
       </select>
       <button type="submit" className="primary-button" disabled={!name.trim()}>Create</button>
-      <button type="button" className="text-button" onClick={onDone}>Cancel</button>
+      <button type="button" className="text-button" onClick={() => onDone()}>Cancel</button>
     </form>
   )
 }

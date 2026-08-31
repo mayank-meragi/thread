@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, BookOpen, Bot, Check, GitBranch, LoaderCircle, Palette, Plus, ShieldCheck, Trash2, Unplug, Users, Wand2 } from 'lucide-react'
+import { AlertTriangle, BookOpen, Bot, Check, FileText, GitBranch, LoaderCircle, Palette, Plus, ShieldCheck, Trash2, Unplug, Users, Wand2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
 import { generateText } from 'ai'
@@ -407,6 +407,13 @@ export function SettingsPage() {
             <button className="secondary-button" onClick={() => setCreatingPersona(true)}><Plus size={16} /> New persona</button>
           </div>
         )}
+      </section>
+
+      <section className="settings-card">
+        <div className="settings-title"><FileText size={20} /><div><h2>Thread templates</h2><p>Mark any thread <em>Use as template</em> in its header, then copy it onto another from the Omnibox (<kbd>⌘⇧P</kbd> → Apply template).</p></div></div>
+        <div className="settings-actions">
+          <a className="secondary-button" href="#/templates">Manage templates</a>
+        </div>
       </section>
 
       <section className="settings-card">

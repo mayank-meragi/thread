@@ -735,7 +735,44 @@ a[href^="#/"] { -webkit-touch-callout: none; }
 .thread-heading { display: flex; align-items: center; gap: 15px; margin-bottom: 45px; }
 .thread-mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; background: var(--thread-soft); color: var(--thread); }
 .thread-heading h1, .utility-page h1 { font-size: 40px; }
+.thread-title[role="button"] { cursor: text; border-radius: 6px; outline: none; }
+.thread-title[role="button"]:hover { background: var(--thread-soft); box-shadow: 0 0 0 6px var(--thread-soft); }
+.thread-title[role="button"]:focus-visible { box-shadow: 0 0 0 2px var(--thread); }
+.thread-title-input {
+  display: block; width: 100%; margin: 7px 0 0; padding: 0;
+  font: 500 40px/1.05 'Newsreader', serif; letter-spacing: -0.025em;
+  color: inherit; background: transparent; border: 0; outline: none;
+}
 .direction-content p { margin: 6px 0 2px; font: 500 20px/1.45 'Newsreader', serif; }
+
+.templates-intro { color: var(--muted); font-size: 13px; margin: -20px 0 28px; }
+.templates-intro kbd { font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+.templates-list { display: flex; flex-direction: column; gap: 6px; }
+.templates-list-item { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 11px; border-radius: 9px; border: 1px solid var(--line); }
+.templates-list-item > a { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; padding: 7px 0; color: inherit; }
+.templates-list-item > a > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.templates-list-item > button { color: var(--muted); }
+.templates-list-item > button:hover { color: var(--danger, #c0392b); }
+
+.add-property { position: relative; margin-top: 10px; }
+.add-property-input {
+  width: 100%; min-width: 0; padding: 7px 9px; border: 1px solid transparent; border-radius: 8px; outline: 0;
+  background: var(--control); color: var(--ink); font-size: var(--text-meta);
+}
+.add-property-input:focus { border-color: var(--thread); box-shadow: 0 0 0 2px var(--focus-ring); }
+/* .add-property-menu composes .menu-panel; positioning + scroll only here. */
+.add-property-menu { position: absolute; z-index: 20; left: 0; right: 0; margin-top: 4px; max-height: 260px; overflow-y: auto; }
+.add-property-menu .menu-item { min-height: 34px; justify-content: space-between; }
+.add-property-type { color: var(--muted); font: 400 9px 'IBM Plex Mono', monospace; text-transform: uppercase; }
+.add-property-create { gap: 8px; }
+.add-property-create-main { display: inline-flex; align-items: center; gap: 6px; flex: 1; padding: 0; border: 0; background: transparent; color: var(--thread); font-size: var(--text-sm); text-align: left; cursor: pointer; }
+.add-property-create select { padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--control); color: var(--ink); font-size: var(--text-meta); }
+.add-property-hint { padding: 8px 10px; color: var(--muted); font-size: var(--text-meta); }
+.thread-properties-template {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
+}
+.thread-properties-template > span { font-size: 13px; color: var(--muted); }
 .thread-composer { margin: 0; padding: 0; border-top: 0; }
 .thread-composer-label small { color: var(--muted); font: 400 9px 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: .05em; }
 .thread-composer .editor-wrap { min-height: 220px; }
@@ -1018,6 +1055,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .day-section { scroll-margin-top: 64px; }
   .thread-page, .utility-page { padding: 42px 22px 110px; }
   .thread-heading h1, .utility-page h1 { font-size: 34px; }
+  .thread-title-input { font-size: 34px; }
   .thread-editor .ProseMirror { font-size: 16px; min-height: 55vh; }
   .thread-editor .ProseMirror .task-inline-meta { position: static; margin-left: 8px; background: transparent; }
   .thread-editor .ProseMirror .block-property-trigger { right: -4px; opacity: .55; }

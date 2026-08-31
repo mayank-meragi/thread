@@ -6,7 +6,11 @@ import { useThreadSummary } from '../../lib/threadSummary'
 
 export function ContextRail() {
   const location = useLocation()
-  const threads = useLiveQuery(() => db.threads.orderBy('updatedAt').reverse().limit(7).toArray(), [], [])
+  const threads = useLiveQuery(
+    () => db.threads.orderBy('updatedAt').reverse().filter((thread) => !thread.isTemplate).limit(7).toArray(),
+    [],
+    [],
+  )
   const activeThreadId = location.pathname.match(/^\/thread\/([^/?]+)/)?.[1] ?? null
   const { thread: activeThread, openTasks, decisionsCount, direction } = useThreadSummary(activeThreadId)
 

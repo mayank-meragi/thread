@@ -46,6 +46,11 @@ export interface ThreadRecord {
   // from `pruneThreadIfOrphan` so an empty, freshly-created thread survives
   // the next app reload.
   origin?: 'manual'
+  // A template is just a thread with this flag: it is authored in the normal
+  // thread editor, kept out of the usual thread lists, exempt from orphan
+  // pruning, and its note body + properties can be copied onto another thread
+  // via `applyThreadTemplate`. Stored `undefined` (never `false`) when off.
+  isTemplate?: boolean
 }
 
 export interface ThreadNoteRecord {
@@ -537,6 +542,28 @@ export async function createThread(title: string): Promise<string> {
   return id
 }
 
+// Rename a thread's display title. The `id` (slug) is left untouched, so the
+// URL, `[[wiki-links]]`, notes, properties and open tabs keep resolving --
+// title/slug divergence is already an accepted state (persona renames, slug
+// collisions above). Local-only: the `threads` table is not in the sync
+// pipeline. The denormalised `title` on mentions/occurrences is refreshed for
+// any future consumer's benefit; a later reindex of an old day may reset it to
+// the wiki-link text, which is expected.
+export async function renameThread(threadId: string, nextTitle: string): Promise<void> {
+  const clean = nextTitle.trim()
+  if (!clean) throw new Error('Thread needs a name')
+  const existing = await db.threads.get(threadId)
+  if (!existing || existing.title === clean) return
+  const now = new Date().toISOString()
+  await db.threads.update(threadId, {
+    title: clean,
+    normalizedTitle: clean.toLocaleLowerCase(),
+    updatedAt: now,
+  })
+  await db.mentions.where('threadId').equals(threadId).modify({ title: clean })
+  await db.occurrences.where('threadId').equals(threadId).modify({ title: clean })
+}
+
 const threadNoteSaveQueues = new Map<string, Promise<void>>()
 
 // Rebuilds the `threadProperties` index for one thread from its decoded
@@ -648,6 +675,64 @@ export async function removeThreadProperty(threadId: string, propertyId: string)
   if (Object.keys(propertySources).length) metadata.propertySources = propertySources
   else delete metadata.propertySources
   await saveThreadNote(threadId, body, metadata)
+}
+
+// --- Thread templates -------------------------------------------------------
+// A template is just a thread with `isTemplate` set. It is authored in the
+// normal thread editor; these helpers only toggle the flag and copy one
+// template thread's body + properties onto another thread.
+
+export async function setThreadIsTemplate(threadId: string, value: boolean): Promise<void> {
+  await db.threads.update(threadId, {
+    isTemplate: value || undefined,
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+// Drop a template thread onto another thread: seed/append its note body, then
+// copy any properties it carries (never clobbering a value the target already
+// has set explicitly). Tags are merged into the note envelope for
+// forward-compat only.
+export async function applyThreadTemplate(targetThreadId: string, templateThreadId: string): Promise<void> {
+  const templateNote = await db.threadNotes.get(templateThreadId)
+  if (!templateNote) throw new Error('This template no longer exists.')
+  const source = parseThreadDocument(templateNote.markdown)
+  const templateBody = source.markdown.trim()
+
+  await ensureThreadNote(targetThreadId)
+  const note = await db.threadNotes.get(targetThreadId)
+  const currentBody = note ? parseThreadDocument(note.markdown).markdown : '- '
+  const templateTags = source.metadata.tags ?? []
+
+  if (templateBody) {
+    const isEmpty = currentBody.trim() === '' || currentBody.trim() === '-'
+    const nextBody = isEmpty ? templateBody : `${currentBody.replace(/\s+$/, '')}\n\n${templateBody}`
+    if (templateTags.length) {
+      const existingMeta = note?.metadata ?? emptyThreadMetadata()
+      const tags = Array.from(new Set([...(existingMeta.tags ?? []), ...templateTags]))
+      await saveThreadNote(targetThreadId, nextBody, { ...existingMeta, tags })
+    } else {
+      await saveThreadNote(targetThreadId, nextBody)
+    }
+  } else if (templateTags.length) {
+    const existingMeta = note?.metadata ?? emptyThreadMetadata()
+    const tags = Array.from(new Set([...(existingMeta.tags ?? []), ...templateTags]))
+    await saveThreadNote(targetThreadId, currentBody, { ...existingMeta, tags })
+  }
+
+  // Best-effort: a single property whose value no longer validates (a renamed
+  // select option, a deleted definition) must not stop the rest from applying.
+  const failed: string[] = []
+  for (const [propertyId, value] of Object.entries(source.metadata.properties)) {
+    const existing = await db.threadProperties.get(`${targetThreadId}:${propertyId}`)
+    if (existing?.source === 'explicit') continue
+    try {
+      await setThreadProperty(targetThreadId, propertyId, value, 'explicit')
+    } catch {
+      failed.push(propertyId)
+    }
+  }
+  if (failed.length) throw new Error(`Some template properties could not be applied: ${failed.join(', ')}`)
 }
 
 async function indexAndStoreDay(record: DayRecord, previous?: DayRecord, options?: { queueOutbox?: boolean }): Promise<void> {
@@ -848,9 +933,11 @@ async function pruneThreadIfOrphan(threadId: string): Promise<void> {
   // text -- so the mention-count check alone would prune them the moment
   // they're created (before any note exists) and they'd never come back.
   if (await db.personas.where('threadId').equals(threadId).count()) return
-  // Threads the user started directly are kept even while empty -- they were
-  // created deliberately, not discovered from journal text.
-  if ((await db.threads.get(threadId))?.origin === 'manual') return
+  // Threads the user started directly, or marked as a template, are kept even
+  // while empty -- they were shaped deliberately, not discovered from journal
+  // text.
+  const thread = await db.threads.get(threadId)
+  if (thread?.origin === 'manual' || thread?.isTemplate) return
   const note = await db.threadNotes.get(threadId)
   if (note && hasMeaningfulThreadNote(note.markdown)) return
   await db.threads.delete(threadId)

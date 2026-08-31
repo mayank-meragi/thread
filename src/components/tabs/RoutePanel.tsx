@@ -5,6 +5,7 @@ import { ThreadPage } from '../../pages/ThreadPage'
 import { TasksPage } from '../../pages/TasksPage'
 import { SearchPage } from '../../pages/SearchPage'
 import { SettingsPage } from '../../pages/SettingsPage'
+import { TemplatesPage } from '../../pages/TemplatesPage'
 import { DocsPage } from '../../pages/DocsPage'
 
 export interface RoutePanelParams {
@@ -20,6 +21,7 @@ export function RoutePanel({ params }: IDockviewPanelProps<RoutePanelParams>) {
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/docs" element={<DocsPage />} />
         <Route path="/docs/:topic" element={<DocsPage />} />
       </Routes>
