@@ -294,9 +294,15 @@ a[href^="#/"] { -webkit-touch-callout: none; }
 .day-toolbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; margin-bottom: 8px; background: var(--paper); }
 .day-toolbar-label { overflow: hidden; color: var(--muted); font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .day-actions { display: flex; align-items: center; gap: 3px; flex: none; }
-.day-actions button { height: 32px; min-width: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
-.day-actions button:hover { background: var(--canvas); color: var(--ink); }
-.day-actions .today-button { padding: 0 8px; font-size: var(--text-meta); }
+/* Direct children only -- a plain `.day-actions button` descendant selector also
+   matches every day-cell and nav button inside the DatePicker popover (which
+   renders inside `.date-picker` inside `.day-actions`), forcing min-width: 32px
+   onto the 7 grid columns and overflowing the panel. */
+.day-actions > .date-picker > button,
+.day-actions > .today-button { height: 32px; min-width: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+.day-actions > .date-picker > button:hover,
+.day-actions > .today-button:hover { background: var(--canvas); color: var(--ink); }
+.day-actions > .today-button { padding: 0 8px; font-size: var(--text-meta); }
 
 .day-load-sentinel { height: 1px; }
 .day-sections { display: flex; flex-direction: column; gap: 56px; }
