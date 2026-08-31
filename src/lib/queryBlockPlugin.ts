@@ -7,7 +7,7 @@ import { $prose } from '@milkdown/utils'
 import { QueryBlock } from '../components/QueryBlock'
 
 // Language info-string that turns a fenced code block into a live results view.
-export const QUERY_BLOCK_LANGUAGE = 'thread-query'
+export const QUERY_BLOCK_LANGUAGE = 'tql'
 
 interface Mounted {
   dom: HTMLElement
@@ -62,7 +62,7 @@ export function createQueryBlockPlugin() {
     return DecorationSet.create(doc, decorations)
   }
 
-  const key = new PluginKey<DecorationSet>('thread-query-blocks')
+  const key = new PluginKey<DecorationSet>('tql-blocks')
   const plugin = $prose(() => new Plugin<DecorationSet>({
     key,
     state: {

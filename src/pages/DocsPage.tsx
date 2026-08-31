@@ -14,7 +14,7 @@ const DOCS: DocEntry[] = [
   {
     slug: 'query-language',
     title: 'Query language',
-    blurb: 'Write ```thread-query blocks to list and tabulate threads and tags.',
+    blurb: 'Write ```tql blocks to list and tabulate threads and tags.',
     body: () => <QueryLanguageDoc />,
   },
 ]

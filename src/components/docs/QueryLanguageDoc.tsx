@@ -1,7 +1,7 @@
 function Q({ children }: { children: string }) {
   return (
     <pre className="docs-code">
-      <span className="docs-code-fence">```thread-query</span>
+      <span className="docs-code-fence">```tql</span>
       {'\n'}{children}{'\n'}
       <span className="docs-code-fence">```</span>
     </pre>
@@ -14,7 +14,7 @@ export function QueryLanguageDoc() {
       <div className="eyebrow">Reference</div>
       <h1>Query language</h1>
       <p className="docs-lead">
-        A <strong>query block</strong> is a fenced code block whose language is <code>thread-query</code>.
+        A <strong>query block</strong> is a fenced code block whose language is <code>tql</code>.
         It runs a small SQL-flavoured query over your threads or tags and renders the result — a list or a
         table — right below the query. Results are live: they update as the underlying data changes.
       </p>
@@ -22,7 +22,7 @@ export function QueryLanguageDoc() {
       <h2>Adding a query block</h2>
       <p>
         In any note (a day page or a thread page), start a fenced code block and set its language to
-        <code>thread-query</code>, then type the query on the next line:
+        <code>tql</code>, then type the query on the next line:
       </p>
       <Q>{`TABLE title, type FROM threads WHERE type = Trip`}</Q>
       <p>

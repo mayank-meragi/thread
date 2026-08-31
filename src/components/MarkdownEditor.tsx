@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { languages as codeMirrorLanguages } from '@codemirror/language-data'
 import { Crepe } from '@milkdown/crepe'
 import { editorViewCtx } from '@milkdown/core'
 import { trailingConfig } from '@milkdown/plugin-trailing'
@@ -25,6 +26,7 @@ import {
 } from '../lib/blockKinds'
 import { inlineSuggestionsPlugin } from '../lib/inlineSuggestions'
 import { createQueryBlockPlugin } from '../lib/queryBlockPlugin'
+import { queryLanguageDescription } from '../lib/queryBlockLanguage'
 import type { BlockConversionKind } from '../lib/suggestions'
 import { editorLinksToWiki, wikiLinkInputRule, wikiLinkInteractionPlugin, wikiLinksToEditor } from '../lib/wikilinks'
 import { editorLinksToTags, tagLinkInputRule, tagLinksToEditor } from '../lib/taglinks'
@@ -102,6 +104,9 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
         },
         [Crepe.Feature.LinkTooltip]: {
           inputPlaceholder: 'Paste or type a link',
+        },
+        [Crepe.Feature.CodeMirror]: {
+          languages: [...codeMirrorLanguages, queryLanguageDescription],
         },
       },
     })

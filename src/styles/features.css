@@ -1111,7 +1111,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 
-/* Query blocks -- a ```thread-query fenced block renders a live results view
+/* Query blocks -- a ```tql fenced block renders a live results view
    (a ProseMirror widget decoration) right after its still-editable source. */
 .query-block-view { display: block; margin: 6px 0 14px; }
 
