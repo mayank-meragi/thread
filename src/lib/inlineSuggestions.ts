@@ -8,6 +8,7 @@ import { $prose } from '@milkdown/utils'
 import { slugifyThread } from './outline'
 import {
   findSuggestionTrigger,
+  isInsertCommand,
   rankSlashCommands,
   rankTagSuggestions,
   rankThreadSuggestions,
@@ -17,6 +18,7 @@ import {
   type TagSuggestion,
   type ThreadSuggestion,
 } from './suggestions'
+import type { InsertCommandId } from './blockKinds/definitions'
 import { WIKI_TITLE } from './wikilinks'
 import { slugifyTag } from './hashtags'
 import { TAG_HREF_PREFIX, TAG_TITLE } from './taglinks'
@@ -26,6 +28,7 @@ interface InlineSuggestionOptions {
   getTags: () => Promise<TagSuggestion[]>
   onMutation: () => void
   setBlockKind: (view: EditorView, kind: BlockConversionKind, replaceRange?: { from: number; to: number }) => void
+  insertBlockCommand: (view: EditorView, id: InsertCommandId, replaceRange: { from: number; to: number }) => void
 }
 
 type ActiveTrigger = SuggestionTrigger & {
@@ -193,7 +196,11 @@ function createMenuController(
     options.onMutation()
 
     if (entry.type === 'command') {
-      options.setBlockKind(view, entry.command.id, { from: trigger.from, to: trigger.to })
+      if (isInsertCommand(entry.command)) {
+        options.insertBlockCommand(view, entry.command.id, { from: trigger.from, to: trigger.to })
+      } else {
+        options.setBlockKind(view, entry.command.id, { from: trigger.from, to: trigger.to })
+      }
     } else if (entry.type === 'thread' || entry.type === 'create-thread') {
       const mark = linkType.create({ href: `#/thread/${entry.id}`, title: WIKI_TITLE })
       const transaction = view.state.tr.replaceWith(

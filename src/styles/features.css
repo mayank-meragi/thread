@@ -188,6 +188,53 @@
 
 .chat-tool-call { display: flex; align-items: center; gap: 6px; margin: 4px 0; padding: 6px 9px; border-radius: 8px; background: var(--paper-raised); color: var(--ink-soft); font-size: 12px; }
 .chat-tool-call svg { flex: 0 0 auto; color: var(--task); }
+
+.chat-session-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.chat-proposals { flex: 0 0 auto; max-height: 45%; overflow-y: auto; padding: 8px; border-top: 1px solid var(--line); background: var(--sidebar); display: grid; gap: 8px; align-content: start; }
+.chat-proposal { border: 1px solid var(--line); border-radius: 10px; background: var(--paper); padding: 10px; font-size: 12px; color: var(--ink); display: grid; gap: 8px; }
+.chat-proposal-loading { color: var(--muted); }
+.chat-proposal-stale { border-color: color-mix(in srgb, orange 45%, var(--line)); }
+.chat-proposal-header { display: flex; align-items: center; gap: 6px; }
+.chat-proposal-title { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-proposal-status { flex: 0 0 auto; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.chat-proposal-risk { flex: 0 0 auto; padding: 1px 6px; border-radius: 999px; font: 600 10px/1.6 'IBM Plex Mono', monospace; text-transform: uppercase; background: var(--control); color: var(--ink-soft); }
+.chat-proposal-risk-destructive { background: color-mix(in srgb, red 16%, var(--control)); color: color-mix(in srgb, red 55%, var(--ink)); }
+.chat-proposal-risk-external { background: color-mix(in srgb, orange 18%, var(--control)); }
+.chat-proposal-steps, .chat-proposal-results, .chat-proposal-warnings { display: grid; gap: 6px; }
+.chat-proposal-step { border-left: 2px solid var(--line); padding-left: 8px; display: grid; gap: 4px; }
+.chat-proposal-step-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.chat-proposal-step-head code { font: 500 11px 'IBM Plex Mono', monospace; }
+.chat-proposal-step-alias { color: var(--thread); font: 500 11px 'IBM Plex Mono', monospace; }
+.chat-proposal-step-deferred { padding: 0 5px; border-radius: 999px; background: var(--control); color: var(--muted); font-size: 10px; text-transform: uppercase; }
+.chat-proposal-step-summary { margin: 0; }
+.chat-proposal-change { display: flex; gap: 6px; }
+.chat-proposal-change-kind { flex: 0 0 auto; color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.chat-proposal-change-body { min-width: 0; display: grid; gap: 2px; }
+.chat-proposal-change-target { font-weight: 500; }
+.chat-proposal-change-target em { color: var(--muted); font-style: normal; }
+.chat-proposal-change-desc { color: var(--ink-soft); }
+.chat-proposal-change-scalar { font: 400 11px 'IBM Plex Mono', monospace; color: var(--ink-soft); overflow-wrap: anywhere; }
+.chat-proposal-diff { display: grid; gap: 4px; }
+.chat-proposal-diff pre { margin: 0; padding: 6px 8px; border-radius: 6px; background: var(--paper-raised); font: 400 11px 'IBM Plex Mono', monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow-y: auto; }
+.chat-proposal-diff pre[data-role='before'] { opacity: 0.6; }
+.chat-proposal-warning { margin: 0; color: var(--muted); }
+.chat-proposal-danger, .chat-proposal-stale, .chat-proposal-executing { margin: 0; display: flex; align-items: center; gap: 6px; color: var(--ink-soft); }
+.chat-proposal-danger svg, .chat-proposal-stale svg { flex: 0 0 auto; color: color-mix(in srgb, orange 60%, var(--ink)); }
+.chat-proposal-spin { animation: chat-proposal-spin 0.9s linear infinite; }
+@keyframes chat-proposal-spin { to { transform: rotate(360deg); } }
+/* .chat-proposal-failed composes .banner.banner-error; this only tightens spacing. */
+.chat-proposal-failed { margin: 0; }
+.chat-proposal-result { display: flex; align-items: center; gap: 6px; }
+.chat-proposal-result svg { flex: 0 0 auto; color: var(--task); }
+.chat-proposal-result code { font: 500 11px 'IBM Plex Mono', monospace; }
+.chat-proposal-result-failed svg { color: color-mix(in srgb, red 55%, var(--ink)); }
+.chat-proposal-source summary { color: var(--muted); cursor: pointer; }
+.chat-proposal-source pre { margin: 4px 0 0; padding: 8px; border-radius: 6px; background: var(--paper-raised); font: 400 11px 'IBM Plex Mono', monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-proposal-actions { display: flex; gap: 6px; }
+.chat-proposal-confirm, .chat-proposal-cancel { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--line); font-size: 12px; cursor: pointer; }
+.chat-proposal-confirm { background: var(--thread); color: var(--on-solid); border-color: transparent; }
+.chat-proposal-confirm:disabled, .chat-proposal-cancel:disabled { opacity: 0.5; cursor: default; }
+.chat-proposal-cancel { background: var(--control); color: var(--ink); }
 .chat-composer { display: flex; align-items: flex-end; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
 .chat-composer-input { flex: 1; min-height: 36px; max-height: 120px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; outline: 0; background: var(--control); color: var(--ink); font: inherit; font-size: 13px; resize: none; }
 .chat-composer-input:focus { border-color: var(--thread); box-shadow: 0 0 0 3px var(--thread-soft); }
@@ -638,9 +685,12 @@ a[href^="#/"] { -webkit-touch-callout: none; }
 
 .task-row-swipe-wrap { position: relative; overflow: hidden; }
 /* overflow: hidden clips the swipe-action layer / row translate during a touch
-   swipe -- but it also clips the status control's open menu. Stop clipping while
-   that menu is open (it's never open mid-swipe). */
-.task-row-swipe-wrap:has(.task-status-menu) { overflow: visible; }
+   swipe -- but it also clips the status control's open menu. While that menu is
+   open (never mid-swipe): stop clipping, and lift this row's whole subtree above
+   the following rows -- each .task-list-row is its own `z-index: 1` stacking
+   context, so without this the menu (trapped at that level) renders behind every
+   later row. */
+.task-row-swipe-wrap:has(.task-status-menu) { overflow: visible; z-index: 20; }
 .task-row-swipe-actions { position: absolute; inset: 0; z-index: 0; display: flex; align-items: stretch; justify-content: flex-end; gap: 1px; }
 .task-row-swipe-actions button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 84px; border: 0; background: var(--control); color: var(--ink-soft); font-size: 10px; font-weight: 600; }
 .task-row-swipe-actions button.danger { background: var(--danger-soft); color: var(--danger); }

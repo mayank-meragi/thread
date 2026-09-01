@@ -131,8 +131,9 @@ export async function renameSession(sessionId: string, title: string): Promise<v
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  await db.transaction('rw', db.chatSessions, db.chatMessages, async () => {
+  await db.transaction('rw', db.chatSessions, db.chatMessages, db.chatProposals, async () => {
     await db.chatMessages.where('sessionId').equals(sessionId).delete()
+    await db.chatProposals.where('sessionId').equals(sessionId).delete()
     await db.chatSessions.delete(sessionId)
   })
 }

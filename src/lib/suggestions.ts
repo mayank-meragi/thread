@@ -1,6 +1,12 @@
-import { blockKindDefinitions, type BlockConversionKind, type BlockKindDefinition } from './blockKinds/definitions'
+import {
+  blockKindDefinitions,
+  insertCommandDefinitions,
+  type BlockConversionKind,
+  type BlockKindDefinition,
+  type InsertCommandDefinition,
+} from './blockKinds/definitions'
 
-export type { BlockConversionKind }
+export type { BlockConversionKind, InsertCommandDefinition }
 
 export interface ThreadSuggestion {
   id: string
@@ -15,10 +21,17 @@ export interface TagSuggestion {
   propertyCount: number
 }
 
-// The slash menu is just a view over the shared block-kind registry -- a new
-// kind registered there appears here with no further changes.
-export type SlashCommand = BlockKindDefinition
-export const slashCommands: SlashCommand[] = blockKindDefinitions
+// The slash menu is a view over two registries: the block-kind registry
+// (commands that toggle the current list item's kind) and the insert-command
+// registry (commands that insert a new block). Both share the id/label/glyph/
+// description/aliases fields the menu renders and ranks on; `insert: true`
+// distinguishes the second group for accept().
+export type SlashCommand = BlockKindDefinition | InsertCommandDefinition
+export const slashCommands: SlashCommand[] = [...blockKindDefinitions, ...insertCommandDefinitions]
+
+export function isInsertCommand(command: SlashCommand): command is InsertCommandDefinition {
+  return 'insert' in command && command.insert === true
+}
 
 export type SuggestionTrigger =
   | { kind: 'wikilink'; query: string; fromOffset: number; toOffset: number }

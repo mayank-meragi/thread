@@ -48,6 +48,27 @@ export function getBlockKindDefinition(id: BlockConversionKind): BlockKindDefini
   return blockKindDefinitions.find((definition) => definition.id === id)
 }
 
+// Slash-menu commands that *insert a new block* rather than toggle the kind of
+// the current list item. They share the slash menu's presentation fields with
+// BlockKindDefinition but carry no prefix/conversion behaviour -- selecting one
+// runs a dedicated insert handler in MarkdownEditor instead of
+// setCurrentBlockKind. `insert: true` is the discriminator the slash menu and
+// its accept() branch key on.
+export type InsertCommandId = 'tql'
+
+export interface InsertCommandDefinition {
+  id: InsertCommandId
+  label: string
+  description: string
+  glyph: string
+  aliases: string[]
+  insert: true
+}
+
+export const insertCommandDefinitions: InsertCommandDefinition[] = [
+  { id: 'tql', label: 'TQL', description: 'Insert a live query block', glyph: '≣', aliases: ['tql', 'query'], insert: true },
+]
+
 // Kinds detectable purely from a text prefix -- i.e. every kind except task
 // (schema attribute) and bullet (no marker at all).
 export const prefixedBlockKinds: Array<BlockKindDefinition & { prefixPattern: RegExp; className: string }> =

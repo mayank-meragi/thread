@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { languages as codeMirrorLanguages } from '@codemirror/language-data'
 import { Crepe } from '@milkdown/crepe'
-import { editorViewCtx } from '@milkdown/core'
+import { commandsCtx, editorViewCtx } from '@milkdown/core'
 import { trailingConfig } from '@milkdown/plugin-trailing'
-import { listItemSchema } from '@milkdown/preset-commonmark'
+import {
+  addBlockTypeCommand,
+  clearTextInCurrentBlockCommand,
+  codeBlockSchema,
+  listItemSchema,
+} from '@milkdown/preset-commonmark'
 import type { Node as ProseNode } from '@milkdown/prose/model'
 import { liftListItem, sinkListItem } from '@milkdown/prose/schema-list'
 import { TextSelection } from '@milkdown/prose/state'
@@ -26,7 +31,7 @@ import {
   semanticPrefixPlugin,
 } from '../lib/blockKinds'
 import { inlineSuggestionsPlugin } from '../lib/inlineSuggestions'
-import { createQueryBlockPlugin } from '../lib/queryBlockPlugin'
+import { createQueryBlockPlugin, QUERY_BLOCK_LANGUAGE } from '../lib/queryBlockPlugin'
 import { queryLanguageDescription } from '../lib/queryBlockLanguage'
 import type { BlockConversionKind } from '../lib/suggestions'
 import { editorLinksToWiki, wikiLinkInputRule, wikiLinkInteractionPlugin, wikiLinksToEditor } from '../lib/wikilinks'
@@ -139,6 +144,26 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       },
       onMutation: markUserMutation,
       setBlockKind: setCurrentBlockKind,
+      insertBlockCommand: (view, _id, replaceRange) => {
+        // Drop the "/tql" trigger text, then reuse commonmark's own block-type
+        // command to turn the (now empty) block into a fenced code block tagged
+        // `tql` -- createQueryBlockPlugin renders the live results widget for
+        // any code_block with that language. Finally seed a starter query.
+        const cleared = view.state.tr.delete(replaceRange.from, replaceRange.to)
+        cleared.setSelection(TextSelection.near(cleared.doc.resolve(replaceRange.from)))
+        view.dispatch(cleared)
+        crepe.editor.action((ctx) => {
+          const commands = ctx.get(commandsCtx)
+          const editorView = ctx.get(editorViewCtx)
+          commands.call(clearTextInCurrentBlockCommand.key)
+          commands.call(addBlockTypeCommand.key, {
+            nodeType: codeBlockSchema.type(ctx),
+            attrs: { language: QUERY_BLOCK_LANGUAGE },
+          })
+          editorView.dispatch(editorView.state.tr.insertText('LIST FROM threads'))
+          editorView.focus()
+        })
+      },
     }))
     crepe.editor.use(wikiLinkInteractionPlugin)
     crepe.editor.use(semanticPrefixPlugin)

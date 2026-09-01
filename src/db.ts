@@ -17,6 +17,8 @@ import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, insertPe
 import { parseTaskDate, stripMatchedText } from './lib/taskDates'
 import { extractHashtags, slugifyTag } from './lib/hashtags'
 import { isoToday } from './lib/dates'
+import type { CommandRisk } from './lib/commands/types'
+import type { CompiledThreadScript, PlanPreview, PlanTargetCapture } from './lib/threadscript/types'
 
 export interface DayRecord {
   date: string
@@ -163,6 +165,43 @@ export interface ChatMessageRecord {
   createdAt: string
 }
 
+export type ChatProposalStatus = 'pending' | 'executing' | 'completed' | 'failed' | 'cancelled' | 'stale'
+
+export interface ChatProposalReceipt {
+  actionIndex: number
+  capability: string
+  status: 'completed' | 'failed'
+  idempotencyKey: string
+  output?: unknown
+  error?: string
+  at: string
+}
+
+// A ThreadScript proposal the AI drafted and previewed. It is inert until the
+// user confirms it in trusted UI (see `dispatchApprovedProposal`); creating
+// one performs no domain write. Persisted so the approval card and its
+// outcome survive a reload.
+export interface ChatProposalRecord {
+  id: string
+  sessionId: string
+  personaId: string
+  messageId?: string
+  source: string
+  sourceHash: string
+  description?: string
+  risk: CommandRisk
+  status: ChatProposalStatus
+  plan: CompiledThreadScript
+  preview: PlanPreview
+  capturedTargets: PlanTargetCapture[]
+  expectedVersions: Record<string, string | number>
+  receipts: ChatProposalReceipt[]
+  error?: string
+  createdAt: string
+  updatedAt: string
+  resolvedAt?: string
+}
+
 export type TaskPriority = 'low' | 'medium' | 'high'
 export type TaskStatus = 'not_started' | 'in_progress' | 'blocked' | 'done' | 'canceled'
 
@@ -211,6 +250,7 @@ class ThreadDatabase extends Dexie {
   personas!: EntityTable<PersonaRecord, 'id'>
   chatSessions!: EntityTable<ChatSessionRecord, 'id'>
   chatMessages!: EntityTable<ChatMessageRecord, 'id'>
+  chatProposals!: EntityTable<ChatProposalRecord, 'id'>
 
   constructor() {
     super('thread-v1')
@@ -420,6 +460,28 @@ class ThreadDatabase extends Dexie {
       personas: 'id, threadId, updatedAt',
       chatSessions: 'id, personaId, updatedAt, [personaId+updatedAt]',
       chatMessages: 'id, sessionId, createdAt, [sessionId+createdAt]',
+    })
+    this.version(13).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, kind, blockId, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, scope, aggregateId, detectedAt, resolvedAt',
+      blocks: 'id, day, parentId, kind, [day+order]',
+      occurrences: 'id, threadId, day, rootBlockId, [threadId+day]',
+      viewState: 'key, view, blockId, collapsed',
+      revisions: 'id, day, archivedAt, [day+localRevision]',
+      tasks: 'id, blockId, day, status, parentTaskId, dueDate, startDate, priority, [day+order], [status+dueDate]',
+      threadNotes: 'threadId, updatedAt',
+      threadProperties: 'id, threadId, propertyId, value, [threadId+propertyId], [propertyId+value]',
+      propertyDefinitions: 'id, name, type, updatedAt',
+      blockProperties: 'id, blockId, day, propertyId, [blockId+propertyId], [propertyId+day]',
+      tagDefinitions: 'id, name, updatedAt',
+      blockTags: 'id, blockId, day, tagId, [blockId+tagId], [tagId+day]',
+      personas: 'id, threadId, updatedAt',
+      chatSessions: 'id, personaId, updatedAt, [personaId+updatedAt]',
+      chatMessages: 'id, sessionId, createdAt, [sessionId+createdAt]',
+      chatProposals: 'id, sessionId, messageId, status, createdAt, [sessionId+createdAt]',
     })
   }
 }
@@ -1217,7 +1279,7 @@ export async function removeBlockProperty(blockId: string, propertyId: string): 
   })
 }
 
-function validatePropertyValue(definition: PropertyDefinitionRecord, value: PropertyValue): void {
+export function validatePropertyValue(definition: PropertyDefinitionRecord, value: PropertyValue): void {
   if (value === null) return
   if (definition.type === 'number' && typeof value !== 'number') throw new Error(`${definition.name} must be a number.`)
   if (definition.type === 'boolean' && typeof value !== 'boolean') throw new Error(`${definition.name} must be true or false.`)

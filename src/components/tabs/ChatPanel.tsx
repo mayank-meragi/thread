@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { History, NotebookPen, Plus, Send } from 'lucide-react'
+import { FileCheck, History, Plus, Send } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { AssistantRuntimeProvider, ComposerPrimitive, MessagePrimitive, ThreadPrimitive, useLocalRuntime, type ThreadMessageLike, type ToolCallMessagePartProps } from '@assistant-ui/react'
 import { MarkdownTextPrimitive } from '@assistant-ui/react-markdown'
@@ -8,6 +8,7 @@ import { createSession, GENERAL_PERSONA_ID } from '../../lib/personas'
 import { createSessionAdapter, loadSessionHistory } from '../../lib/aiChat'
 import { PersonaSwitcher } from '../chat/PersonaSwitcher'
 import { SessionList } from '../chat/SessionList'
+import { ThreadScriptProposal } from '../chat/ThreadScriptProposal'
 
 // MarkdownTextPrimitive reads the current message part's text via its own
 // context hook rather than a `text` prop, so it doesn't literally match the
@@ -16,11 +17,33 @@ function AssistantMarkdown() {
   return <MarkdownTextPrimitive />
 }
 
-function TakeNoteToolUI({ args, result }: ToolCallMessagePartProps<{ note?: string }>) {
+function ProposeThreadScriptToolUI({ result }: ToolCallMessagePartProps<{ source?: string }>) {
+  const payload = result as { created?: boolean; diagnostics?: Array<{ message: string }> } | undefined
+  const label = !payload
+    ? 'Drafting a proposal…'
+    : payload.created
+      ? 'Drafted a proposal — review below'
+      : `Draft failed: ${payload.diagnostics?.[0]?.message ?? 'invalid script'}`
   return (
     <div className="chat-tool-call">
-      <NotebookPen size={13} />
-      <span>{result ? 'Noted in journal' : 'Taking a note…'}{args?.note ? `: ${args.note}` : ''}</span>
+      <FileCheck size={13} />
+      <span>{label}</span>
+    </div>
+  )
+}
+
+function SessionProposals({ sessionId }: { sessionId: string }) {
+  const proposals = useLiveQuery(
+    () => db.chatProposals.where('[sessionId+createdAt]').between([sessionId, ''], [sessionId, '￿']).toArray(),
+    [sessionId],
+    [],
+  )
+  if (!proposals.length) return null
+  return (
+    <div className="chat-proposals">
+      {proposals.map((proposal) => (
+        <ThreadScriptProposal key={proposal.id} proposalId={proposal.id} />
+      ))}
     </div>
   )
 }
@@ -45,7 +68,7 @@ function AssistantMessage() {
       <MessagePrimitive.Content
         components={{
           Text: AssistantMarkdown,
-          tools: { by_name: { takeNote: TakeNoteToolUI } },
+          tools: { by_name: { proposeThreadScript: ProposeThreadScriptToolUI } },
         }}
       />
       <MessagePrimitive.Error>
@@ -87,7 +110,10 @@ function ChatSessionRuntime({
   const runtime = useLocalRuntime(adapter, { initialMessages })
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <ChatThread />
+      <div className="chat-session-body">
+        <ChatThread />
+        <SessionProposals sessionId={sessionId} />
+      </div>
     </AssistantRuntimeProvider>
   )
 }

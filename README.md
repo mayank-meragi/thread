@@ -37,4 +37,8 @@ Product workflows, measurable UX budgets, and release criteria are documented in
 CSS/React primitives behind the UI are documented in
 [`docs/design-system.md`](docs/design-system.md).
 
+The proposed AI action layer is documented in the
+[`ThreadScript v1 specification`](docs/threadscript-spec.md), with current and planned app parity
+tracked in the [`ThreadScript capability inventory`](docs/threadscript-capability-inventory.md).
+
 Pushing `main` deploys the production build through the GitHub Pages workflow.
