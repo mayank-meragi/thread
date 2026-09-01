@@ -23,6 +23,39 @@ Open [http://127.0.0.1:5173/thread/](http://127.0.0.1:5173/thread/).
 - Undated thread-only notes sync separately to `threads/<thread-id>.md`.
 - GitHub credentials remain in the current browser and are sent only to `api.github.com`.
 
+## Workout tracking
+
+A workout is an ordinary task subtree in a daily note — a `#[workout]` root, `#[exercise]` children,
+and `#[set]` grandchildren:
+
+```markdown
+- [ ] #[workout] [[Push Day]]
+  - [ ] #[exercise] [[Bench Press]]
+    - [x] #[set] Set 1
+    - [x] #[set] Set 2
+```
+
+- The three structural tags are built-in with stable IDs; the `#[set]` schema carries the optional
+  measurement properties (load, unit, reps, RPE, duration, distance, distance unit) and `#[workout]`
+  carries start/finish times. Task status is the lifecycle.
+- `/workout`, `/exercise`, and `/set` slash commands apply the structural tags in the editor, which
+  stays the canonical authoring surface.
+- The workout lens at `/workout/:day/:blockId` is a specialized read/write view over that subtree —
+  start, log sets, complete, finish, reopen — sharing the same source blocks as the outline. The
+  ContextualInspector shows the same role-specific controls per task.
+- Today surfaces the day's workouts with Open/Resume and a New workout action. General Tasks shows
+  workout roots but hides exercise/set internals unless **Include workout internals** is on. An
+  exercise's thread lists its **Workout occurrences** by day.
+- No new tables or migration: everything is stored as existing tasks, tags, block properties, and
+  daily Markdown, so workout views can always be rebuilt from source.
+- A built-in **Workout Coach** persona co-designs a holistic "Training Plan" thread with you
+  through conversation (goals, principles, weekly themes — not a fixed exercise list), then programs
+  each day's workout from that plan and your recent sessions, proposing it as a confirmed
+  `workout.*` ThreadScript action you can open in the workout lens.
+
+Design rationale and phasing are in
+[`docs/workout-tracking-implementation-plan.md`](docs/workout-tracking-implementation-plan.md).
+
 ## Verification
 
 ```bash

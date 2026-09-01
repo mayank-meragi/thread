@@ -9,6 +9,7 @@ import { slugifyThread } from './outline'
 import {
   findSuggestionTrigger,
   isInsertCommand,
+  isSemanticTaskCommand,
   rankSlashCommands,
   rankTagSuggestions,
   rankThreadSuggestions,
@@ -19,6 +20,7 @@ import {
   type ThreadSuggestion,
 } from './suggestions'
 import type { InsertCommandId } from './blockKinds/definitions'
+import type { WorkoutRole } from './workouts/systemTags'
 import { WIKI_TITLE } from './wikilinks'
 import { slugifyTag } from './hashtags'
 import { TAG_HREF_PREFIX, TAG_TITLE } from './taglinks'
@@ -28,6 +30,7 @@ interface InlineSuggestionOptions {
   getTags: () => Promise<TagSuggestion[]>
   onMutation: () => void
   setBlockKind: (view: EditorView, kind: BlockConversionKind, replaceRange?: { from: number; to: number }) => void
+  setSemanticTask: (view: EditorView, role: WorkoutRole, replaceRange: { from: number; to: number }) => void
   insertBlockCommand: (view: EditorView, id: InsertCommandId, replaceRange: { from: number; to: number }) => void
 }
 
@@ -198,6 +201,8 @@ function createMenuController(
     if (entry.type === 'command') {
       if (isInsertCommand(entry.command)) {
         options.insertBlockCommand(view, entry.command.id, { from: trigger.from, to: trigger.to })
+      } else if (isSemanticTaskCommand(entry.command)) {
+        options.setSemanticTask(view, entry.command.id, { from: trigger.from, to: trigger.to })
       } else {
         options.setBlockKind(view, entry.command.id, { from: trigger.from, to: trigger.to })
       }

@@ -48,6 +48,8 @@ describe('suggestion ranking', () => {
   it('filters slash commands by names and aliases', () => {
     expect(rankSlashCommands('que')[0].id).toBe('question')
     expect(rankSlashCommands('todo')[0].id).toBe('task')
+    expect(rankSlashCommands('workout')[0]).toMatchObject({ id: 'workout', kind: 'semantic-task', tagId: 'system-workout' })
+    expect(rankSlashCommands('movement')[0]).toMatchObject({ id: 'exercise', kind: 'semantic-task' })
   })
 
   it('ranks existing tags by exact and prefix matches', () => {

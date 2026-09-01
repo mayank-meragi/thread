@@ -483,6 +483,16 @@ a[href^="#/"] { -webkit-touch-callout: none; }
   padding-left: 16px; background: linear-gradient(90deg, transparent, var(--paper) 14px); pointer-events: none;
 }
 .thread-editor .ProseMirror li.task-focused > .children > .task-inline-meta { display: none; }
+.thread-editor .ProseMirror .workout-role-chip {
+  display: inline-flex; align-items: center; margin-left: 7px; padding: 1px 6px; border: 1px solid var(--line);
+  border-radius: 999px; color: var(--muted); font: 600 9px/1.5 'IBM Plex Mono', monospace;
+  text-transform: uppercase; vertical-align: middle;
+}
+.thread-editor .ProseMirror li.workout-role-workout > .children > .workout-role-chip {
+  border-color: color-mix(in srgb, var(--thread) 35%, var(--line)); background: var(--thread-soft); color: var(--thread);
+}
+.thread-editor .ProseMirror li.workout-role-exercise > .children > .workout-role-chip { color: var(--ink-soft); }
+.thread-editor .ProseMirror li.workout-role-set > .children > .workout-role-chip { opacity: .8; }
 .task-meta-chip, .priority-chip {
   display: inline-flex; align-items: center; min-height: 20px; padding: 0 7px; border: 1px solid var(--line);
   border-radius: 999px; background: var(--control); color: var(--muted); font: 500 9px/1 'IBM Plex Mono', monospace;
@@ -1288,3 +1298,184 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .docs-index-card:hover { border-color: var(--outline-muted); text-decoration: none; }
 .docs-index-card strong { display: block; font-size: 14px; }
 .docs-index-card span { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
+
+/* ---------------------------------------------------------------------------
+   Workout lens (WorkoutPage + components/workouts/*)
+   A specialized read/write view over a #[workout] task subtree. Mobile-first:
+   the core log-a-set flow must work at 320px with no horizontal scroll, and
+   every completion target is at least 44x44 CSS px.
+   ------------------------------------------------------------------------- */
+.workout-page { max-width: 720px; margin: 0 auto; padding: 24px 16px calc(96px + env(safe-area-inset-bottom)); }
+.workout-page .back-link { margin-bottom: 18px; }
+.workout-page button { cursor: pointer; }
+.workout-page button:disabled { opacity: .45; cursor: default; }
+
+.workout-page .primary-button,
+.workout-page .text-button {
+  min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 0 14px; border-radius: 10px; font-size: var(--text-meta); font-weight: 600;
+}
+.workout-page .text-button { min-height: 40px; }
+.workout-page .link-button { border: 0; background: transparent; color: var(--thread); font: inherit; padding: 0; text-decoration: underline; }
+
+.workout-page .icon-button {
+  width: 34px; height: 34px; flex: none; display: grid; place-items: center; padding: 0;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--control); color: var(--muted);
+}
+.workout-page .icon-button:hover { color: var(--ink); }
+
+/* Header */
+.workout-header { margin-bottom: 20px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper-raised); }
+.workout-header-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.workout-title { margin: 6px 0 0; font-size: 22px; line-height: 1.2; }
+.workout-title a { color: inherit; }
+.workout-state-badge {
+  display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px;
+  font: 600 9px/1.6 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: .06em;
+  border: 1px solid var(--line); color: var(--muted); background: var(--control);
+}
+.workout-state-badge.state-active { border-color: color-mix(in srgb, var(--thread) 40%, var(--line)); background: var(--thread-soft); color: var(--thread); }
+.workout-state-badge.state-completed { border-color: color-mix(in srgb, var(--ok, #3a7) 40%, var(--line)); color: var(--ok, #3a7); }
+.workout-state-badge.state-canceled { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); }
+.workout-header-stats { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; color: var(--muted); font-size: 12px; }
+.workout-elapsed { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+.workout-header-actions { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+.workout-header-error, .add-exercise-error, .set-row-error, .exercise-card-error, .set-editor-error {
+  margin: 8px 0 0; color: var(--danger); font-size: 12px;
+}
+
+.workout-next-hint { margin: 0 0 16px; color: var(--muted); font-size: 12px; }
+
+/* Diagnostics */
+.workout-diagnostics { display: grid; gap: 6px; margin-bottom: 16px; }
+.workout-diagnostic {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 9px; font-size: 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--line)); color: var(--ink);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+.workout-diagnostic svg { color: var(--danger); flex: none; }
+
+/* Exercises */
+.exercise-list { display: grid; gap: 14px; }
+.exercise-card { padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper-raised); }
+.exercise-card.is-complete { border-color: color-mix(in srgb, var(--thread) 30%, var(--line)); }
+.exercise-card.is-skipped { opacity: .55; }
+.exercise-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.exercise-card-title { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 650; min-width: 0; }
+.exercise-card-title a { color: inherit; }
+.exercise-card-title svg { color: var(--thread); flex: none; }
+.exercise-card-meta { display: inline-flex; align-items: center; gap: 6px; flex: none; color: var(--muted); font-size: 11px; }
+.exercise-note { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+.add-set-button { margin-top: 10px; }
+
+/* Sets */
+.set-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.set-row { border: 1px solid var(--line); border-radius: 11px; padding: 8px; background: var(--paper); }
+.set-row.is-done { border-color: color-mix(in srgb, var(--thread) 28%, var(--line)); background: var(--thread-soft); }
+.set-row.is-skipped { opacity: .55; }
+.set-row-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.set-row-title {
+  flex: 1 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 6px;
+  border: 0; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+  min-height: 44px;
+}
+.set-row-title svg { flex: none; color: var(--muted); }
+.set-row-title span { font-weight: 600; }
+.set-row-title small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.set-row-actions { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+/* Set editor form */
+.set-editor { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.set-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.set-editor-field { display: grid; gap: 3px; font-size: 11px; color: var(--muted); }
+.set-editor-field input, .set-editor-field select {
+  width: 100%; min-width: 0; height: 40px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px;
+  outline: 0; background: var(--control); color: var(--ink); font-size: 14px;
+}
+.set-editor-field input:focus, .set-editor-field select:focus { border-color: var(--thread); box-shadow: 0 0 0 2px var(--thread-soft); }
+.set-editor-actions { margin-top: 10px; }
+
+/* Add-exercise footer form */
+.add-exercise-form { display: flex; gap: 8px; margin-top: 20px; }
+.add-exercise-form input {
+  flex: 1 1 auto; min-width: 0; height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px;
+  outline: 0; background: var(--control); color: var(--ink); font-size: 14px;
+}
+.add-exercise-form input:focus { border-color: var(--thread); box-shadow: 0 0 0 2px var(--thread-soft); }
+
+@media (min-width: 560px) {
+  .set-editor-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* "Open workout" affordance rendered into the outline editor */
+.thread-editor .ProseMirror .workout-open-link {
+  display: inline-flex; align-items: center; margin-left: 8px; padding: 1px 7px; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--thread) 35%, var(--line)); background: var(--thread-soft);
+  color: var(--thread); font: 600 9px/1.6 'IBM Plex Mono', monospace; text-transform: uppercase;
+  vertical-align: middle; cursor: pointer;
+}
+
+/* ---------------------------------------------------------------------------
+   Workout surface integration (Today entry points, Tasks row treatment,
+   ThreadPage exercise history)
+   ------------------------------------------------------------------------- */
+.today-workouts { margin-top: 20px; padding-top: 24px; border-top: 1px solid var(--line); }
+.today-workouts-heading { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+.today-workouts-heading h2 { margin: 6px 0 0; font: 500 27px/1 'Newsreader', serif; letter-spacing: -.02em; }
+.today-workouts-heading > svg { color: var(--outline-muted); }
+.today-workout-row {
+  display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 0;
+  border-bottom: 1px solid var(--line); font-size: 13px;
+}
+.today-workout-row:last-of-type { border-bottom: 0; }
+.today-workout-state {
+  flex: none; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line);
+  font: 600 8px/1.7 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+}
+.today-workout-state.state-active { border-color: color-mix(in srgb, var(--thread) 40%, var(--line)); background: var(--thread-soft); color: var(--thread); }
+.today-workout-state.state-completed { color: var(--ok, #3a7); }
+.today-workout-name { flex: 1 1 auto; min-width: 0; color: var(--ink); font-weight: 600; }
+.today-workout-meta { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+.today-workout-open { flex: none; color: var(--thread); font-weight: 600; font-size: 12px; }
+.today-workout-new {
+  margin-top: 12px; min-height: 40px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--control); color: var(--ink);
+  font-size: var(--text-meta); font-weight: 600; cursor: pointer;
+}
+.today-workout-new:disabled { opacity: .5; cursor: default; }
+
+.task-row-workout-link {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--thread) 35%, var(--line)); background: var(--thread-soft);
+  color: var(--thread); font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+
+.task-filter-panel .field-check { flex-direction: row; align-items: center; gap: 8px; cursor: pointer; }
+.task-filter-panel .field-check input { width: 15px; height: 15px; flex: none; }
+.task-filter-panel .field-check .field-label { margin: 0; }
+
+.exercise-occurrences { display: grid; }
+.exercise-occurrence-row {
+  display: flex; align-items: center; gap: 12px; padding: 9px 2px; border-bottom: 1px solid var(--line);
+  color: var(--ink); font-size: 13px;
+}
+.exercise-occurrence-row:last-child { border-bottom: 0; }
+.exercise-occurrence-row:hover { text-decoration: none; background: var(--control); }
+.exercise-occurrence-row > time { flex: none; width: 68px; color: var(--muted); font: 400 11px 'IBM Plex Mono', monospace; }
+.exercise-occurrence-sets { flex: 1 1 auto; font-variant-numeric: tabular-nums; }
+.exercise-occurrence-status { flex: none; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.exercise-occurrence-status.status-done { color: var(--ok, #3a7); }
+.exercise-occurrence-status.status-canceled { color: var(--danger); }
+
+/* Role-specific workout sections inside the ContextualInspector sheet */
+.inspector-workout-link {
+  display: inline-flex; align-items: center; gap: 6px; margin: 10px 0 0; padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--thread) 35%, var(--line)); border-radius: 9px;
+  background: var(--thread-soft); color: var(--thread); font-size: var(--text-meta); font-weight: 600;
+}
+.inspector-workout-actions { margin-top: 10px; }
+.inspector-workout-actions button {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid var(--line);
+  border-radius: 9px; background: var(--control); color: var(--ink); font-size: var(--text-meta); cursor: pointer;
+}
+.inspector-section > .set-editor { margin-top: 10px; padding-top: 0; border-top: 0; }

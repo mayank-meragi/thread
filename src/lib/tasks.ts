@@ -9,6 +9,7 @@ import {
   type TaskStatus,
 } from '../db'
 import { isoToday } from './dates'
+import { systemTagIdForWorkoutRole, type WorkoutRole } from './workouts/systemTags'
 
 async function persistTaskMarkdown(day: string, markdown: string): Promise<void> {
   await saveDay(day, markdown)
@@ -139,6 +140,26 @@ export async function createSubtask(parentTaskId: string, text: string): Promise
   const created = refreshed.find((item) => item.order === insertAt)
   if (!created) throw new Error('The new subtask could not be indexed.')
   return created.id
+}
+
+function workoutTaggedText(role: WorkoutRole, text: string): string {
+  const label = role === 'set' && !text.trim() ? 'Set' : text.trim()
+  return `#[${role}]${label ? ` ${label}` : ''}`
+}
+
+async function requireWorkoutSystemTag(role: WorkoutRole): Promise<void> {
+  const tagId = systemTagIdForWorkoutRole(role)
+  if (!await db.tagDefinitions.get(tagId)) throw new Error('Workout system tags are not initialized.')
+}
+
+export async function createWorkoutTask(input: { role: WorkoutRole; text: string; day?: string }): Promise<string> {
+  await requireWorkoutSystemTag(input.role)
+  return createTask({ text: workoutTaggedText(input.role, input.text), day: input.day })
+}
+
+export async function createWorkoutSubtask(parentTaskId: string, role: WorkoutRole, text = ''): Promise<string> {
+  await requireWorkoutSystemTag(role)
+  return createSubtask(parentTaskId, workoutTaggedText(role, text))
 }
 
 export async function updateTaskTitle(taskId: string, text: string): Promise<void> {

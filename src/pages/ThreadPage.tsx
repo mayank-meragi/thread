@@ -7,6 +7,7 @@ import { formatDay } from '../lib/dates'
 import { useOpenTab } from '../lib/tabsApi'
 import { openBlockInspector, openTaskInspector } from '../lib/inspectorTarget'
 import type { OutlineBlock } from '../lib/outline'
+import { getExerciseOccurrences } from '../lib/workouts/selectors'
 import { EditableThreadTitle } from '../components/EditableThreadTitle'
 import { ThreadComposer } from '../components/ThreadComposer'
 import { ThreadProperties } from '../components/ThreadProperties'
@@ -44,6 +45,7 @@ export function ThreadPage() {
       return { occurrence, blocks }
     })
   }, [threadId], [])
+  const exerciseOccurrences = useLiveQuery(() => getExerciseOccurrences(threadId), [threadId], [])
   const view = `thread:${threadId}`
   const collapseStates = useLiveQuery(
     () => db.viewState.where('view').equals(view).toArray(),
@@ -178,6 +180,31 @@ export function ThreadPage() {
           </>
         )}
       </ProjectionDisclosure>
+
+      {exerciseOccurrences.length > 0 && (
+        <ProjectionDisclosure title="Workout occurrences" meta={exerciseOccurrences.length} contentClassName="full-bleed">
+          <div className="exercise-occurrences">
+            {exerciseOccurrences.map((occurrence) => (
+              <Link
+                key={`${occurrence.day}-${occurrence.exerciseTaskId}`}
+                className="exercise-occurrence-row"
+                to={occurrence.workoutTaskId
+                  ? `/workout/${occurrence.day}/${occurrence.workoutTaskId}`
+                  : `/?date=${occurrence.day}&block=${occurrence.exerciseTaskId}`}
+              >
+                <time>{formatDay(occurrence.day).short}</time>
+                <span className="exercise-occurrence-sets">
+                  {occurrence.completedSets}/{occurrence.totalSets} sets
+                  {occurrence.skippedSets > 0 && ` · ${occurrence.skippedSets} skipped`}
+                </span>
+                <span className={`exercise-occurrence-status status-${occurrence.status}`}>
+                  {occurrence.status === 'done' ? 'Completed' : occurrence.status === 'canceled' ? 'Skipped' : occurrence.status === 'in_progress' ? 'In progress' : 'Planned'}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </ProjectionDisclosure>
+      )}
 
       <ProjectionDisclosure title="Current direction" meta="from your latest notes" contentClassName="full-bleed direction-content">
         <p>{direction ?? 'Keep writing. A direction will emerge as this thread grows.'}</p>

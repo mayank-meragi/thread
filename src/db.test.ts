@@ -1,7 +1,8 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { addBlockTag, applyRemoteDay, applyThreadTemplate, createPropertyDefinition, createTag, createThread, db, ensureThreadNote, markDaySynced, pruneOrphanThreads, removeBlockTag, removeThreadProperty, renameThread, saveDay, saveThreadNote, setBlockProperty, setThreadIsTemplate, setThreadProperty, toggleTask, updateTagDefinition } from './db'
+import { addBlockTag, applyRemoteDay, applyThreadTemplate, createPropertyDefinition, createTag, createThread, db, deleteTagDefinition, ensureThreadNote, initializeDatabase, markDaySynced, pruneOrphanThreads, removeBlockTag, removeThreadProperty, renameThread, saveDay, saveThreadNote, setBlockProperty, setThreadIsTemplate, setThreadProperty, toggleTask, updateTagDefinition } from './db'
 import { parseThreadDocument } from './lib/threadDocument'
+import { WORKOUT_SYSTEM_TAGS } from './lib/workouts/systemTags'
 
 const DATE = '2026-08-19'
 
@@ -285,6 +286,97 @@ describe('journal persistence', () => {
     await toggleTask({ ...task, line: 99 })
 
     expect((await db.days.get(DATE))?.markdown).toContain('1. [x] Finish this by Monday')
+  })
+})
+
+describe('workout system metadata', () => {
+  it('seeds stable workout tags and their property schemas idempotently', async () => {
+    await initializeDatabase(DATE)
+    await initializeDatabase(DATE)
+
+    expect(await db.tagDefinitions.get(WORKOUT_SYSTEM_TAGS.workout)).toMatchObject({
+      name: 'workout',
+      propertyIds: ['workout-started-at', 'workout-finished-at'],
+    })
+    expect(await db.tagDefinitions.get(WORKOUT_SYSTEM_TAGS.exercise)).toMatchObject({
+      name: 'exercise',
+      propertyIds: [],
+    })
+    expect(await db.tagDefinitions.get(WORKOUT_SYSTEM_TAGS.set)).toMatchObject({
+      name: 'set',
+      propertyIds: [
+        'set-load',
+        'set-load-unit',
+        'set-reps',
+        'set-rpe',
+        'set-duration-seconds',
+        'set-distance',
+        'set-distance-unit',
+      ],
+    })
+    expect(await db.tagDefinitions.where('id').anyOf(Object.values(WORKOUT_SYSTEM_TAGS)).count()).toBe(3)
+    expect(await db.propertyDefinitions.get('set-load-unit')).toMatchObject({
+      type: 'select',
+      options: [{ id: 'kg', label: 'kg' }, { id: 'lb', label: 'lb' }],
+    })
+  })
+
+  it('keeps a colliding ordinary tag but resolves reserved inline syntax to the system tag', async () => {
+    const ordinary = await createTag('workout')
+    expect(ordinary.id).toBe('workout')
+
+    await initializeDatabase(DATE)
+    await saveDay(DATE, '- [ ] #[workout] [[Push Day]]')
+
+    const block = (await db.blocks.where('day').equals(DATE).first())!
+    expect(await db.tagDefinitions.get(ordinary.id)).toBeDefined()
+    expect(await db.blockTags.get(`${block.id}:${WORKOUT_SYSTEM_TAGS.workout}`)).toMatchObject({ source: 'inline' })
+    expect(await db.blockTags.get(`${block.id}:${ordinary.id}`)).toBeUndefined()
+  })
+
+  it('protects system tags from deletion and renaming', async () => {
+    await initializeDatabase(DATE)
+
+    await expect(deleteTagDefinition(WORKOUT_SYSTEM_TAGS.set)).rejects.toThrow('cannot be deleted')
+    await expect(updateTagDefinition(WORKOUT_SYSTEM_TAGS.set, { name: 'working-set' })).rejects.toThrow('cannot be renamed')
+
+    expect(await db.tagDefinitions.get(WORKOUT_SYSTEM_TAGS.set)).toMatchObject({ name: 'set' })
+  })
+
+  it('allows only one structural workout tag on a block', async () => {
+    await initializeDatabase(DATE)
+    await saveDay(DATE, '- [ ] A semantic task')
+    const block = (await db.blocks.where('day').equals(DATE).first())!
+
+    await addBlockTag(block.id, WORKOUT_SYSTEM_TAGS.exercise)
+    await addBlockTag(block.id, WORKOUT_SYSTEM_TAGS.set)
+
+    const tags = await db.blockTags.where('blockId').equals(block.id).toArray()
+    expect(tags.map((tag) => tag.tagId)).toEqual([WORKOUT_SYSTEM_TAGS.set])
+  })
+
+  it('converts a plain block into a task when a structural tag is applied', async () => {
+    await initializeDatabase(DATE)
+    await saveDay(DATE, '- Bench Press')
+    const block = (await db.blocks.where('day').equals(DATE).first())!
+
+    await addBlockTag(block.id, WORKOUT_SYSTEM_TAGS.exercise)
+
+    expect((await db.days.get(DATE))?.markdown).toBe('- [ ] Bench Press')
+    expect(await db.tasks.get(block.id)).toBeDefined()
+    expect(await db.blockTags.get(`${block.id}:${WORKOUT_SYSTEM_TAGS.exercise}`)).toBeDefined()
+  })
+
+  it('lets the last inline structural role replace an explicitly applied role', async () => {
+    await initializeDatabase(DATE)
+    await saveDay(DATE, '- [ ] Semantic task')
+    const block = (await db.blocks.where('day').equals(DATE).first())!
+    await addBlockTag(block.id, WORKOUT_SYSTEM_TAGS.workout)
+
+    await saveDay(DATE, '- [ ] #[exercise] Semantic task')
+
+    const tags = await db.blockTags.where('blockId').equals(block.id).toArray()
+    expect(tags.map((tag) => tag.tagId)).toEqual([WORKOUT_SYSTEM_TAGS.exercise])
   })
 })
 

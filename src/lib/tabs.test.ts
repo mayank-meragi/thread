@@ -6,6 +6,7 @@ describe('working tab routes', () => {
     expect(isWorkingPath('/')).toBe(true)
     expect(isWorkingPath('/?date=2026-08-22')).toBe(true)
     expect(isWorkingPath('/thread/browser')).toBe(true)
+    expect(isWorkingPath('/workout/2026-09-01/block_abc')).toBe(true)
   })
 
   it('treats the primary destinations as working tabs too', () => {
@@ -21,6 +22,7 @@ describe('working tab routes', () => {
   it('uses one Today tab and one tab per thread or destination', () => {
     expect(tabIdForPath('/?date=2026-08-20')).toBe(TODAY_TAB_ID)
     expect(tabIdForPath('/thread/browser?block=one')).toBe('/thread/browser')
+    expect(tabIdForPath('/workout/2026-09-01/block_abc')).toBe('/workout/2026-09-01/block_abc')
     expect(tabIdForPath('/settings?focus=sync')).toBe('/settings')
   })
 })

@@ -5,6 +5,7 @@ import {
   type BlockKindDefinition,
   type InsertCommandDefinition,
 } from './blockKinds/definitions'
+import { WORKOUT_SYSTEM_TAGS, type WorkoutRole } from './workouts/systemTags'
 
 export type { BlockConversionKind, InsertCommandDefinition }
 
@@ -26,11 +27,31 @@ export interface TagSuggestion {
 // registry (commands that insert a new block). Both share the id/label/glyph/
 // description/aliases fields the menu renders and ranks on; `insert: true`
 // distinguishes the second group for accept().
-export type SlashCommand = BlockKindDefinition | InsertCommandDefinition
-export const slashCommands: SlashCommand[] = [...blockKindDefinitions, ...insertCommandDefinitions]
+export interface SemanticTaskCommand {
+  id: WorkoutRole
+  kind: 'semantic-task'
+  tagId: (typeof WORKOUT_SYSTEM_TAGS)[WorkoutRole]
+  label: string
+  description: string
+  glyph: string
+  aliases: string[]
+}
+
+export const semanticTaskCommands: SemanticTaskCommand[] = [
+  { id: 'workout', kind: 'semantic-task', tagId: WORKOUT_SYSTEM_TAGS.workout, label: 'Workout', description: 'Track a workout as a task tree', glyph: '◉', aliases: ['training', 'session'] },
+  { id: 'exercise', kind: 'semantic-task', tagId: WORKOUT_SYSTEM_TAGS.exercise, label: 'Exercise', description: 'Add an exercise task to a workout', glyph: '◇', aliases: ['movement'] },
+  { id: 'set', kind: 'semantic-task', tagId: WORKOUT_SYSTEM_TAGS.set, label: 'Set', description: 'Add a measurable set task', glyph: '●', aliases: ['reps'] },
+]
+
+export type SlashCommand = BlockKindDefinition | InsertCommandDefinition | SemanticTaskCommand
+export const slashCommands: SlashCommand[] = [...blockKindDefinitions, ...semanticTaskCommands, ...insertCommandDefinitions]
 
 export function isInsertCommand(command: SlashCommand): command is InsertCommandDefinition {
   return 'insert' in command && command.insert === true
+}
+
+export function isSemanticTaskCommand(command: SlashCommand): command is SemanticTaskCommand {
+  return 'kind' in command && command.kind === 'semantic-task'
 }
 
 export type SuggestionTrigger =

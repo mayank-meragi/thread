@@ -30,6 +30,13 @@ describe('command registry', () => {
       'thread.content.replace',
       'thread.create',
       'thread.rename',
+      'workout.addExercises',
+      'workout.buildDay',
+      'workout.finish',
+      'workout.logSet',
+      'workout.removeExercise',
+      'workout.start',
+      'workout.updateExercise',
     ])
     expect(commandRegistry.require('thread.content.replace')).toMatchObject({ risk: 'destructive', idempotency: 'natural' })
     expect(commandRegistry.require('journal.takeNote')).toMatchObject({ risk: 'write', idempotency: 'receipt-required' })

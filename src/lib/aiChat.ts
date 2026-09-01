@@ -3,7 +3,8 @@ import { z } from 'zod'
 import type { ChatModelAdapter, ChatModelRunResult, ThreadAssistantMessagePart, ThreadMessage, ThreadMessageLike } from '@assistant-ui/react'
 import { db, type PersonaRecord } from '../db'
 import { getAIConfig, resolveModel } from './ai'
-import { buildThreadSystemContext } from './aiContext'
+import { buildThreadSystemContext, TRAINING_PLAN_THREAD_ID } from './aiContext'
+import { WORKOUT_COACH_PERSONA_ID } from './personas'
 import { loadSource, parseQuery, runQuery } from './query'
 import { compileThreadScript, validateThreadScript } from './threadscript/compiler'
 import { getThreadScriptHelp } from './threadscript/help'
@@ -50,7 +51,13 @@ async function buildSystemPrompt(persona: PersonaRecord, headingText: string): P
     .map((mention) => `- (${mention.day}) ${mention.excerpt}`)
     .join('\n')
   const memory = notes ? `\n\nYour notes from previous sessions with this user:\n${notes}` : ''
-  return `${persona.systemPrompt}${memory}\n\n${threadContext}`
+  let coachHint = ''
+  if (persona.id === WORKOUT_COACH_PERSONA_ID) {
+    coachHint = (await db.threads.get(TRAINING_PLAN_THREAD_ID))
+      ? '\n\n[Coach phase: a Training Plan thread exists — you are in PHASE 2 (session programming).]'
+      : '\n\n[Coach phase: no Training Plan thread yet — you are in PHASE 1 (intake interview).]'
+  }
+  return `${persona.systemPrompt}${memory}${coachHint}\n\n${threadContext}`
 }
 
 function diagnosticOf(error: unknown): { code: string; message: string; line: number; column: number; length: number } {

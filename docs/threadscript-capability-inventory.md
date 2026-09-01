@@ -128,6 +128,27 @@ requires a new preview and approval.
 | Apply or remove a tag on a block | Content write | `tag.apply`, `tag.remove` | Later | `addBlockTag`, `removeBlockTag` |
 | Delete a tag definition and remove it from blocks | Destructive | `tag.delete` | Later | `deleteTagDefinition` |
 
+## Workouts and training plans
+
+Workouts are ordinary `#[workout]` / `#[exercise]` / `#[set]` tagged task subtrees; the `workout.*`
+commands are convenience orchestrations over `src/lib/workouts/mutations.ts` + `lifecycle.ts`, not a
+new storage shape. Because workout/exercise/set task IDs are non-deterministic, every command
+resolves its target by natural key (day + optional workout title; exercise by name; set by 1-based
+number) and previews against a synthetic `kind: 'workout'` target.
+
+| User outcome | Class | Proposed capability/resource | Coverage | Current implementation |
+|---|---|---|---|---|
+| Read the coaching training plan and recent sessions | Read | `context.trainingPlan`, `context.recentWorkouts` application context | Read model | `src/lib/aiContext.ts`, `getRecentWorkouts` |
+| Create a whole day's workout (root, exercises, measured sets) | Content write | `workout.buildDay` | Slice: workout-coach | `createWorkout` + `addExercise` + `addSet` + `updateSet` |
+| Add exercises to an existing day's workout | Content write | `workout.addExercises` | Slice: workout-coach | `addExercise` + `addSet` + `updateSet` |
+| Rebuild one exercise's set list (update / add / skip) | Destructive | `workout.updateExercise` | Slice: workout-coach | `updateSet` / `addSet` / `skipSet` |
+| Remove an exercise and its sets | Destructive | `workout.removeExercise` | Slice: workout-coach | `deleteWorkoutItem` |
+| Start a day's workout | Content write | `workout.start` | Slice: workout-coach | `startWorkout` |
+| Record and complete one performed set | Content write | `workout.logSet` | Slice: workout-coach | `updateSet` + `completeSet` |
+| Finish a day's workout | Content write | `workout.finish` | Slice: workout-coach | `finishWorkout` |
+| Create / update the "Training Plan" thread | Content write | reuses `thread.create`, `thread.content.append`, `thread.content.replace` | Slice 1 | thread commands |
+| Mutate an existing workout outside these commands | — | none (direct interaction) | Direct only | the workout lens (`/workout/:day/:blockId`) |
+
 ## TQL, search, and documentation
 
 | User outcome | Class | Proposed capability/resource | Coverage | Current implementation |

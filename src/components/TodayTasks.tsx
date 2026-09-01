@@ -3,13 +3,18 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
 import { db, type TaskRecord } from '../db'
 import { setTaskStatus } from '../lib/tasks'
+import { isWorkoutInternalRole, workoutRolesByBlockId } from '../lib/workouts/integration'
 
 interface TodayTasksProps {
   today: string
 }
 
 export function TodayTasks({ today }: TodayTasksProps) {
-  const allTasks = useLiveQuery(() => db.tasks.toArray(), [], [])
+  const rawTasks = useLiveQuery(() => db.tasks.toArray(), [], [])
+  const tagRows = useLiveQuery(() => db.blockTags.toArray(), [], [])
+  // Exercise/set tasks belong to the workout lens, not the general journal list.
+  const workoutRoles = workoutRolesByBlockId(tagRows)
+  const allTasks = rawTasks.filter((task) => !isWorkoutInternalRole(workoutRoles.get(task.id)))
   const tasks = allTasks.filter((task) => task.status !== 'done' && task.status !== 'canceled' && task.dueDate)
   const doneToday = sortTasks(allTasks.filter((task) => task.status === 'done' && task.completedAt?.slice(0, 10) === today))
 

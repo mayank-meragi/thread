@@ -15,6 +15,7 @@ export function isWorkingPath(path: string): boolean {
   const pathname = path.split('?')[0] || '/'
   return pathname === '/'
     || pathname.startsWith('/thread/')
+    || pathname.startsWith('/workout/')
     || pathname.startsWith('/docs/')
     || STATIC_TAB_PATHS.includes(pathname)
 }

@@ -35,10 +35,11 @@ import { createQueryBlockPlugin, QUERY_BLOCK_LANGUAGE } from '../lib/queryBlockP
 import { queryLanguageDescription } from '../lib/queryBlockLanguage'
 import type { BlockConversionKind } from '../lib/suggestions'
 import { editorLinksToWiki, wikiLinkInputRule, wikiLinkInteractionPlugin, wikiLinksToEditor } from '../lib/wikilinks'
-import { editorLinksToTags, tagLinkInputRule, tagLinksToEditor } from '../lib/taglinks'
+import { editorLinksToTags, TAG_HREF_PREFIX, TAG_TITLE, tagLinkInputRule, tagLinksToEditor } from '../lib/taglinks'
 import { replaceAll } from '@milkdown/utils'
 import { MobileEditorToolbar, type ToolbarAction, type ToolbarBlockKind } from './MobileEditorToolbar'
 import { openBlockInspector } from '../lib/inspectorTarget'
+import { workoutRoleFromTagIds, type WorkoutRole } from '../lib/workouts/systemTags'
 
 interface MarkdownEditorProps {
   day: string
@@ -144,6 +145,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       },
       onMutation: markUserMutation,
       setBlockKind: setCurrentBlockKind,
+      setSemanticTask: setCurrentSemanticTask,
       insertBlockCommand: (view, _id, replaceRange) => {
         // Drop the "/tql" trigger text, then reuse commonmark's own block-type
         // command to turn the (now empty) block into a fenced code block tagged
@@ -532,6 +534,40 @@ function setCurrentBlockKind(
   view.dispatch(transaction)
 }
 
+function setCurrentSemanticTask(
+  view: EditorView,
+  role: WorkoutRole,
+  replaceRange: { from: number; to: number },
+): void {
+  let transaction = view.state.tr.delete(replaceRange.from, replaceRange.to)
+  transaction = transaction.setSelection(TextSelection.near(transaction.doc.resolve(replaceRange.from)))
+  const { $from } = transaction.selection
+  let itemDepth = $from.depth
+  while (itemDepth > 0 && $from.node(itemDepth).type.name !== 'list_item') itemDepth -= 1
+  if (itemDepth === 0) return
+
+  let paragraphDepth = $from.depth
+  while (paragraphDepth > itemDepth && $from.node(paragraphDepth).type.name !== 'paragraph') paragraphDepth -= 1
+  if (paragraphDepth <= itemDepth) return
+
+  const item = $from.node(itemDepth)
+  const itemPosition = $from.before(itemDepth)
+  const paragraph = $from.node(paragraphDepth)
+  const paragraphStart = $from.start(paragraphDepth)
+  const existingKind = detectPrefixKind(paragraph.textContent)
+  const existingPrefix = existingKind?.prefixPattern.exec(paragraph.textContent)?.[0]
+  if (existingPrefix) transaction = transaction.delete(paragraphStart, paragraphStart + existingPrefix.length)
+  if (item.attrs.checked == null) {
+    transaction = transaction.setNodeMarkup(itemPosition, undefined, { ...item.attrs, checked: false })
+  }
+
+  const tagMark = view.state.schema.marks.link.create({ href: `${TAG_HREF_PREFIX}system-${role}`, title: TAG_TITLE })
+  transaction = transaction.replaceWith(paragraphStart, paragraphStart, view.state.schema.text(role, [tagMark]))
+  transaction = transaction.insertText(' ', paragraphStart + role.length)
+  transaction = transaction.setSelection(TextSelection.create(transaction.doc, paragraphStart + role.length + 1))
+  view.dispatch(transaction)
+}
+
 // Finds the minimal replaced span between two strings by trimming the common
 // prefix/suffix -- lets a strip land as one small delete(+insert) touching
 // only the changed text, instead of replacing the whole paragraph and
@@ -635,11 +671,54 @@ async function installBlockMetadataControls(view: EditorView, day: string, onOpe
     if (dom instanceof HTMLElement) domNodes.push(dom)
     return true
   })
-  const blocks = await db.blocks.where('day').equals(day).sortBy('order')
+  const [blocks, blockTags] = await Promise.all([
+    db.blocks.where('day').equals(day).sortBy('order'),
+    db.blockTags.where('day').equals(day).toArray(),
+  ])
   if (domNodes.length !== blocks.length) return
+  const tagIdsByBlock = new Map<string, string[]>()
+  blockTags.forEach((tag) => tagIdsByBlock.set(tag.blockId, [...(tagIdsByBlock.get(tag.blockId) ?? []), tag.tagId]))
   domNodes.forEach((dom, index) => {
     const blockId = blocks[index].id
     dom.dataset.blockId = blockId
+    dom.classList.remove('workout-role-workout', 'workout-role-exercise', 'workout-role-set')
+    const role = workoutRoleFromTagIds(tagIdsByBlock.get(blockId) ?? [])
+    if (role) dom.classList.add(`workout-role-${role}`)
+    let roleChip = dom.querySelector<HTMLElement>(':scope > .children > .workout-role-chip')
+    if (role && !roleChip) {
+      roleChip = document.createElement('span')
+      roleChip.className = 'workout-role-chip'
+      roleChip.contentEditable = 'false'
+      const children = dom.querySelector<HTMLElement>(':scope > .children') ?? dom
+      children.append(roleChip)
+    }
+    if (roleChip) {
+      roleChip.textContent = role ?? ''
+      roleChip.hidden = !role
+    }
+    let openLink = dom.querySelector<HTMLAnchorElement>(':scope > .children > .workout-open-link')
+    if (role === 'workout' && !openLink) {
+      openLink = document.createElement('a')
+      openLink.className = 'workout-open-link'
+      openLink.contentEditable = 'false'
+      openLink.textContent = 'Open workout'
+      const children = dom.querySelector<HTMLElement>(':scope > .children') ?? dom
+      children.append(openLink)
+    }
+    if (openLink) {
+      openLink.hidden = role !== 'workout'
+      const target = `#/workout/${day}/${blockId}`
+      openLink.href = target
+      // ProseMirror swallows plain clicks inside the editable surface, so drive
+      // navigation explicitly (cmd/ctrl-click still opens a background tab via
+      // the global handler in tabsApi).
+      openLink.onclick = (event) => {
+        if (event.metaKey || event.ctrlKey) return
+        event.preventDefault()
+        event.stopPropagation()
+        window.location.hash = target.slice(1)
+      }
+    }
     let button = dom.querySelector<HTMLButtonElement>(':scope > .block-property-trigger')
     if (!button) {
       button = document.createElement('button')

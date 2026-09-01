@@ -461,6 +461,17 @@ The first implementation slice registers:
 | `property.set` | Set a validated property value on a resolved thread. |
 | `property.remove` | Remove a property assignment/value from a resolved thread. |
 | `journal.takeNote` | Append a persona journal note only after approval. |
+| `workout.buildDay` | Create a whole day's workout — a `#[workout]` root with `#[exercise]` children and measured `#[set]` grandchildren — in one preview. |
+| `workout.addExercises` | Add exercises (with sets) to the workout that already exists on a day. |
+| `workout.updateExercise` | Rebuild one exercise's set list: update matching sets, add missing ones, skip extras. |
+| `workout.removeExercise` | Delete an exercise and its sets from a day's workout. |
+| `workout.start` | Mark a day's workout in progress and stamp its start time. |
+| `workout.logSet` | Record what was performed on one set (exercise + 1-based number) and mark it done. |
+| `workout.finish` | Complete a day's workout, optionally skipping unresolved sets. |
+
+The `workout.*` commands are convenience orchestrations over the canonical task/tag/property model
+(`src/lib/workouts/`), not a new storage shape; they address their target by natural key rather than
+a threaded `$result` id.
 
 Command schemas are authoritative. The language specification does not duplicate every command's
 arguments because registry-generated help must stay synchronized with implementation.

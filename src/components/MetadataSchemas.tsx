@@ -13,6 +13,7 @@ import {
   type TagDefinitionRecord,
 } from '../db'
 import { DEFAULT_TAG_COLOR } from '../lib/tagColors'
+import { isWorkoutSystemTag } from '../lib/workouts/systemTags'
 
 const FIELD_TYPES: Array<{ value: PropertyType; label: string }> = [
   { value: 'text', label: 'Text' },
@@ -80,6 +81,7 @@ export function MetadataSchemas() {
 }
 
 function SchemaEditor({ tag, definitions, onError }: { tag: TagDefinitionRecord; definitions: PropertyDefinitionRecord[]; onError: (message: string) => void }) {
+  const isSystem = isWorkoutSystemTag(tag.id)
   const visibleDefinitions = definitions.filter((definition) => !definition.hidden)
   const [name, setName] = useState(tag.name)
   const [color, setColor] = useState(tag.color ?? DEFAULT_TAG_COLOR)
@@ -109,13 +111,13 @@ function SchemaEditor({ tag, definitions, onError }: { tag: TagDefinitionRecord;
     <details className="schema-editor">
       <summary>
         <span className="schema-color" style={{ background: tag.color ?? DEFAULT_TAG_COLOR }} />
-        <span><b>#{tag.name}</b><small>{tag.propertyIds.length ? `${tag.propertyIds.length} field${tag.propertyIds.length === 1 ? '' : 's'}` : 'Plain tag'}</small></span>
+        <span><b>#{tag.name}</b><small>{isSystem ? 'Built-in workout schema' : tag.propertyIds.length ? `${tag.propertyIds.length} field${tag.propertyIds.length === 1 ? '' : 's'}` : 'Plain tag'}</small></span>
         <ChevronDown size={15} />
       </summary>
       <div className="schema-editor-body">
         <div className="schema-name-row">
           <input type="color" value={color} onChange={(event) => setColor(event.target.value)} aria-label={`${tag.name} color`} />
-          <label><span>Schema name</span><input value={name} onChange={(event) => setName(event.target.value)} /></label>
+          <label><span>Schema name</span><input value={name} disabled={isSystem} onChange={(event) => setName(event.target.value)} /></label>
         </div>
         <div className="schema-column-head"><span>Field</span><span>Required</span><span>Default</span></div>
         <div className="schema-fields">
@@ -141,10 +143,10 @@ function SchemaEditor({ tag, definitions, onError }: { tag: TagDefinitionRecord;
         </div>
         <div className="schema-editor-actions">
           <button type="button" className="primary-button" onClick={() => void save()}><Save size={14} /> {saved ? 'Saved' : 'Save schema'}</button>
-          <button type="button" className="text-button schema-delete" onClick={() => {
+          {!isSystem && <button type="button" className="text-button schema-delete" onClick={() => {
             if (!window.confirm(`Delete #${tag.name}? The tag will be removed from every block. Explicit property values will stay.`)) return
             void deleteTagDefinition(tag.id).catch((caught) => onError(caught instanceof Error ? caught.message : String(caught)))
-          }}><Trash2 size={14} /> Delete</button>
+          }}><Trash2 size={14} /> Delete</button>}
         </div>
       </div>
     </details>

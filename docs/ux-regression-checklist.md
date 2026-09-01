@@ -55,6 +55,24 @@ performance results where noted.
 - [ ] Success is acknowledged immediately; persistence/sync failures are clearly announced.
 - [ ] Destructive actions identify scope, require confirmation, and preserve unrelated blocks.
 
+### Workouts
+
+- [ ] `/workout`, `/exercise`, `/set` slash commands create correctly tagged task blocks.
+- [ ] Today shows today's workout roots with Open/Resume and a New workout action; the editor stays
+      the canonical authoring surface.
+- [ ] The workout lens (`/workout/:day/:blockId`) reflects outline and property edits live, and its
+      counts/status agree with the source outline.
+- [ ] Start, log a set, complete, finish (with the unresolved-set prompt), reload, and revisit a
+      workout — including once on a 320 CSS px viewport with no hardware keyboard.
+- [ ] Set measurement validation is visible and announced; invalid values are rejected without
+      rewriting the set title.
+- [ ] Tasks hides exercise/set internals by default and reveals them only via
+      **Include workout internals**; task vitals and view counts are not inflated by internals.
+- [ ] Workout rows in Tasks show progress and an Open/Resume affordance to the lens.
+- [ ] An exercise thread lists its Workout occurrences grouped by day with set counts and completion.
+- [ ] Workout properties survive reload, export, GitHub pull, and conflict resolution.
+- [ ] The AI coach receives the active/open workout as read-only context and cannot mutate it.
+
 ### Revisit context
 
 - [ ] Recent thread navigation works on desktop and mobile.

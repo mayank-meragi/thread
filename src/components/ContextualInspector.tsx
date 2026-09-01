@@ -24,6 +24,8 @@ import { formatDay } from '../lib/dates'
 import { closeInspector, getInspectorTarget, INSPECTOR_TARGET_EVENT, type InspectorTarget } from '../lib/inspectorTarget'
 import { NewPropertyForm, PropertyField } from './inspector/PropertyField'
 import { TaskDraft } from './inspector/TaskDraft'
+import { WorkoutInspectorSections } from './inspector/WorkoutInspectorSections'
+import { workoutRoleFromTagIds } from '../lib/workouts/systemTags'
 import { TaskStatusControl } from './TaskStatusControl'
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
@@ -31,6 +33,15 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 // These built-in system properties only make sense on a task -- a plain
 // thought/question/decision/idea block has no due date or status to track.
 const TASK_ONLY_PROPERTY_IDS = new Set(['status', 'start-date', 'due-date', 'priority', 'estimate-minutes'])
+
+// Workout/set measurements are edited through the role-specific inspector
+// section (WorkoutInspectorSections), which validates across fields -- so they
+// are kept out of the raw alphabetical property list on a tagged workout block.
+const WORKOUT_PROPERTY_IDS = new Set([
+  'workout-started-at', 'workout-finished-at',
+  'set-load', 'set-load-unit', 'set-reps', 'set-rpe',
+  'set-duration-seconds', 'set-distance', 'set-distance-unit',
+])
 
 export function ContextualInspector() {
   const [target, setTarget] = useState<InspectorTarget>(() => getInspectorTarget())
@@ -127,8 +138,11 @@ export function ContextualInspector() {
     return result
   }, [tags, appliedTags])
   const isTaskTarget = block?.kind === 'task'
+  const workoutRole = useMemo(() => workoutRoleFromTagIds(appliedTags.map((item) => item.tagId)), [appliedTags])
   const orderedDefinitions = useMemo(() => definitions.filter((definition) => {
     if (definition.hidden) return false
+    // Workout roles get a curated, cross-validated section instead.
+    if (workoutRole && WORKOUT_PROPERTY_IDS.has(definition.id)) return false
     // Task-only system fields (status, dates, priority, estimate) only make
     // sense to offer on a task -- but a plain block that already carries one
     // (e.g. from before a kind change) keeps showing it, so existing data
@@ -138,7 +152,7 @@ export function ContextualInspector() {
   }).sort((a, b) => {
     const schemaDifference = Number(schemaByProperty.has(b.id)) - Number(schemaByProperty.has(a.id))
     return schemaDifference || a.name.localeCompare(b.name)
-  }), [definitions, schemaByProperty, isTaskTarget, values])
+  }), [definitions, schemaByProperty, isTaskTarget, values, workoutRole])
 
   if (!target) return null
 
@@ -218,6 +232,16 @@ export function ContextualInspector() {
                 <ListPlus size={15} /><input value={subtaskText} onChange={(event) => setSubtaskText(event.target.value)} placeholder="Add a subtask" /><button type="submit">Add</button>
               </form>
             </section>
+
+            {workoutRole && (
+              <WorkoutInspectorSections
+                task={task}
+                values={values}
+                role={workoutRole}
+                run={run}
+                onNavigate={closeInspector}
+              />
+            )}
           </>}
 
           <section className="inspector-section">

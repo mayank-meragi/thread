@@ -4,7 +4,7 @@ export type CommandRisk = 'write' | 'destructive' | 'external'
 export type CommandIdempotency = 'natural' | 'receipt-required'
 
 export interface CommandTarget {
-  kind: 'thread' | 'template' | 'property' | 'persona'
+  kind: 'thread' | 'template' | 'property' | 'persona' | 'workout'
   id: string
   label: string
   version?: string | number

@@ -1,5 +1,6 @@
 import type { BlockKind, OutlineBlock } from './outline'
 import { emptyDayMetadata, type DayMetadata, type PropertyValue } from './dayDocument'
+import { WORKOUT_SYSTEM_TAGS } from './workouts/systemTags'
 
 export type PropertyType = 'text' | 'rich_text' | 'number' | 'boolean' | 'date' | 'datetime' | 'status' | 'select' | 'multi_select' | 'relation' | 'url'
 export type PropertySource = 'explicit' | 'default' | 'derived' | 'automation'
@@ -84,6 +85,54 @@ export const BUILT_IN_PROPERTIES: Array<Omit<PropertyDefinitionRecord, 'createdA
     ],
   },
   { id: 'estimate-minutes', name: 'Estimate', type: 'number', system: true },
+  { id: 'workout-started-at', name: 'Workout started at', type: 'datetime', system: true },
+  { id: 'workout-finished-at', name: 'Workout finished at', type: 'datetime', system: true },
+  { id: 'set-load', name: 'Load', type: 'number', system: true },
+  {
+    id: 'set-load-unit', name: 'Load unit', type: 'select', system: true,
+    options: [
+      { id: 'kg', label: 'kg' },
+      { id: 'lb', label: 'lb' },
+    ],
+  },
+  { id: 'set-reps', name: 'Reps', type: 'number', system: true },
+  { id: 'set-rpe', name: 'RPE', type: 'number', system: true },
+  { id: 'set-duration-seconds', name: 'Duration', type: 'number', system: true },
+  { id: 'set-distance', name: 'Distance', type: 'number', system: true },
+  {
+    id: 'set-distance-unit', name: 'Distance unit', type: 'select', system: true,
+    options: [
+      { id: 'm', label: 'm' },
+      { id: 'km', label: 'km' },
+      { id: 'mi', label: 'mi' },
+    ],
+  },
+]
+
+export const BUILT_IN_TAGS: Array<Omit<TagDefinitionRecord, 'createdAt' | 'updatedAt'>> = [
+  {
+    id: WORKOUT_SYSTEM_TAGS.workout,
+    name: 'workout',
+    propertyIds: ['workout-started-at', 'workout-finished-at'],
+  },
+  {
+    id: WORKOUT_SYSTEM_TAGS.exercise,
+    name: 'exercise',
+    propertyIds: [],
+  },
+  {
+    id: WORKOUT_SYSTEM_TAGS.set,
+    name: 'set',
+    propertyIds: [
+      'set-load',
+      'set-load-unit',
+      'set-reps',
+      'set-rpe',
+      'set-duration-seconds',
+      'set-distance',
+      'set-distance-unit',
+    ],
+  },
 ]
 
 export function blockPath(block: Pick<OutlineBlock, 'id'>, fallback: string): string {

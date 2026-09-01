@@ -48,6 +48,25 @@ export function projectCommandOutput(prepared: PreparedCommand): unknown | undef
       const persona = resolved.persona as { id: string } | undefined
       return { persona: persona?.id, changed: true }
     }
+    // Workout/exercise/set task ids are non-deterministic, so `workout` stays
+    // undefined (a downstream `$alias.workout` ref then defers safely); the
+    // scalar counts are projectable from the resolved plan.
+    case 'workout.buildDay':
+      return {
+        workout: undefined,
+        day: resolved.day as string | undefined,
+        exerciseCount: (resolved.exercises as unknown[] | undefined)?.length ?? 0,
+        setCount: (resolved.setCount as number | undefined) ?? 0,
+      }
+    case 'workout.addExercises':
+      return { workout: undefined, added: (resolved.exercises as unknown[] | undefined)?.length ?? 0, updated: 0, removed: 0 }
+    case 'workout.updateExercise':
+    case 'workout.removeExercise':
+      return { workout: undefined, exercise: resolved.name as string | undefined }
+    case 'workout.start':
+    case 'workout.logSet':
+    case 'workout.finish':
+      return { workout: undefined, status: undefined }
     default:
       return undefined
   }
