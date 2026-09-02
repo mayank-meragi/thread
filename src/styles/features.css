@@ -1235,6 +1235,45 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .inspector-layer { align-items: flex-end; background: var(--scrim-strong); }
   .inspector-panel { width: 100%; height: min(90vh, 820px); padding: 21px 20px calc(28px + env(safe-area-inset-bottom)); border: 1px solid var(--line); border-bottom: 0; border-radius: 20px 20px 0 0; box-shadow: 0 -20px 60px rgba(20, 26, 35, .18); }
   .inspector-panel::before { top: 0; right: 0; bottom: auto; width: auto; height: 3px; background: linear-gradient(90deg, transparent, var(--thread), var(--idea), transparent); }
+
+  /* Right-edge swipe drawer (MobileRailDrawer): the only mobile entry point to
+     the context rail + chat panel. */
+  body.mobile-rail-drawer-lock { overflow: hidden; }
+  .mobile-rail-edge {
+    position: fixed; z-index: 18; top: 0; right: 0; width: 20px;
+    bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+  .mobile-rail-scrim {
+    position: fixed; inset: 0; z-index: 70; background: var(--scrim-strong);
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  }
+  .mobile-rail-panel {
+    position: fixed; z-index: 70; top: 0; right: 0; bottom: 0;
+    display: flex; flex-direction: column; min-height: 0;
+    background: var(--sidebar); border-left: 1px solid var(--line);
+    box-shadow: -20px 0 60px rgba(20, 26, 35, .22);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .mobile-rail-head {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+    padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--line);
+  }
+  .mobile-rail-tabs { flex: 1; display: flex; gap: 4px; }
+  .mobile-rail-tabs button {
+    display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px;
+    border: 0; border-radius: 9px; background: transparent; color: var(--muted);
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .mobile-rail-tabs button.is-active { background: var(--paper); color: var(--ink); box-shadow: var(--shadow-soft); }
+  .mobile-rail-close {
+    flex: 0 0 auto; width: 34px; height: 34px; display: grid; place-items: center;
+    border: 0; border-radius: 9px; background: transparent; color: var(--muted); cursor: pointer;
+  }
+  .mobile-rail-close:hover { background: var(--control-hover); color: var(--ink); }
+  .mobile-rail-body { flex: 1; min-height: 0; display: flex; }
+  .mobile-rail-body > * { flex: 1; min-width: 0; min-height: 0; }
+  .mobile-rail-body .context-rail { background: var(--sidebar); }
   .inspector-property > label { grid-template-columns: 88px minmax(0, 1fr); }
   .thread-editor .ProseMirror .task-metadata-row { flex-wrap: wrap; gap: 8px 15px; margin-left: 0; }
   /* Tasks-view + today-task layout rules moved to `@container panel (max-width: 760px)` above. */

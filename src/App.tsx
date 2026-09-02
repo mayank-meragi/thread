@@ -8,6 +8,7 @@ import { isUserActivityBarHidden, toggleActivityBarHidden } from './lib/activity
 import { DockviewTabs } from './components/tabs/DockviewTabs'
 import { Omnibox } from './components/Omnibox'
 import { ContextualInspector } from './components/ContextualInspector'
+import { MobileRailDrawer } from './components/shell/MobileRailDrawer'
 import { ActivityBar } from './components/shell/ActivityBar'
 import { TitleBar } from './components/shell/TitleBar'
 import { useGitHubSync } from './hooks/useGitHubSync'
@@ -99,6 +100,7 @@ function AppShell() {
 
       <Omnibox open={omnibox.open} initialMode={omnibox.mode} onClose={closeOmnibox} onTogglePanel={toggleRail} />
       <ContextualInspector />
+      <MobileRailDrawer />
     </div>
   )
 }
