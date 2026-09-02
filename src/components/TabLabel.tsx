@@ -6,6 +6,7 @@ export function TabLabel({ path }: { path: string }) {
   if (pathname === '/') return <>Today</>
   if (pathname === '/search') return <>Search</>
   if (pathname === '/tasks') return <>Tasks</>
+  if (pathname === '/workouts') return <>Workouts</>
   if (pathname === '/settings') return <>Settings</>
   if (pathname === '/templates') return <>Templates</>
   if (pathname === '/docs' || pathname.startsWith('/docs/')) return <>Docs</>

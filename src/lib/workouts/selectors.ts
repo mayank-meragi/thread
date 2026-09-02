@@ -200,6 +200,15 @@ export async function getExerciseOccurrences(threadId: string): Promise<Exercise
   return results.sort((a, b) => b.day.localeCompare(a.day))
 }
 
+export async function getAllWorkouts(): Promise<WorkoutView[]> {
+  const days = await db.days.orderBy('date').reverse().toArray()
+  const workouts: WorkoutView[] = []
+  for (const day of days) {
+    workouts.push(...await getWorkoutsForDay(day.date))
+  }
+  return workouts
+}
+
 export async function getRecentWorkouts(limit: number): Promise<WorkoutView[]> {
   if (limit <= 0) return []
   const days = await db.days.orderBy('date').reverse().toArray()

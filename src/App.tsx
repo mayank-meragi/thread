@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BookOpenText, ListTodo, Plus, Search, Settings } from 'lucide-react'
+import { BookOpenText, Dumbbell, ListTodo, Plus, Search, Settings } from 'lucide-react'
 import { HashRouter, NavLink, useNavigate } from 'react-router-dom'
 import { initializeDatabase } from './db'
 import { isoToday } from './lib/dates'
@@ -84,6 +84,7 @@ function AppShell() {
       <nav className="mobile-nav" aria-label="Mobile primary destinations">
         <NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}><BookOpenText size={19} /><span>Today</span></NavLink>
         <NavLink to="/tasks" className={({ isActive }) => isActive ? 'active' : ''}><ListTodo size={19} /><span>Tasks</span></NavLink>
+        <NavLink to="/workouts" className={({ isActive }) => isActive ? 'active' : ''}><Dumbbell size={19} /><span>Workouts</span></NavLink>
         <button
           type="button"
           className="mobile-create"
