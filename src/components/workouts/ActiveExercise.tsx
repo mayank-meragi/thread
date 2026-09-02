@@ -139,6 +139,8 @@ export function ActiveExercise({
             </div>
           </div>
 
+          <hr className="workout-rule" />
+
           {selectedSet && (
             <SetPanel
               key={selectedSet.task.id}
@@ -151,13 +153,16 @@ export function ActiveExercise({
         </>
       )}
 
+      <hr className="workout-rule" />
+
       <button
         type="button"
-        className="text-button add-set-button"
+        className="add-set-button"
         disabled={busy}
         onClick={addAndSelect}
       >
-        <Plus size={14} aria-hidden="true" /> Add set
+        <span className="add-set-icon" aria-hidden="true"><Plus size={14} /></span>
+        Add set
       </button>
 
       {exercise.notes.map((note) => (

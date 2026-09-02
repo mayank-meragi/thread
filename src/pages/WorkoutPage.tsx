@@ -8,8 +8,8 @@ import { nextActionableSetId } from '../lib/workouts/presentation'
 import type { WorkoutExerciseView, WorkoutView } from '../lib/workouts/types'
 import { WorkoutHeader } from '../components/workouts/WorkoutHeader'
 import { WorkoutDiagnostics } from '../components/workouts/WorkoutDiagnostics'
-import { ExerciseTabs } from '../components/workouts/ExerciseTabs'
 import { ActiveExercise } from '../components/workouts/ActiveExercise'
+import { CollapsedExercise } from '../components/workouts/CollapsedExercise'
 import { CompleteSetBar } from '../components/workouts/CompleteSetBar'
 
 function firstPendingSetId(exercise: WorkoutExerciseView | null): string {
@@ -111,24 +111,27 @@ export function WorkoutPage() {
       <WorkoutHeader view={view} />
 
       {view.exercises.length > 0 ? (
-        <>
-          <ExerciseTabs
-            exercises={view.exercises}
-            selectedId={effectiveExerciseId}
-            onSelect={selectExercise}
-          />
-          {effectiveExercise && (
-            <ActiveExercise
-              key={effectiveExercise.task.id}
-              exercise={effectiveExercise}
-              selectedSetId={effectiveSetId}
-              onSelectSet={setPickedSetId}
-              detailsOpen={detailsOpen}
-              onToggleDetails={() => setDetailsOpen((open) => !open)}
-              onRegisterFlush={registerFlush}
-            />
+        <div className="exercise-stack">
+          {view.exercises.map((exercise) =>
+            exercise.task.id === effectiveExerciseId ? (
+              <ActiveExercise
+                key={exercise.task.id}
+                exercise={exercise}
+                selectedSetId={effectiveSetId}
+                onSelectSet={setPickedSetId}
+                detailsOpen={detailsOpen}
+                onToggleDetails={() => setDetailsOpen((open) => !open)}
+                onRegisterFlush={registerFlush}
+              />
+            ) : (
+              <CollapsedExercise
+                key={exercise.task.id}
+                exercise={exercise}
+                onExpand={selectExercise}
+              />
+            ),
           )}
-        </>
+        </div>
       ) : (
         <p className="section-empty">No exercises yet — add the first one below.</p>
       )}

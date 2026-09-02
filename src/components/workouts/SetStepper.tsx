@@ -19,6 +19,7 @@ export function SetStepper({
   max,
   integer = false,
   inputMode = 'decimal',
+  unit,
   onChange,
 }: {
   label: string
@@ -28,6 +29,7 @@ export function SetStepper({
   max?: number
   integer?: boolean
   inputMode?: 'decimal' | 'numeric'
+  unit?: string
   onChange: (next: number | null) => void
 }) {
   // Local text buffer so a half-typed "1." or a transiently empty field is not
@@ -89,6 +91,7 @@ export function SetStepper({
             if (event.key === 'Enter') event.currentTarget.blur()
           }}
         />
+        {unit && text !== '' && <small className="set-stepper-unit">{unit}</small>}
         <button
           type="button"
           className="set-stepper-btn"

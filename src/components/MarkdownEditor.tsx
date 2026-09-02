@@ -793,6 +793,13 @@ async function installCollapseControls(root: HTMLElement, day: string): Promise<
       button.setAttribute('aria-expanded', String(!item.classList.contains('thread-collapsed')))
 
       if (!existing && label) label.append(button)
+      // The button lives inside Crepe's `.label-wrapper`, which toggles the
+      // task's checked state on `pointerdown`. Stop the event here so clicking
+      // the collapse caret never checks/unchecks the task.
+      button.onpointerdown = (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+      }
       button.onclick = (event) => {
         event.preventDefault()
         event.stopPropagation()

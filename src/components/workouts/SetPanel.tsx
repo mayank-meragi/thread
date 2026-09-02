@@ -3,21 +3,10 @@ import { ChevronDown } from 'lucide-react'
 import { useWorkoutSetDraft } from '../../hooks/useWorkoutSetDraft'
 import type { WorkoutSetView } from '../../lib/workouts/types'
 import { SetStepper } from './SetStepper'
+import { NumberField } from './NumberField'
 
 const LOAD_UNITS = ['kg', 'lb'] as const
 const DISTANCE_UNITS = ['m', 'km', 'mi'] as const
-
-function Readout({ value, unit, caption }: { value: number | null; unit?: string; caption: string }) {
-  return (
-    <div className="set-readout-cell">
-      <div className="set-readout-value">
-        <span>{value ?? '—'}</span>
-        {unit && value !== null && <small>{unit}</small>}
-      </div>
-      <span className="set-readout-caption">{caption}</span>
-    </div>
-  )
-}
 
 export function SetPanel({
   set,
@@ -40,20 +29,13 @@ export function SetPanel({
 
   return (
     <div className="set-panel">
-      <div className="set-readout">
-        <Readout value={draft.load} unit={draft.loadUnit ?? 'kg'} caption="load" />
-        <span className="set-readout-sep" aria-hidden="true">×</span>
-        <Readout value={draft.reps} caption="reps" />
-        <span className="set-readout-sep" aria-hidden="true">·</span>
-        <Readout value={draft.rpe} caption="RPE" />
-      </div>
-
       <div className="set-steppers">
         <SetStepper
           label={`Load (${draft.loadUnit ?? 'kg'})`}
           value={draft.load}
           step={2.5}
           inputMode="decimal"
+          unit={draft.loadUnit ?? 'kg'}
           onChange={(next) => setField('load', next)}
         />
         <SetStepper
@@ -77,35 +59,38 @@ export function SetPanel({
 
       {error && <p className="workout-inline-error" role="alert">{error}</p>}
 
+      <hr className="workout-rule" />
+
       <button
         type="button"
         className="set-details-toggle"
         aria-expanded={detailsOpen}
         onClick={onToggleDetails}
       >
-        <ChevronDown size={15} aria-hidden="true" /> More details
+        <ChevronDown size={16} aria-hidden="true" /> More details
       </button>
 
       {detailsOpen && (
         <div className="set-details-grid">
-          <SetStepper
+          <NumberField
             label="Duration (s)"
             value={draft.durationSeconds}
-            step={5}
+            placeholder="e.g. 90"
+            integer
             inputMode="numeric"
             onChange={(next) => setField('durationSeconds', next)}
           />
-          <SetStepper
+          <NumberField
             label="Distance"
             value={draft.distance}
-            step={1}
+            placeholder="e.g. 10"
             inputMode="decimal"
             onChange={(next) => setField('distance', next)}
           />
-          <label className="field set-details-field">
-            <span className="field-label">Load unit</span>
+          <label className="number-field">
+            <span className="number-field-label">Load unit</span>
             <select
-              className="field-control"
+              className="number-field-input"
               value={draft.loadUnit ?? ''}
               onChange={(event) => setField('loadUnit', event.target.value || null)}
             >
@@ -113,10 +98,10 @@ export function SetPanel({
               {LOAD_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
             </select>
           </label>
-          <label className="field set-details-field">
-            <span className="field-label">Distance unit</span>
+          <label className="number-field">
+            <span className="number-field-label">Distance unit</span>
             <select
-              className="field-control"
+              className="number-field-input"
               value={draft.distanceUnit ?? ''}
               onChange={(event) => setField('distanceUnit', event.target.value || null)}
             >
