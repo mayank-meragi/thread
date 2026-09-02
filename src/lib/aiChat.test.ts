@@ -71,7 +71,7 @@ describe('loadSessionHistory', () => {
 
     expect(history[0].content).toBe('plan me a workout')
     expect(Array.isArray(history[1].content)).toBe(true)
-    const parts = history[1].content as Array<Record<string, unknown>>
+    const parts = history[1].content as unknown as Array<Record<string, unknown>>
     expect(parts[0]).toMatchObject({ type: 'text', text: 'Here is today’s session.' })
     expect(parts[1]).toMatchObject({
       type: 'tool-call',
