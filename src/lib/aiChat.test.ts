@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '../db'
-import { buildThreadScriptTools, createSessionAdapter, loadSessionHistory } from './aiChat'
+import { buildThreadScriptTools, createSessionAdapter, loadSessionHistory, stopAfterProposal } from './aiChat'
 import aiChatSource from './aiChat.ts?raw'
 
 const streamTextMock = vi.fn()
@@ -96,6 +96,37 @@ describe('AI ThreadScript tool surface', () => {
 
   it('does not import the trusted dispatcher', () => {
     expect(aiChatSource).not.toMatch(/threadscript\/dispatch/)
+  })
+})
+
+describe('stopAfterProposal', () => {
+  const step = (results: Array<{ toolName: string; output: unknown }>) => ({ toolResults: results }) as never
+
+  it('keeps the loop going after a failed draft so the model can retry', () => {
+    const steps = [step([{ toolName: 'proposeThreadScript', output: { created: false, diagnostics: [{ message: 'nope' }] } }])]
+    expect(stopAfterProposal({ steps })).toBe(false)
+  })
+
+  it('stops once a proposal is actually drafted', () => {
+    const steps = [
+      step([{ toolName: 'proposeThreadScript', output: { created: false } }]),
+      step([{ toolName: 'proposeThreadScript', output: { created: true, proposalId: 'p1' } }]),
+    ]
+    expect(stopAfterProposal({ steps })).toBe(true)
+  })
+
+  it('gives up after three failed drafts', () => {
+    const steps = [
+      step([{ toolName: 'proposeThreadScript', output: { created: false } }]),
+      step([{ toolName: 'proposeThreadScript', output: { created: false } }]),
+      step([{ toolName: 'proposeThreadScript', output: { created: false } }]),
+    ]
+    expect(stopAfterProposal({ steps })).toBe(true)
+  })
+
+  it('ignores other tool results', () => {
+    const steps = [step([{ toolName: 'inspectTql', output: { rows: [] } }])]
+    expect(stopAfterProposal({ steps })).toBe(false)
   })
 })
 

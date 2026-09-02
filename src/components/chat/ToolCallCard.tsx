@@ -1,25 +1,27 @@
-import { BookOpen, Database, Loader2, SpellCheck } from 'lucide-react'
+import { useState } from 'react'
+import { Check, ChevronRight, Loader2, X } from 'lucide-react'
 import type { ToolCallMessagePartProps } from '@assistant-ui/react'
 
 type ToolName = 'threadScriptHelp' | 'validateThreadScript' | 'inspectTql'
 
-const RUNNING_LABEL: Record<ToolName, string> = {
-  threadScriptHelp: 'Looking up ThreadScript help…',
-  validateThreadScript: 'Validating ThreadScript…',
-  inspectTql: 'Running query…',
+const LABEL: Record<ToolName, string> = {
+  threadScriptHelp: 'Looked up ThreadScript help',
+  validateThreadScript: 'Checked a ThreadScript',
+  inspectTql: 'Ran a query',
 }
 
-const ICON: Record<ToolName, typeof BookOpen> = {
-  threadScriptHelp: BookOpen,
-  validateThreadScript: SpellCheck,
-  inspectTql: Database,
+function argPill(toolName: ToolName, args: unknown): string | null {
+  const value = (args ?? {}) as Record<string, unknown>
+  if (toolName === 'inspectTql' && typeof value.query === 'string') return value.query
+  if (toolName === 'threadScriptHelp' && typeof value.topic === 'string' && value.topic.trim()) return value.topic
+  return null
 }
 
 function summarize(toolName: ToolName, result: unknown): string {
   const value = (result ?? {}) as Record<string, unknown>
   if (toolName === 'threadScriptHelp') {
     const commands = Array.isArray(value.commands) ? value.commands.length : 0
-    return commands ? `Help · ${commands} command${commands === 1 ? '' : 's'}` : 'Looked up ThreadScript help'
+    return commands ? `${commands} command${commands === 1 ? '' : 's'}` : 'Looked up ThreadScript help'
   }
   if (toolName === 'validateThreadScript') {
     const diagnostics = Array.isArray(value.diagnostics) ? value.diagnostics.length : 0
@@ -33,35 +35,41 @@ function summarize(toolName: ToolName, result: unknown): string {
   return `${rowCount} row${rowCount === 1 ? '' : 's'}${value.truncated ? ' (showing 50)' : ''}`
 }
 
-// Compact status card for the read-only ThreadScript tools (help / validate /
-// inspect). Renders running -> complete -> error off the assistant-ui tool-call
-// part status.
-export function ToolCallCard({ toolName, status, result }: ToolCallMessagePartProps) {
+// A collapsible disclosure row for the read-only ThreadScript tools: a
+// past-tense label, the key argument as a pill, and a status icon. Expanding it
+// shows the raw request args and a one-line result.
+export function ToolCallCard({ toolName, status, args, argsText, result }: ToolCallMessagePartProps) {
+  const [open, setOpen] = useState(false)
   const name = toolName as ToolName
-  const Icon = ICON[name] ?? Database
-
-  if (status.type === 'running') {
-    return (
-      <div className="chat-toolcall-card">
-        <Loader2 size={13} className="chat-proposal-spin" />
-        <span>{RUNNING_LABEL[name] ?? 'Working…'}</span>
-      </div>
-    )
-  }
-
-  if (status.type === 'incomplete') {
-    return (
-      <div className="chat-toolcall-card chat-toolcall-card-error">
-        <Icon size={13} />
-        <span>{name} failed{status.reason ? ` (${status.reason})` : ''}</span>
-      </div>
-    )
-  }
+  const running = status.type === 'running'
+  const failed = status.type === 'incomplete'
+  const pill = argPill(name, args)
 
   return (
-    <div className="chat-toolcall-card">
-      <Icon size={13} />
-      <span>{summarize(name, result)}</span>
+    <div className="chat-tool">
+      <button type="button" className="chat-tool-row" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        <ChevronRight size={14} className="chat-tool-chevron" data-open={open || undefined} aria-hidden="true" />
+        <span className="chat-tool-label">{LABEL[name] ?? toolName}</span>
+        {pill ? <span className="chat-tool-arg">{pill}</span> : null}
+        <span className="chat-tool-status" data-state={running ? 'running' : failed ? 'error' : 'ok'} aria-hidden="true">
+          {running ? <Loader2 size={13} className="chat-spin" /> : failed ? <X size={13} /> : <Check size={13} />}
+        </span>
+      </button>
+
+      {open ? (
+        <div className="chat-tool-detail">
+          <div className="chat-tool-detail-label">Request</div>
+          <pre className="chat-tool-detail-code">{argsText || JSON.stringify(args ?? {})}</pre>
+          {running ? null : (
+            <>
+              <div className="chat-tool-detail-label chat-tool-detail-divider">Result</div>
+              <p className="chat-tool-detail-value">
+                {failed ? `Failed${status.reason ? ` (${status.reason})` : ''}` : summarize(name, result)}
+              </p>
+            </>
+          )}
+        </div>
+      ) : null}
     </div>
   )
 }

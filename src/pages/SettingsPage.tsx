@@ -21,6 +21,8 @@ import {
   type GitHubConfig,
 } from '../lib/github'
 import { applyTheme, getTheme, themes, type ThemeId } from '../lib/theme'
+import { commandRegistry } from '../lib/commands'
+import { revokeCapability, useTrustedCapabilities } from '../lib/threadscript/trustedCapabilities'
 import { MetadataSchemas } from '../components/MetadataSchemas'
 
 export function SettingsPage() {
@@ -358,6 +360,8 @@ export function SettingsPage() {
         </div>
       </section>
 
+      <TrustedActionsCard />
+
       <section className="settings-card">
         <div className="settings-title"><Users size={20} /><div><h2>Personas</h2><p>Each persona keeps its own notes and sessions, alongside your other threads.</p></div></div>
         <div className="persona-settings-list">
@@ -424,6 +428,39 @@ export function SettingsPage() {
         </div>
       </section>
     </article>
+  )
+}
+
+function TrustedActionsCard() {
+  const trusted = useTrustedCapabilities()
+  return (
+    <section className="settings-card">
+      <div className="settings-title">
+        <ShieldCheck size={20} />
+        <div>
+          <h2>Trusted actions</h2>
+          <p>Choosing <em>Always allow</em> on a proposal skips its confirmation next time. Only non-destructive actions can be trusted.</p>
+        </div>
+      </div>
+      {trusted.length === 0 ? (
+        <p className="settings-empty">Nothing trusted yet.</p>
+      ) : (
+        <div className="trusted-actions-list">
+          {trusted.map((name) => {
+            const summary = commandRegistry.get(name)?.summary
+            return (
+              <div key={name} className="trusted-actions-row">
+                <div>
+                  <code>{name}</code>
+                  {summary ? <span>{summary}</span> : null}
+                </div>
+                <button className="text-button" onClick={() => revokeCapability(name)}>Revoke</button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }
 

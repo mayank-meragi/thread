@@ -1,4 +1,4 @@
-import { hasToolCall, stepCountIs, streamText, tool } from 'ai'
+import { stepCountIs, streamText, tool, type StopCondition, type ToolSet } from 'ai'
 import { z } from 'zod'
 import type { ChatModelAdapter, ChatModelRunResult, ThreadAssistantMessagePart, ThreadMessage, ThreadMessageLike } from '@assistant-ui/react'
 import { db, type ChatMessagePartRecord, type PersonaRecord } from '../db'
@@ -72,6 +72,21 @@ function diagnosticOf(error: unknown): { code: string; message: string; line: nu
   return { code: 'invalid-document', message: error instanceof Error ? error.message : String(error), line: 1, column: 1, length: 0 }
 }
 
+const MAX_PROPOSAL_ATTEMPTS = 3
+
+// Stop once a proposal is actually drafted (the approval gate takes over), or
+// after a few failed drafts so the model can't loop on a broken idea. A
+// `created: false` result otherwise stays in context so the next step can read
+// its diagnostics and retry with a corrected script.
+export const stopAfterProposal: StopCondition<ToolSet> = ({ steps }) => {
+  const outcomes = steps
+    .flatMap((step) => step.toolResults)
+    .filter((result) => result.toolName === 'proposeThreadScript')
+    .map((result) => result.output as { created?: boolean } | undefined)
+  if (outcomes.some((outcome) => outcome?.created === true)) return true
+  return outcomes.length >= MAX_PROPOSAL_ATTEMPTS
+}
+
 // The complete AI-facing ThreadScript surface. Three read-only lookups plus
 // `proposeThreadScript`, which only ever *drafts* a pending proposal. There is
 // deliberately no model-callable execute -- Confirm lives in trusted UI.
@@ -117,7 +132,9 @@ export function buildThreadScriptTools(context: { sessionId: string; personaId: 
       description:
         'Compile a ThreadScript, preview its exact effects, and create a pending proposal for the user to '
         + 'review and confirm. Does NOT execute anything. This is the ONLY way to change the workspace — '
-        + 'including recording a durable journal note, via `action journal.takeNote`.',
+        + 'including recording a durable journal note, via `action journal.takeNote`. '
+        + 'If it returns `created: false`, read `diagnostics`, fix the script, and call this tool again — '
+        + 'do not ask the user to correct it.',
       inputSchema: z.object({ source: z.string().min(1) }),
       execute: async ({ source }) => {
         let compiled
@@ -262,7 +279,7 @@ export function createSessionAdapter(sessionId: string, personaId: string): Chat
         tools: buildThreadScriptTools({ sessionId, personaId, assistantMessageId }),
         // Halt the loop the moment a proposal is drafted -- the model must not
         // narrate past it; the turn pauses on the approval gate instead.
-        stopWhen: [stepCountIs(8), hasToolCall('proposeThreadScript')],
+        stopWhen: [stepCountIs(8), stopAfterProposal],
         abortSignal,
       })
 
