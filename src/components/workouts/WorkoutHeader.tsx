@@ -16,6 +16,7 @@ import {
   tallyWorkoutSets,
   workoutLensState,
 } from '../../lib/workouts/presentation'
+import { formatShortDate } from '../../lib/dates'
 import type { WorkoutView } from '../../lib/workouts/types'
 
 const STATE_LABEL: Record<ReturnType<typeof workoutLensState>, string> = {
@@ -79,8 +80,9 @@ export function WorkoutHeader({ view }: { view: WorkoutView }) {
   return (
     <header className="workout-header">
       <div className="workout-header-top">
-        <div>
+        <div className="workout-header-heading">
           <div className={`workout-state-badge state-${state}`}>{STATE_LABEL[state]}</div>
+          <p className="workout-eyebrow">{view.task.day ? formatShortDate(view.task.day) : 'Workout'}</p>
           <h1 className="workout-title">
             {threadSlug ? <Link to={`/thread/${threadSlug}`}>{label}</Link> : label}
           </h1>

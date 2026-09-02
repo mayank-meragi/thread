@@ -1,45 +1,90 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { addExercise } from '../lib/workouts/mutations'
 import { getWorkout } from '../lib/workouts/selectors'
 import { nextActionableSetId } from '../lib/workouts/presentation'
+import type { WorkoutExerciseView, WorkoutView } from '../lib/workouts/types'
 import { WorkoutHeader } from '../components/workouts/WorkoutHeader'
 import { WorkoutDiagnostics } from '../components/workouts/WorkoutDiagnostics'
-import { ExerciseCard } from '../components/workouts/ExerciseCard'
+import { ExerciseTabs } from '../components/workouts/ExerciseTabs'
+import { ActiveExercise } from '../components/workouts/ActiveExercise'
+import { CompleteSetBar } from '../components/workouts/CompleteSetBar'
+
+function firstPendingSetId(exercise: WorkoutExerciseView | null): string {
+  if (!exercise) return ''
+  const pending = exercise.sets.find(
+    (set) => set.task.status !== 'done' && set.task.status !== 'canceled',
+  )
+  return pending?.task.id ?? exercise.sets[exercise.sets.length - 1]?.task.id ?? ''
+}
+
+function exerciseOwningSet(view: WorkoutView, setId: string): WorkoutExerciseView | undefined {
+  return view.exercises.find((exercise) => exercise.sets.some((set) => set.task.id === setId))
+}
 
 export function WorkoutPage() {
   const { day = '', blockId = '' } = useParams()
   // `undefined` = still loading; `null` = resolved, but this block is not a workout.
   const view = useLiveQuery(async () => (blockId ? (await getWorkout(blockId)) ?? null : null), [blockId])
 
-  const [expandedSets, setExpandedSets] = useState<Set<string>>(new Set())
+  // The selection is stored as "intent"; the effective ids are derived each
+  // render with fallbacks so a deleted/completed target self-heals.
+  const [pickedExerciseId, setPickedExerciseId] = useState('')
+  const [pickedSetId, setPickedSetId] = useState('')
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const [exerciseTitle, setExerciseTitle] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
   const [addingExercise, setAddingExercise] = useState(false)
-
-  const toggleSet = useCallback((setId: string) => {
-    setExpandedSets((current) => {
-      const next = new Set(current)
-      if (next.has(setId)) next.delete(setId)
-      else next.add(setId)
-      return next
-    })
+  const flushRef = useRef<() => Promise<void>>(async () => {})
+  const registerFlush = useCallback((flush: () => Promise<void>) => {
+    flushRef.current = flush
   }, [])
 
-  const advance = useCallback((nextSetId: string | undefined) => {
-    if (!nextSetId) return
-    setExpandedSets((current) => new Set(current).add(nextSetId))
-  }, [])
+  const exercises = view ? view.exercises : []
+
+  let effectiveExerciseId = ''
+  if (exercises.some((exercise) => exercise.task.id === pickedExerciseId)) {
+    effectiveExerciseId = pickedExerciseId
+  } else if (view) {
+    const nextSet = nextActionableSetId(view)
+    const owner = nextSet ? exerciseOwningSet(view, nextSet) : undefined
+    effectiveExerciseId = owner?.task.id ?? exercises[0]?.task.id ?? ''
+  }
+
+  const effectiveExercise = exercises.find((exercise) => exercise.task.id === effectiveExerciseId) ?? null
+  const effectiveSetId = effectiveExercise?.sets.some((set) => set.task.id === pickedSetId)
+    ? pickedSetId
+    : firstPendingSetId(effectiveExercise)
+  const effectiveSet = effectiveExercise?.sets.find((set) => set.task.id === effectiveSetId) ?? null
+
+  const selectExercise = (id: string) => {
+    setPickedExerciseId(id)
+    setPickedSetId('')
+  }
+
+  const advance = (nextSetId: string | undefined) => {
+    if (!view) return
+    if (!nextSetId) {
+      // No more actionable sets — stay on the current exercise rather than
+      // snapping back to the first one.
+      if (effectiveExerciseId) setPickedExerciseId(effectiveExerciseId)
+      return
+    }
+    const owner = exerciseOwningSet(view, nextSetId)
+    if (owner) setPickedExerciseId(owner.task.id)
+    setPickedSetId(nextSetId)
+  }
 
   const submitExercise = async () => {
     if (!view || !exerciseTitle.trim()) return
     setAddingExercise(true)
     setAddError(null)
     try {
-      await addExercise(view.task.id, exerciseTitle)
+      const id = await addExercise(view.task.id, exerciseTitle)
       setExerciseTitle('')
+      if (typeof id === 'string') selectExercise(id)
     } catch (caught) {
       setAddError(caught instanceof Error ? caught.message : String(caught))
     } finally {
@@ -58,8 +103,6 @@ export function WorkoutPage() {
     )
   }
 
-  const nextId = nextActionableSetId(view)
-
   return (
     <article className="workout-page">
       <Link to={`/?date=${view.task.day}&block=${view.task.id}`} className="back-link"><ArrowLeft size={15} /> Outline</Link>
@@ -67,24 +110,28 @@ export function WorkoutPage() {
       <WorkoutDiagnostics diagnostics={view.diagnostics} />
       <WorkoutHeader view={view} />
 
-      {nextId && (
-        <p className="workout-next-hint">
-          Next up: <button type="button" className="link-button" onClick={() => advance(nextId)}>open the next set</button>
-        </p>
-      )}
-
-      <div className="exercise-list">
-        {view.exercises.map((exercise) => (
-          <ExerciseCard
-            key={exercise.task.id}
-            exercise={exercise}
-            expandedSets={expandedSets}
-            onToggleSet={toggleSet}
-            onAdvance={advance}
+      {view.exercises.length > 0 ? (
+        <>
+          <ExerciseTabs
+            exercises={view.exercises}
+            selectedId={effectiveExerciseId}
+            onSelect={selectExercise}
           />
-        ))}
-        {view.exercises.length === 0 && <p className="section-empty">No exercises yet — add the first one below.</p>}
-      </div>
+          {effectiveExercise && (
+            <ActiveExercise
+              key={effectiveExercise.task.id}
+              exercise={effectiveExercise}
+              selectedSetId={effectiveSetId}
+              onSelectSet={setPickedSetId}
+              detailsOpen={detailsOpen}
+              onToggleDetails={() => setDetailsOpen((open) => !open)}
+              onRegisterFlush={registerFlush}
+            />
+          )}
+        </>
+      ) : (
+        <p className="section-empty">No exercises yet — add the first one below.</p>
+      )}
 
       <form
         className="add-exercise-form"
@@ -104,6 +151,15 @@ export function WorkoutPage() {
         </button>
       </form>
       {addError && <p className="add-exercise-error" role="alert">{addError}</p>}
+
+      {effectiveSet && (
+        <CompleteSetBar
+          selectedSetId={effectiveSet.task.id}
+          isDone={effectiveSet.task.status === 'done'}
+          flush={() => flushRef.current()}
+          onAdvance={advance}
+        />
+      )}
     </article>
   )
 }
