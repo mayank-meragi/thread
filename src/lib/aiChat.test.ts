@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { db } from '../db'
-import { buildThreadScriptTools } from './aiChat'
+import { buildThreadScriptTools, loadSessionHistory } from './aiChat'
 import aiChatSource from './aiChat.ts?raw'
 
 beforeEach(async () => {
@@ -42,5 +42,41 @@ describe('AI ThreadScript tool surface', () => {
 
   it('does not import the trusted dispatcher', () => {
     expect(aiChatSource).not.toMatch(/threadscript\/dispatch/)
+  })
+})
+
+describe('loadSessionHistory', () => {
+  it('round-trips a persisted assistant reply that carried a tool-call part', async () => {
+    await db.chatMessages.bulkPut([
+      { id: 'm1', sessionId: 's', role: 'user', content: 'plan me a workout', createdAt: '2026-09-02T10:00:00.000Z' },
+      {
+        id: 'm2',
+        sessionId: 's',
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Here is today’s session.' },
+          {
+            type: 'tool-call',
+            toolCallId: 'call-1',
+            toolName: 'proposeThreadScript',
+            args: { source: 'action workout.buildDay' },
+            result: { created: true, proposalId: 'prop-1' },
+          },
+        ],
+        createdAt: '2026-09-02T10:00:01.000Z',
+      },
+    ])
+
+    const history = await loadSessionHistory('s')
+
+    expect(history[0].content).toBe('plan me a workout')
+    expect(Array.isArray(history[1].content)).toBe(true)
+    const parts = history[1].content as Array<Record<string, unknown>>
+    expect(parts[0]).toMatchObject({ type: 'text', text: 'Here is today’s session.' })
+    expect(parts[1]).toMatchObject({
+      type: 'tool-call',
+      toolName: 'proposeThreadScript',
+      result: { created: true, proposalId: 'prop-1' },
+    })
   })
 })

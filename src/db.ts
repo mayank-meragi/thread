@@ -163,11 +163,26 @@ export interface ChatSessionRecord {
   updatedAt: string
 }
 
+// Assistant replies are stored as their ordered parts (text + tool-call, with
+// the tool result inline) so an inline tool-call UI -- e.g. the ThreadScript
+// proposal card -- survives a reload. Plain text messages stay a bare string.
+export type ChatMessagePartRecord =
+  | { type: 'text'; text: string }
+  | {
+      type: 'tool-call'
+      toolCallId: string
+      toolName: string
+      args?: unknown
+      argsText?: string
+      result?: unknown
+      isError?: boolean
+    }
+
 export interface ChatMessageRecord {
   id: string
   sessionId: string
   role: 'user' | 'assistant'
-  content: string
+  content: string | ChatMessagePartRecord[]
   createdAt: string
 }
 

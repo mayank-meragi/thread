@@ -17,33 +17,28 @@ function AssistantMarkdown() {
   return <MarkdownTextPrimitive />
 }
 
+// The proposeThreadScript tool only ever *drafts* a pending proposal; the
+// package renders this inline where the model called the tool, so the
+// ThreadScript proposal card lives in the message flow (above the composer)
+// rather than a separate panel. The tool's `result` carries the proposalId,
+// and assistant replies persist their tool-call parts (see aiChat.ts), so the
+// card is restored on reload.
 function ProposeThreadScriptToolUI({ result }: ToolCallMessagePartProps<{ source?: string }>) {
-  const payload = result as { created?: boolean; diagnostics?: Array<{ message: string }> } | undefined
+  const payload = result as
+    | { created?: boolean; proposalId?: string; diagnostics?: Array<{ message: string }> }
+    | undefined
+
+  if (payload?.created && payload.proposalId) {
+    return <ThreadScriptProposal proposalId={payload.proposalId} />
+  }
+
   const label = !payload
     ? 'Drafting a proposal…'
-    : payload.created
-      ? 'Drafted a proposal — review below'
-      : `Draft failed: ${payload.diagnostics?.[0]?.message ?? 'invalid script'}`
+    : `Draft failed: ${payload.diagnostics?.[0]?.message ?? 'invalid script'}`
   return (
     <div className="chat-tool-call">
       <FileCheck size={13} />
       <span>{label}</span>
-    </div>
-  )
-}
-
-function SessionProposals({ sessionId }: { sessionId: string }) {
-  const proposals = useLiveQuery(
-    () => db.chatProposals.where('[sessionId+createdAt]').between([sessionId, ''], [sessionId, '￿']).toArray(),
-    [sessionId],
-    [],
-  )
-  if (!proposals.length) return null
-  return (
-    <div className="chat-proposals">
-      {proposals.map((proposal) => (
-        <ThreadScriptProposal key={proposal.id} proposalId={proposal.id} />
-      ))}
     </div>
   )
 }
@@ -110,10 +105,7 @@ function ChatSessionRuntime({
   const runtime = useLocalRuntime(adapter, { initialMessages })
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <div className="chat-session-body">
-        <ChatThread />
-        <SessionProposals sessionId={sessionId} />
-      </div>
+      <ChatThread />
     </AssistantRuntimeProvider>
   )
 }

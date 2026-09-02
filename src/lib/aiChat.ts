@@ -24,7 +24,9 @@ export async function loadSessionHistory(sessionId: string): Promise<ThreadMessa
   return rows.map((row) => ({
     id: row.id,
     role: row.role,
-    content: row.content,
+    // Stored as a bare string (plain text) or an ordered parts array (assistant
+    // replies that carried a tool call). ThreadMessageLike accepts both.
+    content: row.content as ThreadMessageLike['content'],
     createdAt: new Date(row.createdAt),
   }))
 }
@@ -229,7 +231,12 @@ export function createSessionAdapter(sessionId: string, personaId: string): Chat
         id: assistantMessageId,
         sessionId,
         role: 'assistant',
-        content: fullText,
+        // Keep the ordered parts when the reply carried a tool call (so an
+        // inline tool-call UI, e.g. the ThreadScript proposal card, survives a
+        // reload); otherwise a bare string is enough.
+        content: parts.some((part) => part.type !== 'text')
+          ? (parts as unknown as import('../db').ChatMessagePartRecord[])
+          : fullText,
         createdAt: new Date().toISOString(),
       })
       await db.chatSessions.update(sessionId, { updatedAt: new Date().toISOString() })
