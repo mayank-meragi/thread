@@ -1,46 +1,57 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileCheck, History, Plus, Send } from 'lucide-react'
+import { ArrowDown, ArrowUp, Copy, History, Plus, RotateCcw, Square } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { AssistantRuntimeProvider, ComposerPrimitive, MessagePrimitive, ThreadPrimitive, useLocalRuntime, type ThreadMessageLike, type ToolCallMessagePartProps } from '@assistant-ui/react'
+import { ActionBarPrimitive, AssistantRuntimeProvider, ComposerPrimitive, MessagePartPrimitive, MessagePrimitive, ThreadPrimitive, useLocalRuntime, type ThreadMessageLike } from '@assistant-ui/react'
 import { MarkdownTextPrimitive } from '@assistant-ui/react-markdown'
 import { db } from '../../db'
-import { createSession, GENERAL_PERSONA_ID } from '../../lib/personas'
+import { createSession, GENERAL_PERSONA_ID, WORKOUT_COACH_PERSONA_ID } from '../../lib/personas'
 import { createSessionAdapter, loadSessionHistory } from '../../lib/aiChat'
 import { PersonaSwitcher } from '../chat/PersonaSwitcher'
 import { SessionList } from '../chat/SessionList'
 import { ThreadScriptProposal } from '../chat/ThreadScriptProposal'
+import { ToolCallCard } from '../chat/ToolCallCard'
 
 // MarkdownTextPrimitive reads the current message part's text via its own
 // context hook rather than a `text` prop, so it doesn't literally match the
 // `Text` slot's prop type -- wrap it to satisfy that without passing anything.
 function AssistantMarkdown() {
-  return <MarkdownTextPrimitive />
+  return (
+    <>
+      <MarkdownTextPrimitive />
+      {/* Blinking caret while this text part is still streaming in. */}
+      <MessagePartPrimitive.InProgress>
+        <span className="chat-cursor" aria-hidden="true" />
+      </MessagePartPrimitive.InProgress>
+    </>
+  )
 }
 
-// The proposeThreadScript tool only ever *drafts* a pending proposal; the
-// package renders this inline where the model called the tool, so the
-// ThreadScript proposal card lives in the message flow (above the composer)
-// rather than a separate panel. The tool's `result` carries the proposalId,
-// and assistant replies persist their tool-call parts (see aiChat.ts), so the
-// card is restored on reload.
-function ProposeThreadScriptToolUI({ result }: ToolCallMessagePartProps<{ source?: string }>) {
-  const payload = result as
-    | { created?: boolean; proposalId?: string; diagnostics?: Array<{ message: string }> }
-    | undefined
+const SUGGESTIONS: Record<string, string[]> = {
+  [WORKOUT_COACH_PERSONA_ID]: [
+    'Plan my training week',
+    'Build today’s workout',
+    'How’s my recent volume trending?',
+  ],
+  default: [
+    'What’s on my plate today?',
+    'Summarize this week’s journal',
+    'Draft a task from my notes',
+  ],
+}
 
-  if (payload?.created && payload.proposalId) {
-    return <ThreadScriptProposal proposalId={payload.proposalId} />
-  }
+function suggestionsFor(personaId: string): string[] {
+  return SUGGESTIONS[personaId] ?? SUGGESTIONS.default
+}
 
-  const label = !payload
-    ? 'Drafting a proposal…'
-    : `Draft failed: ${payload.diagnostics?.[0]?.message ?? 'invalid script'}`
-  return (
-    <div className="chat-tool-call">
-      <FileCheck size={13} />
-      <span>{label}</span>
-    </div>
-  )
+// Every ThreadScript tool call renders through assistant-ui's `by_name` slot.
+// `proposeThreadScript` is the approval gate (ThreadScriptProposal, which reads
+// the live chatProposals row and calls respondToApproval); the three read-only
+// tools get a compact running -> complete -> error status card.
+const TOOL_UI = {
+  proposeThreadScript: ThreadScriptProposal,
+  threadScriptHelp: ToolCallCard,
+  validateThreadScript: ToolCallCard,
+  inspectTql: ToolCallCard,
 }
 
 const ACTIVE_PERSONA_KEY = 'thread.active-persona'
@@ -60,33 +71,74 @@ function UserMessage() {
 function AssistantMessage() {
   return (
     <MessagePrimitive.Root className="chat-message chat-message-assistant">
+      {/* Thinking dots while the run is active but no token has landed yet. */}
+      <ThreadPrimitive.If running>
+        <MessagePrimitive.If last>
+          <MessagePrimitive.If hasContent={false}>
+            <div className="chat-running" aria-label="Assistant is responding">
+              <span />
+              <span />
+              <span />
+            </div>
+          </MessagePrimitive.If>
+        </MessagePrimitive.If>
+      </ThreadPrimitive.If>
       <MessagePrimitive.Content
         components={{
           Text: AssistantMarkdown,
-          tools: { by_name: { proposeThreadScript: ProposeThreadScriptToolUI } },
+          tools: { by_name: TOOL_UI },
         }}
       />
       <MessagePrimitive.Error>
         <p className="banner banner-error chat-message-error">Something went wrong. Check your AI provider settings.</p>
       </MessagePrimitive.Error>
+      <ActionBarPrimitive.Root className="chat-action-bar" hideWhenRunning autohide="not-last" autohideFloat="single-branch">
+        <ActionBarPrimitive.Copy className="chat-action-btn" aria-label="Copy">
+          <Copy size={13} />
+        </ActionBarPrimitive.Copy>
+        <ActionBarPrimitive.Reload className="chat-action-btn" aria-label="Retry">
+          <RotateCcw size={13} />
+        </ActionBarPrimitive.Reload>
+      </ActionBarPrimitive.Root>
     </MessagePrimitive.Root>
   )
 }
 
-function ChatThread() {
+function ChatThread({ personaId }: { personaId: string }) {
   return (
     <ThreadPrimitive.Root className="chat-thread">
       <ThreadPrimitive.Viewport className="chat-viewport">
         <ThreadPrimitive.Empty>
-          <p className="empty-hint">Say something to get started.</p>
+          <div className="chat-empty">
+            <p className="empty-hint">Say something to get started.</p>
+            <div className="chat-suggestions">
+              {suggestionsFor(personaId).map((prompt) => (
+                <ThreadPrimitive.Suggestion key={prompt} className="chat-suggestion" prompt={prompt} send>
+                  {prompt}
+                </ThreadPrimitive.Suggestion>
+              ))}
+            </div>
+          </div>
         </ThreadPrimitive.Empty>
         <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
+        <ThreadPrimitive.If empty={false}>
+          <ThreadPrimitive.ScrollToBottom className="chat-scroll-bottom" aria-label="Scroll to latest">
+            <ArrowDown size={14} />
+          </ThreadPrimitive.ScrollToBottom>
+        </ThreadPrimitive.If>
       </ThreadPrimitive.Viewport>
       <ComposerPrimitive.Root className="chat-composer">
-        <ComposerPrimitive.Input className="chat-composer-input" placeholder="Message…" rows={1} />
-        <ComposerPrimitive.Send className="chat-composer-send" aria-label="Send">
-          <Send size={15} />
-        </ComposerPrimitive.Send>
+        <ComposerPrimitive.Input className="chat-composer-input" placeholder="Message…" rows={1} autoFocus />
+        <ThreadPrimitive.If running={false}>
+          <ComposerPrimitive.Send className="chat-composer-send" aria-label="Send message">
+            <ArrowUp size={16} />
+          </ComposerPrimitive.Send>
+        </ThreadPrimitive.If>
+        <ThreadPrimitive.If running>
+          <ComposerPrimitive.Cancel className="chat-composer-send chat-composer-stop" aria-label="Stop generating">
+            <Square size={12} fill="currentColor" />
+          </ComposerPrimitive.Cancel>
+        </ThreadPrimitive.If>
       </ComposerPrimitive.Root>
     </ThreadPrimitive.Root>
   )
@@ -102,10 +154,12 @@ function ChatSessionRuntime({
   initialMessages: ThreadMessageLike[]
 }) {
   const adapter = useMemo(() => createSessionAdapter(sessionId, personaId), [sessionId, personaId])
-  const runtime = useLocalRuntime(adapter, { initialMessages })
+  // maxSteps >= 3: model turn -> approval-gate pause -> resume turn that closes
+  // out the tool call.
+  const runtime = useLocalRuntime(adapter, { initialMessages, maxSteps: 4 })
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <ChatThread />
+      <ChatThread personaId={personaId} />
     </AssistantRuntimeProvider>
   )
 }

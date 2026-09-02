@@ -1,7 +1,7 @@
-import { stepCountIs, streamText, tool } from 'ai'
+import { hasToolCall, stepCountIs, streamText, tool } from 'ai'
 import { z } from 'zod'
 import type { ChatModelAdapter, ChatModelRunResult, ThreadAssistantMessagePart, ThreadMessage, ThreadMessageLike } from '@assistant-ui/react'
-import { db, type PersonaRecord } from '../db'
+import { db, type ChatMessagePartRecord, type PersonaRecord } from '../db'
 import { getAIConfig, resolveModel } from './ai'
 import { buildThreadSystemContext, TRAINING_PLAN_THREAD_ID } from './aiContext'
 import { WORKOUT_COACH_PERSONA_ID } from './personas'
@@ -28,6 +28,9 @@ export async function loadSessionHistory(sessionId: string): Promise<ThreadMessa
     // replies that carried a tool call). ThreadMessageLike accepts both.
     content: row.content as ThreadMessageLike['content'],
     createdAt: new Date(row.createdAt),
+    // Rehydrate a turn that is still paused on an approval gate so the runtime
+    // re-enters `requires-action` and the card's Confirm/Cancel stay live.
+    ...(row.status ? { status: row.status } : {}),
   }))
 }
 
@@ -154,20 +157,87 @@ export function buildThreadScriptTools(context: { sessionId: string; personaId: 
   }
 }
 
+// After the user answers a `proposeThreadScript` approval gate (Confirm/Cancel
+// in the card, which already ran the trusted dispatcher / cancel), the runtime
+// resumes the loop and re-invokes `run`. The paused assistant message is not in
+// `messages` (only prior turns are), so we read it from `getMessage()`: it now
+// carries `approval.approved` on the tool-call part. Persist the resolved card
+// state (drop the paused status), then end the turn -- no content, no model
+// call. Returns null when this isn't a resumed approval turn.
+async function finalizeApprovalGate(
+  sessionId: string,
+  getMessage: (() => ThreadMessage) | undefined,
+): Promise<ChatModelRunResult | null> {
+  let current: ThreadMessage
+  try {
+    if (!getMessage) return null
+    current = getMessage()
+  } catch {
+    return null
+  }
+  if (current.role !== 'assistant') return null
+
+  const toolPart = current.content.find(
+    (part): part is Extract<typeof part, { type: 'tool-call' }> =>
+      part.type === 'tool-call' && part.toolName === 'proposeThreadScript' && part.approval?.approved !== undefined,
+  )
+  if (!toolPart?.approval) return null
+
+  const confirmed = toolPart.approval.approved === true
+  const proposal = await db.chatProposals.get(toolPart.approval.id)
+  const outcome = {
+    confirmed,
+    status: proposal?.status ?? (confirmed ? 'completed' : 'cancelled'),
+    receipts: proposal?.receipts ?? [],
+    ...(proposal?.error ? { error: proposal.error } : {}),
+  }
+  const parts: ChatMessagePartRecord[] = current.content.map((part) =>
+    part.type === 'tool-call'
+      ? part.toolCallId === toolPart.toolCallId
+        ? { type: 'tool-call', toolCallId: part.toolCallId, toolName: part.toolName, args: part.args, argsText: part.argsText, approval: toolPart.approval, result: outcome, isError: !confirmed }
+        : { type: 'tool-call', toolCallId: part.toolCallId, toolName: part.toolName, args: part.args, argsText: part.argsText, result: part.result, isError: part.isError }
+      : { type: 'text', text: part.type === 'text' ? part.text : '' },
+  )
+  const existing = await db.chatMessages.get(current.id)
+  await db.chatMessages.put({
+    id: current.id,
+    sessionId,
+    role: 'assistant',
+    content: parts,
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+  })
+  await db.chatSessions.update(sessionId, { updatedAt: new Date().toISOString() })
+  // No `content` -> the runtime appends nothing; only the status changes.
+  return { status: { type: 'complete', reason: 'stop' } }
+}
+
 export function createSessionAdapter(sessionId: string, personaId: string): ChatModelAdapter {
   return {
-    async *run({ messages, abortSignal }): AsyncGenerator<ChatModelRunResult> {
+    async *run({ messages, abortSignal, unstable_getMessage }): AsyncGenerator<ChatModelRunResult> {
+      const resumed = await finalizeApprovalGate(sessionId, unstable_getMessage)
+      if (resumed) {
+        yield resumed
+        return
+      }
+
       const persona = await db.personas.get(personaId)
       if (!persona) throw new Error('This persona no longer exists.')
 
       const lastMessage = messages[messages.length - 1]
+      let userCreatedAt: string | undefined
       if (lastMessage?.role === 'user') {
+        // Keyed by the runtime message id (not a fresh uuid) so a regenerate --
+        // which re-runs with the same trailing user message -- upserts the same
+        // row instead of inserting a duplicate. Keep the original timestamp so
+        // the cleanup below can tell "replies from before this regenerate" apart.
+        const existing = await db.chatMessages.get(lastMessage.id)
+        userCreatedAt = existing?.createdAt ?? new Date().toISOString()
         await db.chatMessages.put({
-          id: crypto.randomUUID(),
+          id: lastMessage.id,
           sessionId,
           role: 'user',
           content: textOf(lastMessage),
-          createdAt: new Date().toISOString(),
+          createdAt: userCreatedAt,
         })
         await db.chatSessions.update(sessionId, { updatedAt: new Date().toISOString() })
       }
@@ -190,7 +260,9 @@ export function createSessionAdapter(sessionId: string, personaId: string): Chat
         system,
         messages: modelMessages,
         tools: buildThreadScriptTools({ sessionId, personaId, assistantMessageId }),
-        stopWhen: stepCountIs(8),
+        // Halt the loop the moment a proposal is drafted -- the model must not
+        // narrate past it; the turn pauses on the approval gate instead.
+        stopWhen: [stepCountIs(8), hasToolCall('proposeThreadScript')],
         abortSignal,
       })
 
@@ -201,30 +273,81 @@ export function createSessionAdapter(sessionId: string, personaId: string): Chat
       // and after it, the same shape a real multi-step response has.
       const parts: ThreadAssistantMessagePart[] = []
       let fullText = ''
-      for await (const event of result.fullStream) {
-        if (event.type === 'text-delta') {
-          fullText += event.text
-          const last = parts.at(-1)
-          if (last?.type === 'text') parts[parts.length - 1] = { type: 'text', text: last.text + event.text }
-          else parts.push({ type: 'text', text: event.text })
-        } else if (event.type === 'tool-call') {
-          parts.push({
-            type: 'tool-call',
-            toolCallId: event.toolCallId,
-            toolName: event.toolName,
-            args: event.input as Record<string, string>,
-            argsText: JSON.stringify(event.input),
-          })
-        } else if (event.type === 'tool-result') {
-          const call = parts.find((part) => part.type === 'tool-call' && part.toolCallId === event.toolCallId)
-          if (call?.type === 'tool-call') Object.assign(call, { result: event.output, isError: false })
-        } else if (event.type === 'tool-error') {
-          const call = parts.find((part) => part.type === 'tool-call' && part.toolCallId === event.toolCallId)
-          if (call?.type === 'tool-call') Object.assign(call, { result: event.error, isError: true })
-        } else {
-          continue
+      try {
+        for await (const event of result.fullStream) {
+          if (event.type === 'text-delta') {
+            fullText += event.text
+            const last = parts.at(-1)
+            if (last?.type === 'text') parts[parts.length - 1] = { type: 'text', text: last.text + event.text }
+            else parts.push({ type: 'text', text: event.text })
+          } else if (event.type === 'tool-call') {
+            parts.push({
+              type: 'tool-call',
+              toolCallId: event.toolCallId,
+              toolName: event.toolName,
+              args: event.input as Record<string, string>,
+              argsText: JSON.stringify(event.input),
+            })
+          } else if (event.type === 'tool-result') {
+            const call = parts.find((part) => part.type === 'tool-call' && part.toolCallId === event.toolCallId)
+            if (call?.type === 'tool-call') {
+              const output = event.output as { created?: boolean; proposalId?: string } | undefined
+              if (call.toolName === 'proposeThreadScript' && output?.created && output.proposalId) {
+                // Born as an assistant-ui approval gate -- never carries a
+                // transient `result`. `finalizeApprovalGate` fills it on resume.
+                Object.assign(call, { approval: { id: output.proposalId } })
+              } else {
+                Object.assign(call, { result: event.output, isError: false })
+              }
+            }
+          } else if (event.type === 'tool-error') {
+            const call = parts.find((part) => part.type === 'tool-call' && part.toolCallId === event.toolCallId)
+            if (call?.type === 'tool-call') Object.assign(call, { result: event.error, isError: true })
+          } else {
+            continue
+          }
+          yield { content: [...parts] }
         }
-        yield { content: [...parts] }
+      } catch (error) {
+        // A deliberate Stop aborts the stream -- keep whatever streamed so far
+        // (persisted below) instead of surfacing an error bubble. Anything that
+        // isn't an abort is a real failure and still propagates.
+        if (!abortSignal.aborted && (error as { name?: string } | undefined)?.name !== 'AbortError') throw error
+      }
+
+      // Stop hit before any token arrived -- don't leave a blank assistant row.
+      if (parts.length === 0 && !fullText) return
+
+      // On a regenerate the runtime re-runs with the same trailing user message;
+      // drop the assistant reply(ies) from that turn onward so the rewritten
+      // reply replaces them instead of stacking up. A brand-new turn has none.
+      if (userCreatedAt) {
+        const cutoff = userCreatedAt
+        await db.chatMessages
+          .where('sessionId')
+          .equals(sessionId)
+          .filter((row) => row.role === 'assistant' && row.createdAt >= cutoff)
+          .delete()
+      }
+
+      // Approval gate: `proposeThreadScript` drafted a pending proposal. Persist
+      // the turn as paused on `requires-action` and stop; the card's
+      // Confirm/Cancel resolves it and re-invokes `run` (see finalizeApprovalGate).
+      const gated = parts.some(
+        (part) => part.type === 'tool-call' && part.toolName === 'proposeThreadScript' && part.approval,
+      )
+      if (gated) {
+        await db.chatMessages.put({
+          id: assistantMessageId,
+          sessionId,
+          role: 'assistant',
+          content: parts as unknown as ChatMessagePartRecord[],
+          createdAt: new Date().toISOString(),
+          status: { type: 'requires-action', reason: 'tool-calls' },
+        })
+        await db.chatSessions.update(sessionId, { updatedAt: new Date().toISOString() })
+        yield { content: parts, status: { type: 'requires-action', reason: 'tool-calls' } }
+        return
       }
 
       await db.chatMessages.put({
@@ -235,7 +358,7 @@ export function createSessionAdapter(sessionId: string, personaId: string): Chat
         // inline tool-call UI, e.g. the ThreadScript proposal card, survives a
         // reload); otherwise a bare string is enough.
         content: parts.some((part) => part.type !== 'text')
-          ? (parts as unknown as import('../db').ChatMessagePartRecord[])
+          ? (parts as unknown as ChatMessagePartRecord[])
           : fullText,
         createdAt: new Date().toISOString(),
       })

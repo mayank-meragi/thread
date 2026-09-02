@@ -176,6 +176,9 @@ export type ChatMessagePartRecord =
       argsText?: string
       result?: unknown
       isError?: boolean
+      // assistant-ui approval gate. Present on a `proposeThreadScript` call that
+      // is waiting on (or has resolved) the user's Confirm/Cancel decision.
+      approval?: { id: string; approved?: boolean; reason?: string; resolution?: 'cancelled' | 'expired' }
     }
 
 export interface ChatMessageRecord {
@@ -184,6 +187,9 @@ export interface ChatMessageRecord {
   role: 'user' | 'assistant'
   content: string | ChatMessagePartRecord[]
   createdAt: string
+  // Set while an assistant turn is paused on an approval gate, so a reload
+  // rehydrates the runtime back into its `requires-action` state.
+  status?: { type: 'requires-action'; reason: 'tool-calls' }
 }
 
 export type ChatProposalStatus = 'pending' | 'executing' | 'completed' | 'failed' | 'cancelled' | 'stale'
