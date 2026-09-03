@@ -1,4 +1,5 @@
-import { CalendarClock, Check } from 'lucide-react'
+import { useState } from 'react'
+import { CalendarClock, Check, ChevronRight } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
 import { db, type TaskRecord } from '../db'
@@ -35,7 +36,7 @@ export function TodayTasks({ today }: TodayTasksProps) {
       {overdue.length > 0 && <TaskGroup title="Overdue" tasks={overdue} tone="overdue" />}
       <TaskGroup title="Due today" tasks={dueToday} tone="today" empty="Nothing due today" />
       {upcoming.length > 0 && <TaskGroup title="Upcoming" tasks={upcoming} tone="upcoming" />}
-      {doneToday.length > 0 && <TaskGroup title="Done today" tasks={doneToday} tone="done" />}
+      {doneToday.length > 0 && <TaskGroup title="Done today" tasks={doneToday} tone="done" defaultCollapsed />}
     </section>
   )
 }
@@ -45,17 +46,28 @@ function TaskGroup({
   tasks,
   tone,
   empty,
+  defaultCollapsed = false,
 }: {
   title: string
   tasks: TaskRecord[]
   tone: 'overdue' | 'today' | 'upcoming' | 'done'
   empty?: string
+  defaultCollapsed?: boolean
 }) {
   const isDone = tone === 'done'
+  const [collapsed, setCollapsed] = useState(defaultCollapsed)
   return (
-    <div className={`task-group task-group-${tone}`}>
-      <div className="task-group-label"><span>{title}</span><small>{tasks.length}</small></div>
-      {tasks.length ? tasks.map((task) => (
+    <div className={`task-group task-group-${tone}${collapsed ? ' is-collapsed' : ''}`}>
+      <button
+        type="button"
+        className="task-group-label"
+        aria-expanded={!collapsed}
+        onClick={() => setCollapsed((value) => !value)}
+      >
+        <span><ChevronRight className="task-group-caret" size={12} />{title}</span>
+        <small>{tasks.length}</small>
+      </button>
+      {collapsed ? null : tasks.length ? tasks.map((task) => (
         <div className="today-task-row" key={task.id}>
           <button
             type="button"
