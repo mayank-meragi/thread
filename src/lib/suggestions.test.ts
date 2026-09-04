@@ -45,6 +45,20 @@ describe('suggestion ranking', () => {
     expect(rankThreadSuggestions(threads, 'cmd').map((thread) => thread.id)).toEqual(['command-bar'])
   })
 
+  it('matches thread titles case-insensitively across words and substrings', () => {
+    expect(rankThreadSuggestions(threads, 'RESEARCH').map((thread) => thread.id)).toEqual(['browser-research'])
+    expect(rankThreadSuggestions(threads, 'res').map((thread) => thread.id)).toEqual(['browser-research'])
+  })
+
+  it('keeps input order for equal scores and respects the result limit', () => {
+    const equalMatches = [
+      { id: 'first', title: 'Alpha notes', updatedAt: '2026-08-18' },
+      { id: 'second', title: 'Alpha project', updatedAt: '2026-08-17' },
+      { id: 'third', title: 'Alpha review', updatedAt: '2026-08-16' },
+    ]
+    expect(rankThreadSuggestions(equalMatches, 'alpha', 2).map((thread) => thread.id)).toEqual(['first', 'second'])
+  })
+
   it('filters slash commands by names and aliases', () => {
     expect(rankSlashCommands('que')[0].id).toBe('question')
     expect(rankSlashCommands('todo')[0].id).toBe('task')

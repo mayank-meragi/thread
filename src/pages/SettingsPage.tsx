@@ -25,9 +25,28 @@ import { commandRegistry } from '../lib/commands'
 import { revokeCapability, useTrustedCapabilities } from '../lib/threadscript/trustedCapabilities'
 import { MetadataSchemas } from '../components/MetadataSchemas'
 
+const SETTINGS_CATEGORIES = [
+  { id: 'appearance', label: 'Appearance', description: 'Theme and display', Icon: Palette },
+  { id: 'sync', label: 'Data & sync', description: 'Storage and GitHub', Icon: GitBranch },
+  { id: 'ai', label: 'AI & personas', description: 'Provider and assistants', Icon: Bot },
+  { id: 'workspace', label: 'Workspace', description: 'Schemas and templates', Icon: FileText },
+  { id: 'security', label: 'Security', description: 'Trusted actions', Icon: ShieldCheck },
+  { id: 'help', label: 'Help', description: 'Guides and reference', Icon: BookOpen },
+] as const
+
+type SettingsCategory = typeof SETTINGS_CATEGORIES[number]['id']
+
+function isSettingsCategory(value: string | null): value is SettingsCategory {
+  return SETTINGS_CATEGORIES.some((category) => category.id === value)
+}
+
 export function SettingsPage() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const focusSync = searchParams.get('focus') === 'sync'
+  const requestedCategory = searchParams.get('section')
+  const activeCategory: SettingsCategory = focusSync
+    ? 'sync'
+    : isSettingsCategory(requestedCategory) ? requestedCategory : 'appearance'
   const syncHeadingRef = useRef<HTMLHeadingElement>(null)
   const existing = getGitHubConfig()
   const [repo, setRepo] = useState(existing?.repo ?? '')
@@ -77,10 +96,17 @@ export function SettingsPage() {
   }, [state])
 
   useEffect(() => {
-    if (!focusSync) return
+    if (!focusSync || activeCategory !== 'sync') return
     syncHeadingRef.current?.scrollIntoView({ block: 'start' })
     syncHeadingRef.current?.focus({ preventScroll: true })
-  }, [focusSync])
+  }, [activeCategory, focusSync])
+
+  function chooseCategory(category: SettingsCategory) {
+    const next = new URLSearchParams(searchParams)
+    next.set('section', category)
+    next.delete('focus')
+    setSearchParams(next)
+  }
 
   async function connect() {
     setError('')
@@ -193,9 +219,53 @@ export function SettingsPage() {
 
   return (
     <article className="utility-page settings-page">
-      <div className="eyebrow">Your data, your repository</div>
       <h1>Settings</h1>
+      <p className="settings-intro">Shape how Thread looks, stores your work, and works with AI.</p>
 
+      <label className="settings-category-select">
+        <span>Category</span>
+        <select value={activeCategory} onChange={(event) => chooseCategory(event.target.value as SettingsCategory)}>
+          {SETTINGS_CATEGORIES.map((category) => <option value={category.id} key={category.id}>{category.label}</option>)}
+        </select>
+      </label>
+
+      <div className="settings-layout">
+        <nav className="settings-nav" aria-label="Settings categories">
+          {SETTINGS_CATEGORIES.map(({ id, label, description, Icon }) => (
+            <button type="button" className={activeCategory === id ? 'is-active' : ''} aria-current={activeCategory === id ? 'page' : undefined} onClick={() => chooseCategory(id)} key={id}>
+              <Icon size={17} />
+              <span><strong>{label}</strong><small>{description}</small></span>
+              {id === 'sync' && conflicts.length > 0 ? <b className="settings-nav-alert" aria-label={`${conflicts.length} unresolved sync conflicts`}>{conflicts.length}</b> : null}
+            </button>
+          ))}
+        </nav>
+
+        <div className="settings-content">
+          <section className="settings-category" hidden={activeCategory !== 'appearance'} aria-labelledby="settings-category-appearance">
+            <header className="settings-category-header"><h2 id="settings-category-appearance">Appearance</h2><p>Choose how Thread looks on this device.</p></header>
+            <section className="settings-card theme-card">
+              <div className="settings-title"><Palette size={20} /><div><h3>Theme</h3><p>Choose a familiar palette. Your theme stays on this device.</p></div></div>
+              <div className="theme-groups">
+                {(['Light', 'Dark'] as const).map((mode) => (
+                  <div className="theme-group" key={mode}>
+                    <div className="theme-group-label">{mode}</div>
+                    <div className="theme-options">
+                      {themes.filter((item) => item.mode === mode).map((item) => (
+                        <button type="button" className="theme-option" aria-pressed={theme === item.id} onClick={() => chooseTheme(item.id)} key={item.id}>
+                          <span className="theme-swatches" aria-hidden="true">{item.swatches.map((color) => <span key={color} style={{ background: color }} />)}</span>
+                          <span className="theme-option-name">{item.name}</span>
+                          <span className="theme-check">{theme === item.id && <Check size={14} />}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </section>
+
+          <section className="settings-category" hidden={activeCategory !== 'sync'} aria-labelledby="settings-category-sync">
+            <header className="settings-category-header"><h2 id="settings-category-sync">Data &amp; sync</h2><p>Manage local storage, backup, and multi-device sync.</p></header>
       {conflicts.length > 0 && (
         <section className="settings-card conflicts-card">
           <div className="settings-title">
@@ -275,36 +345,6 @@ export function SettingsPage() {
         </section>
       )}
 
-      <MetadataSchemas />
-
-      <section className="settings-card theme-card">
-        <div className="settings-title"><Palette size={20} /><div><h2>Appearance</h2><p>Choose a familiar palette. Your theme stays on this device.</p></div></div>
-        <div className="theme-groups">
-          {(['Light', 'Dark'] as const).map((mode) => (
-            <div className="theme-group" key={mode}>
-              <div className="theme-group-label">{mode}</div>
-              <div className="theme-options">
-                {themes.filter((item) => item.mode === mode).map((item) => (
-                  <button
-                    type="button"
-                    className="theme-option"
-                    aria-pressed={theme === item.id}
-                    onClick={() => chooseTheme(item.id)}
-                    key={item.id}
-                  >
-                    <span className="theme-swatches" aria-hidden="true">
-                      {item.swatches.map((color) => <span key={color} style={{ background: color }} />)}
-                    </span>
-                    <span className="theme-option-name">{item.name}</span>
-                    <span className="theme-check">{theme === item.id && <Check size={14} />}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
       <section className="settings-card" id="sync-settings">
         <div className="settings-title"><GitBranch size={20} /><div><h2 ref={syncHeadingRef} tabIndex={-1}>GitHub sync</h2><p>Thread works locally first. Connect a private repository for backup and multi-device sync.</p></div></div>
         <div className="field-grid">
@@ -335,6 +375,11 @@ export function SettingsPage() {
         <div className="database-stat"><strong>{pending}</strong><span>changes waiting to sync</span></div>
       </section>
 
+          </section>
+
+          <section className="settings-category" hidden={activeCategory !== 'ai'} aria-labelledby="settings-category-ai">
+            <header className="settings-category-header"><h2 id="settings-category-ai">AI &amp; personas</h2><p>Connect a model provider and shape the assistants you work with.</p></header>
+
       <section className="settings-card">
         <div className="settings-title"><Bot size={20} /><div><h2>AI provider</h2><p>Bring your own API key. Switching providers here changes every persona at once -- no other setup needed.</p></div></div>
         <div className="field-grid">
@@ -359,8 +404,6 @@ export function SettingsPage() {
           {existingAI && <button className="text-button" onClick={() => { clearAIConfig(); setAIApiKey('') }}><Unplug size={15} /> Disconnect</button>}
         </div>
       </section>
-
-      <TrustedActionsCard />
 
       <section className="settings-card">
         <div className="settings-title"><Users size={20} /><div><h2>Personas</h2><p>Each persona keeps its own notes and sessions, alongside your other threads.</p></div></div>
@@ -413,12 +456,29 @@ export function SettingsPage() {
         )}
       </section>
 
+          </section>
+
+          <section className="settings-category" hidden={activeCategory !== 'workspace'} aria-labelledby="settings-category-workspace">
+            <header className="settings-category-header"><h2 id="settings-category-workspace">Workspace</h2><p>Define reusable structure for threads and their metadata.</p></header>
+
+            <MetadataSchemas />
+
       <section className="settings-card">
         <div className="settings-title"><FileText size={20} /><div><h2>Thread templates</h2><p>Mark any thread <em>Use as template</em> in its header, then copy it onto another from the Omnibox (<kbd>⌘⇧P</kbd> → Apply template).</p></div></div>
         <div className="settings-actions">
           <a className="secondary-button" href="#/templates">Manage templates</a>
         </div>
       </section>
+
+          </section>
+
+          <section className="settings-category" hidden={activeCategory !== 'security'} aria-labelledby="settings-category-security">
+            <header className="settings-category-header"><h2 id="settings-category-security">Security</h2><p>Review permissions that Thread can reuse without asking.</p></header>
+            <TrustedActionsCard />
+          </section>
+
+          <section className="settings-category" hidden={activeCategory !== 'help'} aria-labelledby="settings-category-help">
+            <header className="settings-category-header"><h2 id="settings-category-help">Help</h2><p>Learn the language and workflows available in Thread.</p></header>
 
       <section className="settings-card">
         <div className="settings-title"><BookOpen size={20} /><div><h2>Documentation</h2><p>Reference guides for Thread’s features.</p></div></div>
@@ -427,6 +487,10 @@ export function SettingsPage() {
           <a className="text-button" href="#/docs">All docs</a>
         </div>
       </section>
+
+          </section>
+        </div>
+      </div>
     </article>
   )
 }

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpenText, FileText, GitBranch, ListPlus, PanelRight, Search } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { applyThreadTemplate, createThread, db } from '../db'
 import { formatDay } from '../lib/dates'
 import { searchDays } from '../lib/search'
+import { rankThreadSuggestions } from '../lib/suggestions'
 
 interface OmniboxProps {
   open: boolean
@@ -15,6 +16,7 @@ interface OmniboxProps {
 
 interface OmniboxItem {
   id: string
+  group?: 'Threads' | 'Journal days' | 'Actions'
   icon: React.ReactNode
   iconClassName?: string
   title: React.ReactNode
@@ -32,6 +34,7 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
     return match ? decodeURIComponent(match[1]) : null
   })()
   const inputRef = useRef<HTMLInputElement>(null)
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
   const [rawValue, setRawValue] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(0)
   const [caretBump, setCaretBump] = useState(0)
@@ -229,6 +232,10 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
   }, [normalized, onTogglePanel, newThreadMatch, templateMatch, templates, activeThreadId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const dayHits = useMemo(() => searchDays(days, normalized), [days, normalized])
+  const threadHits = useMemo(
+    () => normalized ? rankThreadSuggestions(threads, normalized) : [],
+    [threads, normalized],
+  )
 
   const searchItems = useMemo<OmniboxItem[]>(() => {
     if (!normalized) {
@@ -240,19 +247,29 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
         onActivate: () => go(`/thread/${thread.id}`),
       }))
     }
-    const results: OmniboxItem[] = dayHits.map((hit) => ({
+    const results: OmniboxItem[] = threadHits.map((thread) => ({
+      id: `thread-${thread.id}`,
+      group: 'Threads',
+      icon: <span className="thread-dot" />,
+      title: thread.title,
+      subtitle: 'Thread',
+      onActivate: () => go(`/thread/${thread.id}`),
+    }))
+    results.push(...dayHits.map((hit) => ({
       id: `day-${hit.date}`,
+      group: 'Journal days' as const,
       icon: <BookOpenText size={18} />,
       title: `${formatDay(hit.date).weekday}, ${formatDay(hit.date).full}`,
       subtitle: hit.matchLine,
       onActivate: () => go(`/?date=${hit.date}`),
-    }))
+    })))
     // Fallback: unless the query already names an existing thread, offer to
     // start one with that name.
     const name = query.trim()
     if (name && !threads.some((thread) => thread.normalizedTitle === normalized)) {
       results.push({
         id: 'create-thread',
+        group: 'Actions',
         icon: <GitBranch size={18} />,
         iconClassName: 'command-icon-thread',
         title: `Open new thread "${name}"`,
@@ -262,7 +279,7 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
     }
     return results
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [normalized, dayHits, threads])
+  }, [normalized, dayHits, threadHits, threads])
 
   const items = mode === 'command' ? commandItems : searchItems
 
@@ -274,6 +291,11 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
     setSeenResultsKey(resultsKey)
     setHighlightedIndex(0)
   }
+
+  useEffect(() => {
+    if (!open) return
+    itemRefs.current[highlightedIndex]?.scrollIntoView({ block: 'nearest' })
+  }, [highlightedIndex, open, resultsKey])
 
   if (!open) return null
 
@@ -312,19 +334,27 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
 
         <div className="command-actions">
           {mode === 'search' && (
-            <div className="section-label"><span>{normalized ? 'Journal days' : 'Recent threads'}</span><small>{normalized ? dayHits.length : items.length}</small></div>
+            !normalized && <div className="section-label"><span>Recent threads</span><small>{items.length}</small></div>
           )}
           {items.map((item, index) => (
-            <button
-              key={item.id}
-              type="button"
-              className={index === highlightedIndex ? 'command-item-active' : undefined}
-              onMouseEnter={() => setHighlightedIndex(index)}
-              onClick={() => item.onActivate()}
-            >
-              <span className={`command-icon${item.iconClassName ? ` ${item.iconClassName}` : ''}`}>{item.icon}</span>
-              <span><strong>{item.title}</strong><small>{item.subtitle}</small></span>
-            </button>
+            <Fragment key={item.id}>
+              {mode === 'search' && normalized && item.group !== items[index - 1]?.group && (
+                <div className="section-label">
+                  <span>{item.group}</span>
+                  <small>{items.filter((candidate) => candidate.group === item.group).length}</small>
+                </div>
+              )}
+              <button
+                ref={(element) => { itemRefs.current[index] = element }}
+                type="button"
+                className={index === highlightedIndex ? 'command-item-active' : undefined}
+                onMouseEnter={() => setHighlightedIndex(index)}
+                onClick={() => item.onActivate()}
+              >
+                <span className={`command-icon${item.iconClassName ? ` ${item.iconClassName}` : ''}`}>{item.icon}</span>
+                <span><strong>{item.title}</strong><small>{item.subtitle}</small></span>
+              </button>
+            </Fragment>
           ))}
           {items.length === 0 && <p className="empty-hint">No matches for "{query}".</p>}
         </div>
