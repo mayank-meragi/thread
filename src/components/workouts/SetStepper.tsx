@@ -67,18 +67,11 @@ export function SetStepper({
   return (
     <div className="set-stepper">
       <span className="set-stepper-label">{label}</span>
-      <div className="set-stepper-controls">
-        <button
-          type="button"
-          className="set-stepper-btn"
-          aria-label={`Decrease ${label}`}
-          onClick={() => nudge(-1)}
-        >
-          <Minus size={16} aria-hidden="true" />
-        </button>
+      <span className="set-stepper-value">
         <input
           className="set-stepper-input"
           type="number"
+          size={5}
           inputMode={inputMode}
           step={integer ? 1 : step}
           min={min}
@@ -92,6 +85,16 @@ export function SetStepper({
           }}
         />
         {unit && text !== '' && <small className="set-stepper-unit">{unit}</small>}
+      </span>
+      <div className="set-stepper-controls">
+        <button
+          type="button"
+          className="set-stepper-btn"
+          aria-label={`Decrease ${label}`}
+          onClick={() => nudge(-1)}
+        >
+          <Minus size={16} aria-hidden="true" />
+        </button>
         <button
           type="button"
           className="set-stepper-btn"

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, Copy, History, Plus, RotateCcw, Square } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ActionBarPrimitive, AssistantRuntimeProvider, ComposerPrimitive, MessagePartPrimitive, MessagePrimitive, ThreadPrimitive, useLocalRuntime, type ThreadMessageLike } from '@assistant-ui/react'
+import { ActionBarPrimitive, AssistantRuntimeProvider, ComposerPrimitive, MessagePrimitive, ThreadPrimitive, useLocalRuntime, useMessagePartText, type ThreadMessageLike } from '@assistant-ui/react'
 import { MarkdownTextPrimitive } from '@assistant-ui/react-markdown'
 import { db } from '../../db'
 import { createSession, GENERAL_PERSONA_ID, WORKOUT_COACH_PERSONA_ID } from '../../lib/personas'
@@ -15,13 +15,14 @@ import { ToolCallCard } from '../chat/ToolCallCard'
 // context hook rather than a `text` prop, so it doesn't literally match the
 // `Text` slot's prop type -- wrap it to satisfy that without passing anything.
 function AssistantMarkdown() {
+  const part = useMessagePartText()
+  const streaming = part.status.type === 'running' && part.text.length > 0
   return (
     <>
       <MarkdownTextPrimitive />
-      {/* Blinking caret while this text part is still streaming in. */}
-      <MessagePartPrimitive.InProgress>
-        <span className="chat-cursor" aria-hidden="true" />
-      </MessagePartPrimitive.InProgress>
+      {/* Blinking caret only once text is actually streaming in -- gating on
+          `running` alone shows it under the thinking dots before any token. */}
+      {streaming && <span className="chat-cursor" aria-hidden="true" />}
     </>
   )
 }

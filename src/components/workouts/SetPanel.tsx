@@ -31,7 +31,7 @@ export function SetPanel({
     <div className="set-panel">
       <div className="set-steppers">
         <SetStepper
-          label={`Load (${draft.loadUnit ?? 'kg'})`}
+          label="Load"
           value={draft.load}
           step={2.5}
           inputMode="decimal"

@@ -1540,26 +1540,28 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 
 /* Steppers — three columns divided by hairlines, no per-cell chrome */
 .set-steppers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 2px; }
-.set-stepper { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 0 12px; }
+.set-stepper { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 0 10px; }
 .set-stepper:first-child { padding-left: 0; }
 .set-stepper:last-child { padding-right: 0; }
 .set-stepper + .set-stepper { border-left: 1px solid var(--line); }
 .set-stepper-label { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.set-stepper-controls { display: flex; align-items: center; gap: 4px; }
+.set-stepper-value { display: flex; align-items: baseline; gap: 3px; min-width: 0; }
+.set-stepper-controls { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
 .set-stepper-btn {
   width: 34px; height: 34px; flex: none; display: grid; place-items: center; padding: 0;
   border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); cursor: pointer;
 }
 .set-stepper-btn:hover { background: var(--control-hover); }
 .set-stepper-input {
-  flex: 1 1 auto; min-width: 0; width: 100%; height: 36px; padding: 0; text-align: center;
+  flex: none; min-width: 2ch; width: auto; max-width: 100%; padding: 0; text-align: left;
   border: 0; background: transparent; color: var(--ink);
-  font: 700 26px/1 'IBM Plex Sans', ui-sans-serif, sans-serif; font-variant-numeric: tabular-nums; outline: 0;
+  font: 700 22px/1 'IBM Plex Sans', ui-sans-serif, sans-serif; font-variant-numeric: tabular-nums; outline: 0;
+  field-sizing: content;
   -moz-appearance: textfield;
 }
 .set-stepper-input::-webkit-outer-spin-button,
 .set-stepper-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.set-stepper-unit { flex: none; margin-left: -2px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.set-stepper-unit { flex: none; font-size: 13px; font-weight: 500; color: var(--muted); }
 
 /* More details disclosure */
 .set-details-toggle {
