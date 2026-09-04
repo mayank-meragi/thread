@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { db, initializeDatabase, saveDay, setBlockProperty } from '../../db'
+import { db, initializeDatabase, saveDay, setBlockProperty, setThreadProperty } from '../../db'
 import { createWorkoutSubtask, createWorkoutTask } from '../tasks'
 import { getExerciseOccurrences, getWorkout, getWorkoutForBlock, getWorkoutRole, getWorkoutsForDay } from './selectors'
 import { setTaskStatus } from '../tasks'
@@ -60,6 +60,62 @@ describe('workout selectors', () => {
     const view = await getWorkout(workout.id)
 
     expect(view?.diagnostics.map((item) => item.code).sort()).toEqual(['invalid_set_properties', 'missing_exercise_link'])
+  })
+})
+
+describe('exercise guide hydration', () => {
+  it('omits guide entirely when the exercise thread has no guide content', async () => {
+    // A name unmatched by the vendored image dataset, so no field (guide or
+    // image) ends up populated -- isolates the "everything blank" case from
+    // the auto-applied image match exercised by the tests below.
+    await saveDay(DATE, [
+      '- [ ] #[workout] [[Push Day]]',
+      '  - [ ] #[exercise] [[Zzyzx Unmatched Movement]]',
+    ].join('\n'))
+    const view = (await getWorkoutsForDay(DATE))[0]
+    expect(view.exercises[0].guide).toBeUndefined()
+  })
+
+  it('hydrates guide fields from the exercise thread once any are set', async () => {
+    await saveDay(DATE, [
+      '- [ ] #[workout] [[Push Day]]',
+      '  - [ ] #[exercise] [[Bench Press]]',
+    ].join('\n'))
+    await setThreadProperty('bench-press', 'exercise-summary', 'A horizontal press', 'automation')
+    await setThreadProperty('bench-press', 'exercise-primary-muscles', ['chest'], 'automation')
+
+    const view = (await getWorkoutsForDay(DATE))[0]
+    expect(view.exercises[0].guide).toMatchObject({ summary: 'A horizontal press', primaryMuscles: ['chest'] })
+  })
+
+  it('hydrates the same thread guide for the same exercise occurring on two different days', async () => {
+    await saveDay(DATE, [
+      '- [ ] #[workout] [[Push Day]]',
+      '  - [ ] #[exercise] [[Bench Press]]',
+    ].join('\n'))
+    await setThreadProperty('bench-press', 'exercise-summary', 'Shared guide', 'automation')
+
+    const otherDate = '2026-09-08'
+    await saveDay(otherDate, [
+      '- [ ] #[workout] [[Push Day 2]]',
+      '  - [ ] #[exercise] [[Bench Press]]',
+    ].join('\n'))
+
+    const first = (await getWorkoutsForDay(DATE))[0]
+    const second = (await getWorkoutsForDay(otherDate))[0]
+    expect(first.exercises[0].guide?.summary).toBe('Shared guide')
+    expect(second.exercises[0].guide?.summary).toBe('Shared guide')
+  })
+
+  it('preserves exercise order across the buildWorkout Promise.all conversion', async () => {
+    await saveDay(DATE, [
+      '- [ ] #[workout] [[Push Day]]',
+      '  - [ ] #[exercise] [[Bench Press]]',
+      '  - [ ] #[exercise] [[Incline Press]]',
+      '  - [ ] #[exercise] [[Fly]]',
+    ].join('\n'))
+    const view = (await getWorkoutsForDay(DATE))[0]
+    expect(view.exercises.map((exercise) => exercise.exerciseThread?.title)).toEqual(['Bench Press', 'Incline Press', 'Fly'])
   })
 })
 

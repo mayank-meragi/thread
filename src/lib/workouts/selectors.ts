@@ -1,7 +1,7 @@
-import { db, type BlockPropertyRecord, type BlockTagRecord, type PropertyValue, type TaskRecord, type ThreadOccurrenceRecord } from '../../db'
+import { db, type BlockPropertyRecord, type BlockTagRecord, type PropertyValue, type TaskRecord, type ThreadOccurrenceRecord, type ThreadPropertyRecord } from '../../db'
 import type { OutlineBlock } from '../outline'
 import { workoutRoleFromTagIds, type WorkoutRole } from './systemTags'
-import type { WorkoutDiagnostic, WorkoutExerciseView, WorkoutSetView, WorkoutView } from './types'
+import type { ExerciseGuideView, WorkoutDiagnostic, WorkoutExerciseView, WorkoutSetView, WorkoutView } from './types'
 
 interface DayWorkoutSnapshot {
   tasks: TaskRecord[]
@@ -51,7 +51,36 @@ function validateSetProperties(blockId: string, values: Map<string, PropertyValu
   return invalid ? { code: 'invalid_set_properties', blockId, message: 'This set has invalid or incomplete measurements.' } : undefined
 }
 
-function buildWorkout(snapshot: DayWorkoutSnapshot, workoutTaskId: string): WorkoutView | undefined {
+function buildGuideView(rows: ThreadPropertyRecord[]): ExerciseGuideView | undefined {
+  const byId = new Map(rows.map((row) => [row.propertyId, row.value]))
+  const text = (id: string): string | undefined => {
+    const value = byId.get(id)
+    return typeof value === 'string' && value ? value : undefined
+  }
+  const list = (id: string): string[] => {
+    const value = byId.get(id)
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+  }
+  const guide: ExerciseGuideView = {
+    summary: text('exercise-summary'),
+    primaryMuscles: list('exercise-primary-muscles'),
+    secondaryMuscles: list('exercise-secondary-muscles'),
+    equipment: list('exercise-equipment'),
+    setup: text('exercise-setup'),
+    execution: text('exercise-execution'),
+    cues: text('exercise-cues'),
+    commonMistakes: text('exercise-common-mistakes'),
+    safetyNotes: text('exercise-safety-notes'),
+    imageUrls: list('exercise-image-urls'),
+  }
+  const hasContent = Boolean(
+    guide.summary || guide.setup || guide.execution || guide.cues || guide.commonMistakes || guide.safetyNotes
+    || guide.primaryMuscles.length || guide.secondaryMuscles.length || guide.equipment.length || guide.imageUrls.length,
+  )
+  return hasContent ? guide : undefined
+}
+
+async function buildWorkout(snapshot: DayWorkoutSnapshot, workoutTaskId: string): Promise<WorkoutView | undefined> {
   const taskById = new Map(snapshot.tasks.map((task) => [task.id, task]))
   const tagsByBlock = groupBy(snapshot.tags, (row) => row.blockId)
   const propertiesByBlock = groupBy(snapshot.properties, (row) => row.blockId)
@@ -73,6 +102,15 @@ function buildWorkout(snapshot: DayWorkoutSnapshot, workoutTaskId: string): Work
 
   const diagnostics: WorkoutDiagnostic[] = []
   const exerciseTasks = snapshot.tasks.filter((task) => roleOf(task.id) === 'exercise' && nearestRoleAncestor(task, 'workout')?.id === workout.id)
+
+  const exerciseThreadIds = exerciseTasks
+    .map((exercise) => occurrencesByBlock.get(exercise.id)?.[0]?.threadId)
+    .filter((id): id is string => Boolean(id))
+  const guideRows = exerciseThreadIds.length
+    ? await db.threadProperties.where('threadId').anyOf(exerciseThreadIds).toArray()
+    : []
+  const guideByThread = groupBy(guideRows, (row) => row.threadId)
+
   const exercises: WorkoutExerciseView[] = exerciseTasks.map((exercise) => {
     const occurrence = occurrencesByBlock.get(exercise.id)?.[0]
     if (!occurrence) diagnostics.push({ code: 'missing_exercise_link', blockId: exercise.id, message: 'Exercise tasks should link to an exercise thread.' })
@@ -87,6 +125,7 @@ function buildWorkout(snapshot: DayWorkoutSnapshot, workoutTaskId: string): Work
     return {
       task: exercise,
       exerciseThread: occurrence ? { id: occurrence.threadId, title: occurrence.title } : undefined,
+      guide: occurrence ? buildGuideView(guideByThread.get(occurrence.threadId) ?? []) : undefined,
       sets,
       notes: snapshot.blocks.filter((block) => block.parentId === exercise.id && block.kind !== 'task'),
     }
@@ -116,7 +155,7 @@ export async function getWorkoutRole(blockId: string): Promise<WorkoutRole | und
 
 export async function getWorkout(workoutTaskId: string): Promise<WorkoutView | undefined> {
   const task = await db.tasks.get(workoutTaskId)
-  return task ? buildWorkout(await loadDaySnapshot(task.day), workoutTaskId) : undefined
+  return task ? await buildWorkout(await loadDaySnapshot(task.day), workoutTaskId) : undefined
 }
 
 export async function getWorkoutForBlock(blockId: string): Promise<WorkoutView | undefined> {
@@ -128,7 +167,7 @@ export async function getWorkoutForBlock(blockId: string): Promise<WorkoutView |
   const tagsByBlock = groupBy(snapshot.tags, (row) => row.blockId)
   let currentId: string | null | undefined = taskById.has(blockId) ? blockId : block.parentId
   while (currentId) {
-    if (workoutRoleFromTagIds((tagsByBlock.get(currentId) ?? []).map((tag) => tag.tagId)) === 'workout') return buildWorkout(snapshot, currentId)
+    if (workoutRoleFromTagIds((tagsByBlock.get(currentId) ?? []).map((tag) => tag.tagId)) === 'workout') return await buildWorkout(snapshot, currentId)
     currentId = taskById.get(currentId)?.parentTaskId ?? blockById.get(currentId)?.parentId
   }
   return undefined
@@ -137,10 +176,12 @@ export async function getWorkoutForBlock(blockId: string): Promise<WorkoutView |
 export async function getWorkoutsForDay(day: string): Promise<WorkoutView[]> {
   const snapshot = await loadDaySnapshot(day)
   const tagsByBlock = groupBy(snapshot.tags, (row) => row.blockId)
-  return snapshot.tasks
-    .filter((task) => workoutRoleFromTagIds((tagsByBlock.get(task.id) ?? []).map((tag) => tag.tagId)) === 'workout')
-    .map((task) => buildWorkout(snapshot, task.id))
-    .filter((workout): workout is WorkoutView => Boolean(workout))
+  const workouts = await Promise.all(
+    snapshot.tasks
+      .filter((task) => workoutRoleFromTagIds((tagsByBlock.get(task.id) ?? []).map((tag) => tag.tagId)) === 'workout')
+      .map((task) => buildWorkout(snapshot, task.id)),
+  )
+  return workouts.filter((workout): workout is WorkoutView => Boolean(workout))
 }
 
 export async function getActiveWorkout(day?: string): Promise<WorkoutView | undefined> {

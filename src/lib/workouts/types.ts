@@ -14,9 +14,23 @@ export interface WorkoutSetView {
   tags: BlockTagRecord[]
 }
 
+export interface ExerciseGuideView {
+  summary?: string
+  primaryMuscles: string[]
+  secondaryMuscles: string[]
+  equipment: string[]
+  setup?: string
+  execution?: string
+  cues?: string
+  commonMistakes?: string
+  safetyNotes?: string
+  imageUrls: string[]
+}
+
 export interface WorkoutExerciseView {
   task: TaskRecord
   exerciseThread?: { id: string; title: string }
+  guide?: ExerciseGuideView
   sets: WorkoutSetView[]
   notes: OutlineBlock[]
 }

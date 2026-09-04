@@ -40,7 +40,7 @@ describe('Thread AI context', () => {
     expect(context.resources.templates).toContainEqual({ id: templateId, title: 'Weekly Review' })
     expect(context.resources.tags).toContainEqual({ id: 'project', name: 'project' })
     expect(context.resources.taskCounts).toMatchObject({ blocked: 1, done: 1, not_started: 0 })
-    expect(context.threadScript.availableCommandCount).toBe(20)
+    expect(context.threadScript.availableCommandCount).toBe(21)
   })
 
   it('includes the selected journal date and never constructs credential fields', async () => {
@@ -118,7 +118,7 @@ describe('ThreadScript capability help', () => {
   it('returns compact template-focused help with generated input and output schemas', () => {
     const help = getThreadScriptHelp('create and apply templates', { limit: 4 })
 
-    expect(help.availableCommandCount).toBe(20)
+    expect(help.availableCommandCount).toBe(21)
     expect(help.commands.map((command) => command.name)).toEqual(expect.arrayContaining(['template.create', 'template.apply']))
     const create = help.commands.find((command) => command.name === 'template.create')!
     expect(create.example).toContain('action template.create')
@@ -135,7 +135,7 @@ describe('ThreadScript capability help', () => {
   it('caps detailed help while retaining the complete compact category catalog', () => {
     const help = getThreadScriptHelp('', { limit: 2 })
     expect(help.commands).toHaveLength(2)
-    expect(help.categories.flatMap((category) => category.commands)).toHaveLength(20)
+    expect(help.categories.flatMap((category) => category.commands)).toHaveLength(21)
   })
 })
 

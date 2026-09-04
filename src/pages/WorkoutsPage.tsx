@@ -17,7 +17,7 @@ function workoutLabel(workout: WorkoutView): string {
 function WorkoutRow({ workout }: { workout: WorkoutView }) {
   const state = workoutLensState(workout)
   const tally = tallyWorkoutSets(workout)
-  const href = `/workout/${workout.task.day}/${workout.task.id}`
+  const href = `/workout/${workout.task.day}/${workout.task.id}/overview`
   return (
     <div className="today-workout-row">
       <span className={`today-workout-state state-${state}`}>{STATE_LABEL[state]}</span>
@@ -38,7 +38,7 @@ export function WorkoutsPage() {
     try {
       const today = isoToday()
       const id = await createWorkout({ day: today })
-      navigate(`/workout/${today}/${id}`)
+      navigate(`/workout/${today}/${id}/overview`)
     } finally {
       setBusy(false)
     }

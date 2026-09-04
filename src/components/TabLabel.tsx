@@ -12,7 +12,7 @@ export function TabLabel({ path }: { path: string }) {
   if (pathname === '/docs' || pathname.startsWith('/docs/')) return <>Docs</>
   const threadMatch = pathname.match(/^\/thread\/(.+)$/)
   if (threadMatch) return <ThreadTabLabel threadId={decodeURIComponent(threadMatch[1])} />
-  const workoutMatch = pathname.match(/^\/workout\/([^/]+)\/(.+)$/)
+  const workoutMatch = pathname.match(/^\/workout\/([^/]+)\/([^/]+)(?:\/overview)?$/)
   if (workoutMatch) return <WorkoutTabLabel blockId={decodeURIComponent(workoutMatch[2])} />
   return <>{pathname}</>
 }

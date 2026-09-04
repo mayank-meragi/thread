@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { db, initializeDatabase } from '../../db'
+import { db, initializeDatabase, setThreadProperty } from '../../db'
 import { compileThreadScript } from '../threadscript/compiler'
 import { dispatchApprovedProposal } from '../threadscript/dispatch'
 import { resolvePlan } from '../threadscript/plan'
@@ -157,6 +157,94 @@ describe('workout edit commands', () => {
     await expect(commandRegistry.prepare('workout.updateExercise', {
       day: DAY, exercise: 'Nonexistent', sets: [{ reps: 1 }],
     })).rejects.toThrow(/no exercise/i)
+  })
+})
+
+describe('exercise guide payload', () => {
+  it('workout.buildDay writes guide fields as source "automation", leaving unset fields untouched', async () => {
+    const prepared = await commandRegistry.prepare('workout.buildDay', {
+      day: DAY,
+      title: 'Lower A',
+      exercises: [
+        {
+          name: 'Back Squat',
+          sets: [{ load: 100, loadUnit: 'kg', reps: 5 }],
+          guide: { summary: 'A bilateral squat pattern', primaryMuscles: ['quadriceps', 'glutes'] },
+        },
+      ],
+    })
+    expect(prepared.preview.changes.some((change) => change.field === 'Back Squat guide')).toBe(true)
+    await commandRegistry.execute(prepared, { idempotencyKey: 'p:0' })
+
+    expect(await db.threadProperties.get('back-squat:exercise-summary')).toMatchObject({ value: 'A bilateral squat pattern', source: 'automation' })
+    expect(await db.threadProperties.get('back-squat:exercise-primary-muscles')).toMatchObject({ value: ['quadriceps', 'glutes'], source: 'automation' })
+    // Fields not in the guide input stay whatever the auto-applied blank template set them to.
+    expect(await db.threadProperties.get('back-squat:exercise-cues')).toMatchObject({ value: '', source: 'default' })
+  })
+
+  it('workout.addExercises drops a guide field the exercise thread already has explicit, keeps the rest', async () => {
+    await seedWorkout()
+    await setThreadProperty('bench-press', 'exercise-summary', 'My own summary', 'explicit')
+
+    const prepared = await commandRegistry.prepare('workout.addExercises', {
+      day: DAY,
+      exercises: [{
+        name: 'Bench Press',
+        sets: [{ reps: 8 }],
+        guide: { summary: 'AI summary', cues: 'Squeeze the bar' },
+      }],
+    })
+    await commandRegistry.execute(prepared, { idempotencyKey: 'p:0' })
+
+    expect(await db.threadProperties.get('bench-press:exercise-summary')).toMatchObject({ value: 'My own summary', source: 'explicit' })
+    expect(await db.threadProperties.get('bench-press:exercise-cues')).toMatchObject({ value: 'Squeeze the bar', source: 'automation' })
+  })
+
+  it('a legacy exercise entry with no "guide" key executes identically to today', async () => {
+    const prepared = await commandRegistry.prepare('workout.buildDay', BUILD_INPUT)
+    const result = await commandRegistry.execute(prepared, { idempotencyKey: 'p:0' })
+    expect(result).toEqual({ workout: expect.any(String), day: DAY, exerciseCount: 2, setCount: 3 })
+  })
+})
+
+describe('workout.refreshExerciseGuide', () => {
+  it('previews only fields that will change, excludes explicit fields, and writes as automation', async () => {
+    await seedWorkout()
+    await setThreadProperty('bench-press', 'exercise-cues', 'user cue', 'explicit')
+
+    const prepared = await commandRegistry.prepare('workout.refreshExerciseGuide', {
+      exercise: 'Bench Press',
+      guide: { summary: 'A pressing movement', cues: 'AI cue' },
+    })
+
+    expect(prepared.preview.changes).toHaveLength(1)
+    expect(prepared.preview.changes[0]).toMatchObject({ field: 'Summary', before: '', after: 'A pressing movement' })
+
+    const result = await commandRegistry.execute(prepared, { idempotencyKey: 'p:0' }) as { thread: string; changed: boolean; fields: string[] }
+    expect(result).toMatchObject({ thread: 'bench-press', changed: true, fields: ['exercise-summary'] })
+
+    expect(await db.threadProperties.get('bench-press:exercise-summary')).toMatchObject({ value: 'A pressing movement', source: 'automation' })
+    expect(await db.threadProperties.get('bench-press:exercise-cues')).toMatchObject({ value: 'user cue', source: 'explicit' })
+  })
+
+  it('previews an empty change list and a "no changes" summary when nothing is left to update', async () => {
+    await seedWorkout()
+    await setThreadProperty('bench-press', 'exercise-summary', 'same', 'automation')
+
+    const prepared = await commandRegistry.prepare('workout.refreshExerciseGuide', {
+      exercise: 'Bench Press',
+      guide: { summary: 'same' },
+    })
+
+    expect(prepared.preview.changes).toEqual([])
+    expect(prepared.preview.summary).toMatch(/no guide changes/i)
+  })
+
+  it('rejects a nonexistent exercise thread', async () => {
+    await expect(commandRegistry.prepare('workout.refreshExerciseGuide', {
+      exercise: 'Nonexistent Exercise',
+      guide: { summary: 'x' },
+    })).rejects.toThrow(/was not found/i)
   })
 })
 

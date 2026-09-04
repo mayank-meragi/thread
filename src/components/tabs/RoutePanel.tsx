@@ -7,6 +7,7 @@ import { SearchPage } from '../../pages/SearchPage'
 import { SettingsPage } from '../../pages/SettingsPage'
 import { TemplatesPage } from '../../pages/TemplatesPage'
 import { WorkoutPage } from '../../pages/WorkoutPage'
+import { WorkoutOverviewPage } from '../../pages/WorkoutOverviewPage'
 import { WorkoutsPage } from '../../pages/WorkoutsPage'
 import { DocsPage } from '../../pages/DocsPage'
 
@@ -21,6 +22,7 @@ export function RoutePanel({ params }: IDockviewPanelProps<RoutePanelParams>) {
         <Route path="/" element={<TodayPage />} />
         <Route path="/thread/:threadId" element={<ThreadPage />} />
         <Route path="/workout/:day/:blockId" element={<WorkoutPage />} />
+        <Route path="/workout/:day/:blockId/overview" element={<WorkoutOverviewPage />} />
         <Route path="/workouts" element={<WorkoutsPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/search" element={<SearchPage />} />

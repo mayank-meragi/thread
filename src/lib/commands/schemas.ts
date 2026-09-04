@@ -57,3 +57,9 @@ export const workoutLifecycleResultSchema = z.object({
   status: z.string(),
   set: z.string().optional(),
 }).strict()
+
+export const workoutGuideResultSchema = z.object({
+  thread: z.string(),
+  changed: z.boolean(),
+  fields: z.array(z.string()),
+}).strict()

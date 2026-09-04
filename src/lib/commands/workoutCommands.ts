@@ -1,6 +1,7 @@
 import { z } from 'zod'
-import type { PropertyValue } from '../../db'
+import { db, type PropertyValue } from '../../db'
 import { isoToday } from '../dates'
+import { applyGuideUpdate, planGuideUpdate, type ExerciseGuideInput } from '../exerciseGuide'
 import { slugifyThread } from '../outline'
 import {
   ActiveWorkoutConflictError,
@@ -21,7 +22,8 @@ import {
 import { describeSet, stripStructuralTag, workoutLensState } from '../workouts/presentation'
 import { getActiveWorkout, getWorkoutsForDay } from '../workouts/selectors'
 import type { WorkoutExerciseView, WorkoutView } from '../workouts/types'
-import { workoutBuildResultSchema, workoutEditResultSchema, workoutLifecycleResultSchema } from './schemas'
+import { resolveThread, threadTarget } from './resolve'
+import { workoutBuildResultSchema, workoutEditResultSchema, workoutGuideResultSchema, workoutLifecycleResultSchema } from './schemas'
 import { defineCommand, type CommandChange, type CommandDefinition, type CommandTarget } from './types'
 
 // ---------------------------------------------------------------------------
@@ -52,9 +54,22 @@ const setInputSchema = z.object({
 
 type SetInput = z.infer<typeof setInputSchema>
 
+const exerciseGuideInputSchema = z.object({
+  summary: z.string().trim().min(1).optional(),
+  primaryMuscles: z.array(z.string()).optional(),
+  secondaryMuscles: z.array(z.string()).optional(),
+  equipment: z.array(z.string()).optional(),
+  setup: z.string().trim().min(1).optional(),
+  execution: z.string().trim().min(1).optional(),
+  cues: z.string().trim().min(1).optional(),
+  commonMistakes: z.string().trim().min(1).optional(),
+  safetyNotes: z.string().trim().min(1).optional(),
+}).strict()
+
 const exerciseInputSchema = z.object({
   name: z.string().trim().min(1),
   sets: z.array(setInputSchema).min(1).max(12),
+  guide: exerciseGuideInputSchema.optional(),
 }).strict()
 
 /** Friendly keys → the `set-*` block-property ids `assertValidSetMeasurements` / `updateSet` expect. */
@@ -126,6 +141,7 @@ interface PlannedExercise {
   name: string
   sets: SetPropertyInput[]
   summaries: string[]
+  guide?: ExerciseGuideInput
 }
 
 function planExercises(exercises: z.infer<typeof exerciseInputSchema>[]): PlannedExercise[] {
@@ -133,6 +149,7 @@ function planExercises(exercises: z.infer<typeof exerciseInputSchema>[]): Planne
     name: exercise.name,
     sets: exercise.sets.map((set, index) => validateSet(exercise.name, index, set)),
     summaries: summariesFor(exercise.sets),
+    guide: exercise.guide,
   }))
 }
 
@@ -140,6 +157,13 @@ async function writeExercises(workoutTaskId: string, exercises: PlannedExercise[
   let setCount = 0
   for (const exercise of exercises) {
     const exerciseTaskId = await addExercise(workoutTaskId, exercise.name)
+    if (exercise.guide) {
+      const occurrence = await db.occurrences.where('rootBlockId').equals(exerciseTaskId).first()
+      if (occurrence) {
+        const changes = await planGuideUpdate(occurrence.threadId, exercise.guide)
+        await applyGuideUpdate(occurrence.threadId, changes)
+      }
+    }
     for (const set of exercise.sets) {
       const setTaskId = await addSet(exerciseTaskId)
       if (hasMeasurement(set as SetInput)) await updateSet(setTaskId, set)
@@ -214,6 +238,12 @@ const buildDay = defineCommand({
           field: exercise.name,
           description: `${exercise.sets.length} set(s): ${exercise.summaries.join(' · ')}`,
         })),
+        ...resolved.exercises.filter((exercise) => exercise.guide).map((exercise) => ({
+          kind: 'update' as const,
+          target,
+          field: `${exercise.name} guide`,
+          description: `Set guide fields: ${Object.keys(exercise.guide!).join(', ')}`,
+        })),
       ],
     }
   },
@@ -254,12 +284,20 @@ const addExercises = defineCommand({
     const target = workoutTarget(resolved.day, resolved.title)
     return {
       summary: `Add ${resolved.exercises.length} exercise(s) to “${resolved.title}”`,
-      changes: resolved.exercises.map((exercise) => ({
-        kind: 'append' as const,
-        target,
-        field: exercise.name,
-        description: `Add “${exercise.name}” — ${exercise.sets.length} set(s): ${exercise.summaries.join(' · ')}`,
-      })),
+      changes: [
+        ...resolved.exercises.map((exercise) => ({
+          kind: 'append' as const,
+          target,
+          field: exercise.name,
+          description: `Add “${exercise.name}” — ${exercise.sets.length} set(s): ${exercise.summaries.join(' · ')}`,
+        })),
+        ...resolved.exercises.filter((exercise) => exercise.guide).map((exercise) => ({
+          kind: 'update' as const,
+          target,
+          field: `${exercise.name} guide`,
+          description: `Set guide fields: ${Object.keys(exercise.guide!).join(', ')}`,
+        })),
+      ],
     }
   },
   execute: async (resolved) => {
@@ -581,6 +619,48 @@ const finish = defineCommand({
   },
 })
 
+const refreshExerciseGuide = defineCommand({
+  name: 'workout.refreshExerciseGuide',
+  summary: 'Regenerate or fill in an exercise’s reusable guide (summary, muscles, equipment, cues, etc.) without touching fields the user has edited.',
+  category: 'workouts',
+  keywords: ['exercise', 'guide', 'muscles', 'equipment', 'cues', 'refresh', 'regenerate'],
+  example:
+    'action workout.refreshExerciseGuide\n' +
+    '  exercise: "Back Squat"\n' +
+    '  guide:\n' +
+    '    summary: "A bilateral squat pattern..."\n' +
+    '    primaryMuscles: ["quadriceps", "glutes"]',
+  risk: 'write',
+  idempotency: 'receipt-required',
+  inputSchema: z.object({
+    exercise: z.string().trim().min(1),
+    guide: exerciseGuideInputSchema,
+  }).strict(),
+  outputSchema: workoutGuideResultSchema,
+  resolve: async (input, context) => {
+    const thread = await resolveThread(input.exercise, undefined, context)
+    const changes = await planGuideUpdate(thread.id, input.guide)
+    return { thread, changes }
+  },
+  preview: ({ thread, changes }) => ({
+    summary: changes.length
+      ? `Update ${changes.length} guide field(s) for “${thread.title}”`
+      : `No guide changes for “${thread.title}” — every proposed field is already set explicitly or unchanged`,
+    changes: changes.map((change) => ({
+      kind: 'update' as const,
+      target: threadTarget(thread),
+      field: change.fieldName,
+      description: `${change.before === undefined ? 'Set' : 'Update'} “${change.fieldName}”`,
+      before: change.before,
+      after: change.after,
+    })),
+  }),
+  execute: async ({ thread, changes }) => {
+    await applyGuideUpdate(thread.id, changes)
+    return { thread: thread.id, changed: changes.length > 0, fields: changes.map((change) => change.propertyId) }
+  },
+})
+
 export const workoutCommands: readonly CommandDefinition[] = [
   buildDay,
   addExercises,
@@ -589,4 +669,5 @@ export const workoutCommands: readonly CommandDefinition[] = [
   start,
   logSet,
   finish,
+  refreshExerciseGuide,
 ]

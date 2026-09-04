@@ -34,6 +34,7 @@ describe('command registry', () => {
       'workout.buildDay',
       'workout.finish',
       'workout.logSet',
+      'workout.refreshExerciseGuide',
       'workout.removeExercise',
       'workout.start',
       'workout.updateExercise',

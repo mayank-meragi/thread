@@ -61,6 +61,49 @@ export interface BlockIdentityRecord {
   fingerprint: string
 }
 
+export const EXERCISE_MUSCLE_OPTIONS: PropertyOption[] = [
+  { id: 'chest', label: 'Chest' },
+  { id: 'lats', label: 'Lats' },
+  { id: 'upper-back', label: 'Upper back' },
+  { id: 'front-delts', label: 'Front delts' },
+  { id: 'side-delts', label: 'Side delts' },
+  { id: 'rear-delts', label: 'Rear delts' },
+  { id: 'biceps', label: 'Biceps' },
+  { id: 'triceps', label: 'Triceps' },
+  { id: 'forearms', label: 'Forearms' },
+  { id: 'abs', label: 'Abs' },
+  { id: 'obliques', label: 'Obliques' },
+  { id: 'spinal-erectors', label: 'Spinal erectors' },
+  { id: 'glutes', label: 'Glutes' },
+  { id: 'quadriceps', label: 'Quadriceps' },
+  { id: 'hamstrings', label: 'Hamstrings' },
+  { id: 'adductors', label: 'Adductors' },
+  { id: 'abductors', label: 'Abductors' },
+  { id: 'hip-flexors', label: 'Hip flexors' },
+  { id: 'calves', label: 'Calves' },
+  { id: 'tibialis-anterior', label: 'Tibialis anterior' },
+]
+
+export const EXERCISE_EQUIPMENT_OPTIONS: PropertyOption[] = [
+  { id: 'barbell', label: 'Barbell' },
+  { id: 'dumbbell', label: 'Dumbbell' },
+  { id: 'kettlebell', label: 'Kettlebell' },
+  { id: 'machine', label: 'Machine' },
+  { id: 'cable', label: 'Cable' },
+  { id: 'bodyweight', label: 'Bodyweight' },
+  { id: 'band', label: 'Band' },
+  { id: 'bench', label: 'Bench' },
+  { id: 'pull-up-bar', label: 'Pull-up bar' },
+  { id: 'smith-machine', label: 'Smith machine' },
+  { id: 'ez-bar', label: 'EZ bar' },
+  { id: 'trap-bar', label: 'Trap bar' },
+  { id: 'medicine-ball', label: 'Medicine ball' },
+  { id: 'suspension-trainer', label: 'Suspension trainer (TRX)' },
+  { id: 'sled', label: 'Sled' },
+  { id: 'box', label: 'Box / step' },
+  { id: 'foam-roller', label: 'Foam roller' },
+]
+
 export const BUILT_IN_PROPERTIES: Array<Omit<PropertyDefinitionRecord, 'createdAt' | 'updatedAt'>> = [
   { id: 'description', name: 'Description', type: 'rich_text', system: true },
   {
@@ -107,6 +150,16 @@ export const BUILT_IN_PROPERTIES: Array<Omit<PropertyDefinitionRecord, 'createdA
       { id: 'mi', label: 'mi' },
     ],
   },
+  { id: 'exercise-summary', name: 'Summary', type: 'rich_text', system: true },
+  { id: 'exercise-primary-muscles', name: 'Primary muscles', type: 'multi_select', system: true, options: EXERCISE_MUSCLE_OPTIONS },
+  { id: 'exercise-secondary-muscles', name: 'Secondary muscles', type: 'multi_select', system: true, options: EXERCISE_MUSCLE_OPTIONS },
+  { id: 'exercise-equipment', name: 'Equipment', type: 'multi_select', system: true, options: EXERCISE_EQUIPMENT_OPTIONS },
+  { id: 'exercise-setup', name: 'Setup', type: 'rich_text', system: true },
+  { id: 'exercise-execution', name: 'Execution', type: 'rich_text', system: true },
+  { id: 'exercise-cues', name: 'Cues', type: 'rich_text', system: true },
+  { id: 'exercise-common-mistakes', name: 'Common mistakes', type: 'rich_text', system: true },
+  { id: 'exercise-safety-notes', name: 'Safety notes', type: 'rich_text', system: true },
+  { id: 'exercise-image-urls', name: 'Reference images', type: 'relation', system: true },
 ]
 
 export const BUILT_IN_TAGS: Array<Omit<TagDefinitionRecord, 'createdAt' | 'updatedAt'>> = [

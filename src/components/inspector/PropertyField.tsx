@@ -68,6 +68,30 @@ export function PropertyControl({
   if (definition.type === 'rich_text' && !compact) {
     return <textarea value={draft} rows={3} placeholder="Add context…" onChange={(event) => setDraft(event.target.value)} onBlur={() => void save(draft)} />
   }
+  if (definition.type === 'multi_select' && definition.options?.length) {
+    const selected = new Set(Array.isArray(value) ? value : [])
+    const toggle = (optionId: string) => {
+      const next = new Set(selected)
+      if (next.has(optionId)) next.delete(optionId)
+      else next.add(optionId)
+      void save(Array.from(next))
+    }
+    return (
+      <div className="property-multi-select" role="group" aria-label={definition.name}>
+        {definition.options.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            className={selected.has(option.id) ? 'property-chip active' : 'property-chip'}
+            aria-pressed={selected.has(option.id)}
+            onClick={() => toggle(option.id)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    )
+  }
   if (definition.type === 'multi_select' || definition.type === 'relation') {
     return <input value={draft} placeholder="Comma-separated values" onChange={(event) => setDraft(event.target.value)} onBlur={() => void save(draft.split(',').map((item) => item.trim()).filter(Boolean))} />
   }

@@ -1,90 +1,70 @@
-import { useCallback, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Plus } from 'lucide-react'
 import { addExercise } from '../lib/workouts/mutations'
 import { getWorkout } from '../lib/workouts/selectors'
-import { nextActionableSetId } from '../lib/workouts/presentation'
-import type { WorkoutExerciseView, WorkoutView } from '../lib/workouts/types'
-import { WorkoutHeader } from '../components/workouts/WorkoutHeader'
+import { stripStructuralTag } from '../lib/workouts/presentation'
 import { WorkoutDiagnostics } from '../components/workouts/WorkoutDiagnostics'
 import { ActiveExercise } from '../components/workouts/ActiveExercise'
-import { CollapsedExercise } from '../components/workouts/CollapsedExercise'
-import { CompleteSetBar } from '../components/workouts/CompleteSetBar'
+import { ExerciseTopBar } from '../components/workouts/ExerciseTopBar'
 
-function firstPendingSetId(exercise: WorkoutExerciseView | null): string {
-  if (!exercise) return ''
-  const pending = exercise.sets.find(
-    (set) => set.task.status !== 'done' && set.task.status !== 'canceled',
-  )
-  return pending?.task.id ?? exercise.sets[exercise.sets.length - 1]?.task.id ?? ''
-}
-
-function exerciseOwningSet(view: WorkoutView, setId: string): WorkoutExerciseView | undefined {
-  return view.exercises.find((exercise) => exercise.sets.some((set) => set.task.id === setId))
-}
+const SWIPE_THRESHOLD_PX = 50
 
 export function WorkoutPage() {
   const { day = '', blockId = '' } = useParams()
+  const navigate = useNavigate()
   // `undefined` = still loading; `null` = resolved, but this block is not a workout.
   const view = useLiveQuery(async () => (blockId ? (await getWorkout(blockId)) ?? null : null), [blockId])
 
-  // The selection is stored as "intent"; the effective ids are derived each
-  // render with fallbacks so a deleted/completed target self-heals.
-  const [pickedExerciseId, setPickedExerciseId] = useState('')
-  const [pickedSetId, setPickedSetId] = useState('')
-  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [index, setIndex] = useState(0)
   const [exerciseTitle, setExerciseTitle] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
   const [addingExercise, setAddingExercise] = useState(false)
-  const flushRef = useRef<() => Promise<void>>(async () => {})
-  const registerFlush = useCallback((flush: () => Promise<void>) => {
-    flushRef.current = flush
-  }, [])
+  const touchStartX = useRef<number | null>(null)
 
-  const exercises = view ? view.exercises : []
+  const overviewHref = `/workout/${day}/${blockId}/overview`
 
-  let effectiveExerciseId = ''
-  if (exercises.some((exercise) => exercise.task.id === pickedExerciseId)) {
-    effectiveExerciseId = pickedExerciseId
-  } else if (view) {
-    const nextSet = nextActionableSetId(view)
-    const owner = nextSet ? exerciseOwningSet(view, nextSet) : undefined
-    effectiveExerciseId = owner?.task.id ?? exercises[0]?.task.id ?? ''
+  if (view === undefined) return <div className="page-loading">Loading workout…</div>
+
+  if (view === null) {
+    return (
+      <div className="workout-page">
+        <Link to={day ? `/?date=${day}` : '/'} className="back-link">Back</Link>
+        <p className="section-empty">This block is not a workout, or it no longer exists.</p>
+      </div>
+    )
   }
 
-  const effectiveExercise = exercises.find((exercise) => exercise.task.id === effectiveExerciseId) ?? null
-  const effectiveSetId = effectiveExercise?.sets.some((set) => set.task.id === pickedSetId)
-    ? pickedSetId
-    : firstPendingSetId(effectiveExercise)
-  const effectiveSet = effectiveExercise?.sets.find((set) => set.task.id === effectiveSetId) ?? null
+  const exercises = view.exercises
+  const clampedIndex = Math.min(index, Math.max(exercises.length - 1, 0))
+  const current = exercises[clampedIndex]
+  const title = view.thread?.title || stripStructuralTag(view.task.text, 'workout') || 'Workout'
 
-  const selectExercise = (id: string) => {
-    setPickedExerciseId(id)
-    setPickedSetId('')
+  const goTo = (next: number) => {
+    setIndex(Math.max(0, Math.min(next, exercises.length - 1)))
   }
 
-  const advance = (nextSetId: string | undefined) => {
-    if (!view) return
-    if (!nextSetId) {
-      // No more actionable sets — stay on the current exercise rather than
-      // snapping back to the first one.
-      if (effectiveExerciseId) setPickedExerciseId(effectiveExerciseId)
-      return
-    }
-    const owner = exerciseOwningSet(view, nextSetId)
-    if (owner) setPickedExerciseId(owner.task.id)
-    setPickedSetId(nextSetId)
+  const onTouchStart = (event: React.TouchEvent) => {
+    touchStartX.current = event.touches[0]?.clientX ?? null
+  }
+  const onTouchEnd = (event: React.TouchEvent) => {
+    const start = touchStartX.current
+    touchStartX.current = null
+    const end = event.changedTouches[0]?.clientX
+    if (start === null || end === undefined) return
+    const delta = end - start
+    if (Math.abs(delta) < SWIPE_THRESHOLD_PX) return
+    goTo(clampedIndex + (delta < 0 ? 1 : -1))
   }
 
   const submitExercise = async () => {
-    if (!view || !exerciseTitle.trim()) return
+    if (!exerciseTitle.trim()) return
     setAddingExercise(true)
     setAddError(null)
     try {
-      const id = await addExercise(view.task.id, exerciseTitle)
+      await addExercise(view.task.id, exerciseTitle)
       setExerciseTitle('')
-      if (typeof id === 'string') selectExercise(id)
     } catch (caught) {
       setAddError(caught instanceof Error ? caught.message : String(caught))
     } finally {
@@ -92,45 +72,15 @@ export function WorkoutPage() {
     }
   }
 
-  if (view === undefined) return <div className="page-loading">Loading workout…</div>
-
-  if (view === null) {
-    return (
-      <div className="workout-page">
-        <Link to={day ? `/?date=${day}` : '/'} className="back-link"><ArrowLeft size={15} /> Back</Link>
-        <p className="section-empty">This block is not a workout, or it no longer exists.</p>
-      </div>
-    )
-  }
-
   return (
     <article className="workout-page">
-      <Link to={`/?date=${view.task.day}&block=${view.task.id}`} className="back-link"><ArrowLeft size={15} /> Outline</Link>
+      <ExerciseTopBar title={title} backHref={overviewHref} index={clampedIndex} total={Math.max(exercises.length, 1)} />
 
       <WorkoutDiagnostics diagnostics={view.diagnostics} />
-      <WorkoutHeader view={view} />
 
-      {view.exercises.length > 0 ? (
-        <div className="exercise-stack">
-          {view.exercises.map((exercise) =>
-            exercise.task.id === effectiveExerciseId ? (
-              <ActiveExercise
-                key={exercise.task.id}
-                exercise={exercise}
-                selectedSetId={effectiveSetId}
-                onSelectSet={setPickedSetId}
-                detailsOpen={detailsOpen}
-                onToggleDetails={() => setDetailsOpen((open) => !open)}
-                onRegisterFlush={registerFlush}
-              />
-            ) : (
-              <CollapsedExercise
-                key={exercise.task.id}
-                exercise={exercise}
-                onExpand={selectExercise}
-              />
-            ),
-          )}
+      {exercises.length > 0 ? (
+        <div className="exercise-swipe-area" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+          <ActiveExercise key={current.task.id} exercise={current} index={clampedIndex} />
         </div>
       ) : (
         <p className="section-empty">No exercises yet — add the first one below.</p>
@@ -155,14 +105,16 @@ export function WorkoutPage() {
       </form>
       {addError && <p className="add-exercise-error" role="alert">{addError}</p>}
 
-      {effectiveSet && (
-        <CompleteSetBar
-          selectedSetId={effectiveSet.task.id}
-          isDone={effectiveSet.task.status === 'done'}
-          flush={() => flushRef.current()}
-          onAdvance={advance}
-        />
+      {exercises.length > 1 && (
+        <div className="exercise-pager">
+          <button type="button" disabled={clampedIndex === 0} onClick={() => goTo(clampedIndex - 1)}>Previous</button>
+          <button type="button" disabled={clampedIndex === exercises.length - 1} onClick={() => goTo(clampedIndex + 1)}>Next exercise</button>
+        </div>
       )}
+
+      <button type="button" className="text-button workout-page-finish" onClick={() => navigate(overviewHref)}>
+        Back to overview
+      </button>
     </article>
   )
 }

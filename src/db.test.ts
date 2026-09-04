@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { addBlockTag, applyRemoteDay, applyThreadTemplate, createPropertyDefinition, createTag, createThread, db, deleteTagDefinition, ensureThreadNote, initializeDatabase, markDaySynced, pruneOrphanThreads, removeBlockTag, removeThreadProperty, renameThread, saveDay, saveThreadNote, setBlockProperty, setThreadIsTemplate, setThreadProperty, toggleTask, updateTagDefinition } from './db'
+import { addBlockTag, applyRemoteDay, applyThreadTemplate, createPropertyDefinition, createTag, createThread, db, deleteTagDefinition, ensureThreadNote, initializeDatabase, markDaySynced, pruneOrphanThreads, removeBlockTag, removeThreadProperty, renameThread, saveDay, saveThreadNote, setBlockProperty, setThreadIsTemplate, setThreadProperty, toggleTask, updatePropertyDefinition, updateTagDefinition, validatePropertyValue } from './db'
+import { EXERCISE_GUIDE_TEMPLATE_ID } from './lib/exerciseGuide'
 import { parseThreadDocument } from './lib/threadDocument'
 import { WORKOUT_SYSTEM_TAGS } from './lib/workouts/systemTags'
 
@@ -529,5 +530,117 @@ describe('thread templates', () => {
     expect(body).toContain('existing note')
     expect(body).toContain('Handoff checklist')
     expect(await db.threadProperties.get(`${threadId}:${property.id}`)).toMatchObject({ value: 'me' })
+  })
+
+  describe('propertySource: "default" (auto-apply mode)', () => {
+    it('writes a brand-new property as "default", and skips a property with any existing value regardless of source', async () => {
+      const property = await createPropertyDefinition({ name: 'Notes', type: 'text' })
+      const templateId = await createThread('Guide template')
+      await setThreadIsTemplate(templateId, true)
+      await setThreadProperty(templateId, property.id, 'blank default')
+
+      const threadId = await createThread('Target')
+      await applyThreadTemplate(threadId, templateId, { propertySource: 'default' })
+      expect(await db.threadProperties.get(`${threadId}:${property.id}`)).toMatchObject({ value: 'blank default', source: 'default' })
+
+      // A second thread that already has *any* value (default, automation, or
+      // explicit) must be left untouched -- auto-apply only ever seeds blanks.
+      for (const source of ['default', 'automation', 'explicit'] as const) {
+        const other = await createThread(`Already has ${source}`)
+        await setThreadProperty(other, property.id, 'mine', source)
+        await applyThreadTemplate(other, templateId, { propertySource: 'default' })
+        expect(await db.threadProperties.get(`${other}:${property.id}`)).toMatchObject({ value: 'mine', source })
+      }
+    })
+
+    it('is a no-op the second time it is applied to the same thread', async () => {
+      const property = await createPropertyDefinition({ name: 'Notes', type: 'text' })
+      const templateId = await createThread('Guide template 2')
+      await setThreadIsTemplate(templateId, true)
+      await setThreadProperty(templateId, property.id, 'blank default')
+
+      const threadId = await createThread('Target 2')
+      await applyThreadTemplate(threadId, templateId, { propertySource: 'default' })
+      const first = await db.threadProperties.get(`${threadId}:${property.id}`)
+
+      await applyThreadTemplate(threadId, templateId, { propertySource: 'default' })
+      const second = await db.threadProperties.get(`${threadId}:${property.id}`)
+      expect(second).toEqual(first)
+    })
+  })
+
+  it('validatePropertyValue rejects a multi_select value with an id outside the option list', async () => {
+    const property = await createPropertyDefinition({ name: 'Muscles', type: 'multi_select' })
+    await updatePropertyDefinition(property.id, { options: [{ id: 'chest', label: 'Chest' }, { id: 'lats', label: 'Lats' }] })
+    const withOptions = (await db.propertyDefinitions.get(property.id))!
+
+    expect(() => validatePropertyValue(withOptions, ['chest', 'lats'])).not.toThrow()
+    expect(() => validatePropertyValue(withOptions, ['chest', 'made-up'])).toThrow(/unknown option/i)
+
+    // An option-less multi_select (and `relation`) stay unconstrained.
+    const relation = await createPropertyDefinition({ name: 'Related', type: 'relation' })
+    const relationDefinition = (await db.propertyDefinitions.get(relation.id))!
+    expect(() => validatePropertyValue(relationDefinition, ['anything'])).not.toThrow()
+  })
+})
+
+describe('exercise guide auto-apply on wiki-link resolution', () => {
+  const DATE = '2026-09-02'
+
+  it('seeds all guide properties as "default" on a new exercise thread introduced via #[exercise] [[Wiki Link]]', async () => {
+    await initializeDatabase(DATE)
+    await saveDay(DATE, [
+      '- [ ] #[workout] [[Push Day]]',
+      '  - [ ] #[exercise] [[New Movement]]',
+    ].join('\n'))
+
+    const guideProperties = await db.threadProperties.where('threadId').equals('new-movement').toArray()
+    const bySource = new Set(guideProperties.map((row) => row.source))
+    expect(guideProperties.length).toBeGreaterThanOrEqual(9)
+    expect(bySource).toEqual(new Set(['default']))
+    expect(guideProperties.find((row) => row.propertyId === 'exercise-summary')).toMatchObject({ value: '' })
+  })
+
+  it('does not apply the guide to a wiki-link outside an #[exercise] block', async () => {
+    await initializeDatabase(DATE)
+    await saveDay(DATE, ['- Just a note about [[Some Thread]]'].join('\n'))
+
+    expect(await db.threadProperties.where('threadId').equals('some-thread').count()).toBe(0)
+  })
+
+  it('does not re-stamp already-set guide values on a later re-save of the same day', async () => {
+    await initializeDatabase(DATE)
+    await saveDay(DATE, [
+      '- [ ] #[workout] [[Push Day]]',
+      '  - [ ] #[exercise] [[Bench Press]]',
+    ].join('\n'))
+    const before = await db.threadProperties.where('threadId').equals('bench-press').toArray()
+
+    await saveDay(DATE, [
+      '- [ ] #[workout] [[Push Day]]',
+      '  - [ ] #[exercise] [[Bench Press]]',
+      '  - unrelated edit',
+    ].join('\n'))
+    const after = await db.threadProperties.where('threadId').equals('bench-press').toArray()
+
+    expect(after).toEqual(before)
+  })
+
+  it('backfills an exercise thread that predates this feature during initializeDatabase', async () => {
+    await initializeDatabase(DATE)
+    await saveDay(DATE, [
+      '- [ ] #[workout] [[Push Day]]',
+      '  - [ ] #[exercise] [[Old Movement]]',
+    ].join('\n'))
+    // Simulate a pre-feature install: strip the guide properties this save
+    // already seeded, and the template thread itself, then re-init.
+    await db.threadProperties.where('threadId').equals('old-movement').delete()
+    await db.threads.delete(EXERCISE_GUIDE_TEMPLATE_ID)
+    await db.threadNotes.delete(EXERCISE_GUIDE_TEMPLATE_ID)
+
+    await initializeDatabase(DATE)
+
+    const guideProperties = await db.threadProperties.where('threadId').equals('old-movement').toArray()
+    expect(guideProperties.length).toBeGreaterThanOrEqual(9)
   })
 })

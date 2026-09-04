@@ -14,7 +14,7 @@ import {
 import { normalizePropertyValue, parseDayDocument, type DayMetadata, type PropertyValue } from './lib/dayDocument'
 import { emptyThreadMetadata, hasThreadMetadataEnvelope, parseThreadDocument, serializeThreadDocument, type ThreadMetadata } from './lib/threadDocument'
 import { LOCAL_MARKER, REMOTE_MARKER, SEPARATOR_MARKER, type MergeConflict } from './lib/conflictMerge'
-import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, insertPersonaNote, parseOutline, slugifyThread, type BlockKind, type OutlineBlock, type ParsedMention } from './lib/outline'
+import { cleanMarkdownLine, countMarkdownBlocks, extractThreadMentions, insertPersonaNote, parseOutline, slugifyThread, type BlockKind, type OutlineBlock, type ParsedMention, type ParsedThreadOccurrence } from './lib/outline'
 import { parseTaskDate, stripMatchedText } from './lib/taskDates'
 import { extractHashtags, slugifyTag } from './lib/hashtags'
 import { isoToday } from './lib/dates'
@@ -552,6 +552,13 @@ const DEMO_MARKDOWN = `- Need to improve onboarding
 export async function initializeDatabase(today: string): Promise<void> {
   await ensureBuiltInProperties()
   await ensureBuiltInTags()
+  // Seeded before the day loop below: every day's `reindexDay`/`saveDay` call
+  // already applies the Exercise Guide template to any exercise thread it
+  // touches (see `exerciseThreadEntriesIn`), so looping over every existing
+  // day here doubles as the one-time backfill for exercise threads that
+  // predate this feature -- no separate scan is needed.
+  const { ensureExerciseGuideTemplate } = await import('./lib/exerciseGuide')
+  await ensureExerciseGuideTemplate()
   await ensureDay(today)
   const days = await db.days.toArray()
   for (const day of days) {
@@ -807,7 +814,12 @@ export async function setThreadIsTemplate(threadId: string, value: boolean): Pro
 // copy any properties it carries (never clobbering a value the target already
 // has set explicitly). Tags are merged into the note envelope for
 // forward-compat only.
-export async function applyThreadTemplate(targetThreadId: string, templateThreadId: string): Promise<void> {
+export async function applyThreadTemplate(
+  targetThreadId: string,
+  templateThreadId: string,
+  options?: { propertySource?: PropertySource },
+): Promise<void> {
+  const propertySource = options?.propertySource ?? 'explicit'
   const templateNote = await db.threadNotes.get(templateThreadId)
   if (!templateNote) throw new Error('This template no longer exists.')
   const source = parseThreadDocument(templateNote.markdown)
@@ -839,14 +851,33 @@ export async function applyThreadTemplate(targetThreadId: string, templateThread
   const failed: string[] = []
   for (const [propertyId, value] of Object.entries(source.metadata.properties)) {
     const existing = await db.threadProperties.get(`${targetThreadId}:${propertyId}`)
-    if (existing?.source === 'explicit') continue
+    const skip = propertySource === 'explicit' ? existing?.source === 'explicit' : existing !== undefined
+    if (skip) continue
     try {
-      await setThreadProperty(targetThreadId, propertyId, value, 'explicit')
+      await setThreadProperty(targetThreadId, propertyId, value, propertySource)
     } catch {
       failed.push(propertyId)
     }
   }
   if (failed.length) throw new Error(`Some template properties could not be applied: ${failed.join(', ')}`)
+}
+
+// Every `[[wiki-link]]` occurrence whose containing block carries the
+// `#[exercise]` structural tag -- the exercise-thread ids that should get the
+// Exercise Guide template auto-applied once this save lands. `addExercise`
+// (workouts/mutations.ts) writes the wiki-link directly onto the tagged
+// task's own block, so the occurrence's `rootBlockId` *is* that block; no
+// tree walk is needed, just a tag-set lookup keyed by the same id.
+function exerciseThreadEntriesIn(
+  outline: { occurrences: ParsedThreadOccurrence[] },
+  metadata: DayMetadata,
+): Array<{ id: string; title: string }> {
+  const byThreadId = new Map<string, string>()
+  for (const occurrence of outline.occurrences) {
+    if (!(metadata.blocks[occurrence.rootBlockId]?.tags ?? []).includes(WORKOUT_SYSTEM_TAGS.exercise)) continue
+    byThreadId.set(occurrence.threadId, occurrence.title)
+  }
+  return Array.from(byThreadId, ([id, title]) => ({ id, title }))
 }
 
 async function indexAndStoreDay(record: DayRecord, previous?: DayRecord, options?: { queueOutbox?: boolean }): Promise<void> {
@@ -855,6 +886,7 @@ async function indexAndStoreDay(record: DayRecord, previous?: DayRecord, options
   const reconciled = reconcileBlockMetadata(positional.blocks, record.metadata ?? previous?.metadata)
   const outline = parseOutline(record.markdown, record.date, reconciled.idsByPath)
   await syncInlineHashtags(outline.blocks, reconciled.metadata)
+  const exerciseThreadEntries = exerciseThreadEntriesIn(outline, reconciled.metadata)
   record = { ...record, metadata: reconciled.metadata }
   const parsed = withBlockIds(extractThreadMentions(record.markdown, record.date), outline.blocks)
   const taskRecords = await buildTaskRecords(outline.blocks, record.date, reconciled.metadata)
@@ -905,6 +937,10 @@ async function indexAndStoreDay(record: DayRecord, previous?: DayRecord, options
     }
   })
   if (queueOutbox && typeof window !== 'undefined') window.dispatchEvent(new Event('thread:local-write'))
+  if (exerciseThreadEntries.length) {
+    const { applyExerciseGuideToThreads } = await import('./lib/exerciseGuide')
+    await applyExerciseGuideToThreads(exerciseThreadEntries)
+  }
 }
 
 async function reindexDay(record: DayRecord): Promise<void> {
@@ -912,6 +948,7 @@ async function reindexDay(record: DayRecord): Promise<void> {
   const reconciled = reconcileBlockMetadata(positional.blocks, record.metadata)
   const outline = parseOutline(record.markdown, record.date, reconciled.idsByPath)
   await syncInlineHashtags(outline.blocks, reconciled.metadata)
+  const exerciseThreadEntries = exerciseThreadEntriesIn(outline, reconciled.metadata)
   const parsed = withBlockIds(extractThreadMentions(record.markdown, record.date), outline.blocks)
   const taskRecords = await buildTaskRecords(outline.blocks, record.date, reconciled.metadata)
   await db.transaction('rw', [db.days, db.threads, db.mentions, db.blocks, db.occurrences, db.tasks, db.threadNotes, db.blockProperties, db.blockTags, db.personas], async () => {
@@ -943,6 +980,10 @@ async function reindexDay(record: DayRecord): Promise<void> {
       await pruneThreadIfOrphan(threadId)
     }
   })
+  if (exerciseThreadEntries.length) {
+    const { applyExerciseGuideToThreads } = await import('./lib/exerciseGuide')
+    await applyExerciseGuideToThreads(exerciseThreadEntries)
+  }
 }
 
 async function indexBlockMetadata(day: string, metadata: DayMetadata): Promise<void> {
@@ -1364,6 +1405,12 @@ export function validatePropertyValue(definition: PropertyDefinitionRecord, valu
   }
   if ((definition.type === 'select' || definition.type === 'status') && definition.options?.length) {
     if (typeof value !== 'string' || !definition.options.some((option) => option.id === value)) {
+      throw new Error(`${definition.name} contains an unknown option.`)
+    }
+  }
+  if (definition.type === 'multi_select' && definition.options?.length && Array.isArray(value)) {
+    const validIds = new Set(definition.options.map((option) => option.id))
+    if (value.some((item) => typeof item !== 'string' || !validIds.has(item))) {
       throw new Error(`${definition.name} contains an unknown option.`)
     }
   }

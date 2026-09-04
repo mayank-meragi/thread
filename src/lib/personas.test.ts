@@ -60,6 +60,18 @@ describe('Workout Coach persona seed', () => {
     expect(persona?.systemPrompt).toContain('HOLISTIC')
   })
 
+  it('upgrades an untouched prompt from the prior shipped version to the current one', async () => {
+    await initializeDatabase('2026-09-01')
+    // Simulate an install seeded on the pre-guide prompt revision.
+    await db.personas.update(WORKOUT_COACH_PERSONA_ID, { systemPromptVersion: WORKOUT_COACH_PROMPT_VERSION - 1 })
+
+    await ensureWorkoutCoachPersona()
+
+    const persona = await db.personas.get(WORKOUT_COACH_PERSONA_ID)
+    expect(persona?.systemPromptVersion).toBe(WORKOUT_COACH_PROMPT_VERSION)
+    expect(persona?.systemPrompt).toContain('workout.refreshExerciseGuide')
+  })
+
   it('never re-seeds a prompt the user has edited', async () => {
     await initializeDatabase('2026-09-01')
     await updatePersona(WORKOUT_COACH_PERSONA_ID, { systemPrompt: 'my own coaching prompt' })
