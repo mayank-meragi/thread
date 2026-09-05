@@ -62,6 +62,7 @@ function AppShell() {
     error: sync.error,
     progress: sync.progress,
     onSync: () => { void sync.runSync() },
+    onRefresh: () => { void sync.runSync(true) },
   }
 
   return (

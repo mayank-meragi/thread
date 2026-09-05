@@ -10,6 +10,7 @@ export interface RailSyncIndicatorProps {
   error: string | null
   progress: GitHubSyncProgress
   onSync: () => void
+  onRefresh: () => void
 }
 
 export function RailSyncIndicator({
@@ -20,6 +21,7 @@ export function RailSyncIndicator({
   error,
   progress,
   onSync,
+  onRefresh,
 }: RailSyncIndicatorProps) {
   if (!connected) {
     return <Link to="/settings?focus=sync" className="rail-sync" aria-label="Local only. Notes are saved on this device. Connect GitHub sync." title="Local only"><CloudOff size={16} /></Link>
@@ -41,5 +43,5 @@ export function RailSyncIndicator({
   if (pending > 0) {
     return <button type="button" className="rail-sync rail-sync-pending" onClick={onSync} aria-label={`Pending. ${pending} ${pending === 1 ? 'change' : 'changes'} waiting. Sync now.`} title="Pending changes"><Cloud size={16} /></button>
   }
-  return <Link to="/settings?focus=sync" className="rail-sync" aria-label="Up to date. Local changes are backed up to GitHub. Open sync settings." title="Up to date"><Cloud size={16} /></Link>
+  return <button type="button" className="rail-sync" onClick={onRefresh} aria-label="Up to date. Refresh all data from GitHub now." title="Refresh from GitHub"><Cloud size={16} /></button>
 }

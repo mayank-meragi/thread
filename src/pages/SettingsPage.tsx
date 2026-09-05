@@ -376,7 +376,7 @@ export function SettingsPage() {
             <button className="secondary-button" onClick={() => void sync()} disabled={state !== 'idle'}>Sync {pending} changes</button>
             <button className="secondary-button" onClick={() => void pull()} disabled={state !== 'idle'}>
               {state === 'pulling' ? <LoaderCircle className="spin" size={16} /> : null}
-              Check all GitHub data now
+              Refresh all data from GitHub
             </button>
             <button className="text-button" onClick={() => { clearGitHubConfig(); setToken('') }}><Unplug size={15} /> Disconnect</button>
           </>}
