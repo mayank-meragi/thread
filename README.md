@@ -21,6 +21,8 @@ Open [http://127.0.0.1:5173/thread/](http://127.0.0.1:5173/thread/).
 - `[[wikilinks]]` and their nested blocks build living thread views.
 - GitHub sync writes journal days to `days/YYYY/YYYY-MM-DD.md` in a private data repository.
 - Undated thread-only notes sync separately to `threads/<thread-id>.md`.
+- Durable workspace metadata (manual thread names/templates, schemas, tags, and personas) syncs in `workspace.json`.
+- Visible clients check the GitHub branch every five seconds with conditional requests and reconcile only files changed since their last observed commit; opening or refocusing the PWA checks immediately.
 - GitHub credentials remain in the current browser and are sent only to `api.github.com`.
 
 ## Workout tracking

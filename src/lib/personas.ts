@@ -1,4 +1,4 @@
-import { db, ensureThreadNote, type PersonaRecord } from '../db'
+import { db, ensureThreadNote, queueWorkspaceSync, type PersonaRecord } from '../db'
 import { slugifyThread } from './outline'
 
 export const GENERAL_PERSONA_ID = 'general'
@@ -172,6 +172,7 @@ export async function createPersona(input: { name: string; icon: string; systemP
     updatedAt: now,
   }
   await db.personas.put(persona)
+  await queueWorkspaceSync()
   return persona
 }
 
@@ -187,6 +188,7 @@ export async function updatePersona(
     ? { systemPromptVersion: USER_EDITED_PROMPT_VERSION }
     : {}
   await db.personas.update(id, { ...changes, ...ownership, updatedAt: now })
+  await queueWorkspaceSync()
   // Deliberately does NOT rename `db.threads` when the persona's display name
   // changes: the thread's id is `slugifyThread(the title it was created
   // with)`, and the note-taking tool always files new notes under a
@@ -203,7 +205,9 @@ export async function archivePersona(id: string): Promise<void> {
   if (id === GENERAL_PERSONA_ID || id === WORKOUT_COACH_PERSONA_ID) {
     throw new Error('This built-in persona cannot be archived.')
   }
-  await db.personas.update(id, { archivedAt: new Date().toISOString() })
+  const archivedAt = new Date().toISOString()
+  await db.personas.update(id, { archivedAt, updatedAt: archivedAt })
+  await queueWorkspaceSync()
 }
 
 export async function createSession(personaId: string, title = 'Untitled'): Promise<string> {

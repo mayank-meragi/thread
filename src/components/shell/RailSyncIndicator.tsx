@@ -1,5 +1,6 @@
 import { AlertTriangle, Cloud, CloudOff } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import type { GitHubSyncProgress } from '../../lib/github'
 
 export interface RailSyncIndicatorProps {
   connected: boolean
@@ -7,6 +8,7 @@ export interface RailSyncIndicatorProps {
   pending: number
   conflicts: number
   error: string | null
+  progress: GitHubSyncProgress
   onSync: () => void
 }
 
@@ -16,6 +18,7 @@ export function RailSyncIndicator({
   pending,
   conflicts,
   error,
+  progress,
   onSync,
 }: RailSyncIndicatorProps) {
   if (!connected) {
@@ -25,8 +28,15 @@ export function RailSyncIndicator({
     const detail = conflicts > 0 ? `${conflicts} ${conflicts === 1 ? 'conflict' : 'conflicts'} to resolve` : 'Sync could not finish'
     return <Link to="/settings?focus=sync" className="rail-sync rail-sync-alert" aria-label={`Needs attention. ${detail}. Open sync settings.`} title="Needs attention"><AlertTriangle size={16} /></Link>
   }
+  if (progress.phase === 'backing-off') {
+    const until = progress.retryAt ? new Date(progress.retryAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'shortly'
+    return <Link to="/settings?focus=sync" className="rail-sync rail-sync-alert" aria-label={`GitHub sync paused until ${until}. Open sync settings.`} title={`Sync paused until ${until}`}><AlertTriangle size={16} /></Link>
+  }
   if (syncing) {
-    return <div className="rail-sync rail-sync-busy" role="status" aria-live="polite" title="Syncing" aria-label="Syncing"><Cloud size={16} /></div>
+    const detail = progress.phase === 'catching-up' && progress.totalFiles
+      ? `Catching up ${progress.processedFiles ?? 0} of ${progress.totalFiles}`
+      : 'Checking GitHub'
+    return <div className="rail-sync rail-sync-busy" role="status" aria-live="polite" title={detail} aria-label={detail}><Cloud size={16} /></div>
   }
   if (pending > 0) {
     return <button type="button" className="rail-sync rail-sync-pending" onClick={onSync} aria-label={`Pending. ${pending} ${pending === 1 ? 'change' : 'changes'} waiting. Sync now.`} title="Pending changes"><Cloud size={16} /></button>

@@ -100,11 +100,34 @@ export interface MentionRecord {
 
 export interface OutboxRecord {
   key: string
-  kind: 'day' | 'thread-note'
+  kind: 'day' | 'thread-note' | 'workspace'
   aggregateId: string
   createdAt: string
   attempts: number
   error?: string
+}
+
+export interface GitHubSyncState {
+  key: string
+  repo: string
+  branch: string
+  headSha?: string
+  etag?: string
+  baselineComplete: boolean
+  lastCheckedAt?: string
+  lastSuccessfulPullAt?: string
+  retryAt?: string
+  failureCount: number
+  totalFiles?: number
+  processedFiles?: number
+  lastSyncedWorkspace?: unknown
+}
+
+export interface WorkspaceTombstoneRecord {
+  key: string
+  collection: 'threads' | 'propertyDefinitions' | 'tagDefinitions' | 'personas'
+  recordId: string
+  deletedAt: string
 }
 
 export interface ConflictRecord {
@@ -278,6 +301,8 @@ class ThreadDatabase extends Dexie {
   chatSessions!: EntityTable<ChatSessionRecord, 'id'>
   chatMessages!: EntityTable<ChatMessageRecord, 'id'>
   chatProposals!: EntityTable<ChatProposalRecord, 'id'>
+  syncStates!: EntityTable<GitHubSyncState, 'key'>
+  workspaceTombstones!: EntityTable<WorkspaceTombstoneRecord, 'key'>
 
   constructor() {
     super('thread-v1')
@@ -510,10 +535,49 @@ class ThreadDatabase extends Dexie {
       chatMessages: 'id, sessionId, createdAt, [sessionId+createdAt]',
       chatProposals: 'id, sessionId, messageId, status, createdAt, [sessionId+createdAt]',
     })
+    this.version(14).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, kind, blockId, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, scope, aggregateId, detectedAt, resolvedAt',
+      blocks: 'id, day, parentId, kind, [day+order]',
+      occurrences: 'id, threadId, day, rootBlockId, [threadId+day]',
+      viewState: 'key, view, blockId, collapsed',
+      revisions: 'id, day, archivedAt, [day+localRevision]',
+      tasks: 'id, blockId, day, status, parentTaskId, dueDate, startDate, priority, [day+order], [status+dueDate]',
+      threadNotes: 'threadId, updatedAt',
+      threadProperties: 'id, threadId, propertyId, value, [threadId+propertyId], [propertyId+value]',
+      propertyDefinitions: 'id, name, type, updatedAt',
+      blockProperties: 'id, blockId, day, propertyId, [blockId+propertyId], [propertyId+day]',
+      tagDefinitions: 'id, name, updatedAt',
+      blockTags: 'id, blockId, day, tagId, [blockId+tagId], [tagId+day]',
+      personas: 'id, threadId, updatedAt',
+      chatSessions: 'id, personaId, updatedAt, [personaId+updatedAt]',
+      chatMessages: 'id, sessionId, createdAt, [sessionId+createdAt]',
+      chatProposals: 'id, sessionId, messageId, status, createdAt, [sessionId+createdAt]',
+      syncStates: 'key, repo, branch, lastCheckedAt',
+      workspaceTombstones: 'key, collection, recordId, deletedAt',
+    })
   }
 }
 
 export const db = new ThreadDatabase()
+
+export async function queueWorkspaceSync(): Promise<void> {
+  const now = new Date().toISOString()
+  await db.outbox.put({ key: 'workspace', kind: 'workspace', aggregateId: 'workspace', createdAt: now, attempts: 0 })
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('thread:local-write'))
+}
+
+export async function recordWorkspaceTombstone(
+  collection: WorkspaceTombstoneRecord['collection'],
+  recordId: string,
+  deletedAt = new Date().toISOString(),
+): Promise<void> {
+  await db.workspaceTombstones.put({ key: `${collection}:${recordId}`, collection, recordId, deletedAt })
+  await queueWorkspaceSync()
+}
 
 // Writes a persona's note into today's journal under a `[[Persona]]` heading
 // rather than into a separate per-thread scratchpad -- this way the note is
@@ -581,7 +645,7 @@ export async function initializeDatabase(today: string): Promise<void> {
   await repairPersonaThreads()
 }
 
-async function ensureBuiltInProperties(): Promise<void> {
+export async function ensureBuiltInProperties(): Promise<void> {
   const now = new Date().toISOString()
   for (const definition of BUILT_IN_PROPERTIES) {
     const existing = await db.propertyDefinitions.get(definition.id)
@@ -589,7 +653,7 @@ async function ensureBuiltInProperties(): Promise<void> {
   }
 }
 
-async function ensureBuiltInTags(): Promise<void> {
+export async function ensureBuiltInTags(): Promise<void> {
   const now = new Date().toISOString()
   for (const builtIn of BUILT_IN_TAGS) {
     const existing = await db.tagDefinitions.get(builtIn.id)
@@ -660,14 +724,15 @@ export async function createThread(title: string): Promise<string> {
     origin: existing?.origin ?? 'manual',
   })
   await ensureThreadNote(id)
+  await queueWorkspaceSync()
   return id
 }
 
 // Rename a thread's display title. The `id` (slug) is left untouched, so the
 // URL, `[[wiki-links]]`, notes, properties and open tabs keep resolving --
 // title/slug divergence is already an accepted state (persona renames, slug
-// collisions above). Local-only: the `threads` table is not in the sync
-// pipeline. The denormalised `title` on mentions/occurrences is refreshed for
+// collisions above). Marking the thread manual makes the durable title part
+// of workspace.json. The denormalised `title` on mentions/occurrences is refreshed for
 // any future consumer's benefit; a later reindex of an old day may reset it to
 // the wiki-link text, which is expected.
 export async function renameThread(threadId: string, nextTitle: string): Promise<void> {
@@ -679,10 +744,12 @@ export async function renameThread(threadId: string, nextTitle: string): Promise
   await db.threads.update(threadId, {
     title: clean,
     normalizedTitle: clean.toLocaleLowerCase(),
+    origin: existing.origin ?? 'manual',
     updatedAt: now,
   })
   await db.mentions.where('threadId').equals(threadId).modify({ title: clean })
   await db.occurrences.where('threadId').equals(threadId).modify({ title: clean })
+  await queueWorkspaceSync()
 }
 
 const threadNoteSaveQueues = new Map<string, Promise<void>>()
@@ -808,6 +875,7 @@ export async function setThreadIsTemplate(threadId: string, value: boolean): Pro
     isTemplate: value || undefined,
     updatedAt: new Date().toISOString(),
   })
+  await queueWorkspaceSync()
 }
 
 // Drop a template thread onto another thread: seed/append its note body, then
@@ -1428,6 +1496,7 @@ export async function createPropertyDefinition(input: { name: string; type: Prop
   if (await db.propertyDefinitions.get(id)) id = `${id}-${crypto.randomUUID().slice(0, 6)}`
   const definition: PropertyDefinitionRecord = { id, name: input.name.trim(), type: input.type, createdAt: now, updatedAt: now }
   await db.propertyDefinitions.put(definition)
+  await queueWorkspaceSync()
   return definition
 }
 
@@ -1436,6 +1505,7 @@ export async function updatePropertyDefinition(
   changes: Partial<Pick<PropertyDefinitionRecord, 'name' | 'options' | 'required' | 'defaultValue'>>,
 ): Promise<void> {
   await db.propertyDefinitions.update(id, { ...changes, updatedAt: new Date().toISOString() })
+  await queueWorkspaceSync()
 }
 
 export async function createTag(name: string): Promise<TagDefinitionRecord> {
@@ -1444,6 +1514,7 @@ export async function createTag(name: string): Promise<TagDefinitionRecord> {
   if (await db.tagDefinitions.get(id)) id = `${id}-${crypto.randomUUID().slice(0, 6)}`
   const tag: TagDefinitionRecord = { id, name: name.trim(), propertyIds: [], createdAt: now, updatedAt: now }
   await db.tagDefinitions.put(tag)
+  await queueWorkspaceSync()
   return tag
 }
 
@@ -1540,6 +1611,7 @@ export async function updateTagDefinition(
   }
   if (!next.name) throw new Error('A schema needs a name.')
   await db.tagDefinitions.put(next)
+  await queueWorkspaceSync()
 
   const applications = await db.blockTags.where('tagId').equals(id).toArray()
   const allTags = new Map((await db.tagDefinitions.toArray()).map((tag) => [tag.id, tag]))
@@ -1622,6 +1694,7 @@ export async function deleteTagDefinition(id: string): Promise<void> {
   const applications = await db.blockTags.where('tagId').equals(id).toArray()
   for (const application of applications) await removeBlockTag(application.blockId, id)
   await db.tagDefinitions.delete(id)
+  await recordWorkspaceTombstone('tagDefinitions', id)
 }
 
 // syncedRevision is the day's localRevision at the moment its content was
@@ -1836,6 +1909,38 @@ export async function applyRemoteThreadNote(threadId: string, remoteMarkdown: st
   })
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('thread:day-external-update', { detail: { day: `thread:${threadId}`, markdown: document.markdown } }))
+  }
+}
+
+export async function deleteRemoteDay(date: string): Promise<void> {
+  const mentionedThreadIds = Array.from(new Set((await db.mentions.where('day').equals(date).toArray()).map((item) => item.threadId)))
+  await db.transaction('rw', [db.days, db.mentions, db.blocks, db.occurrences, db.tasks, db.blockProperties, db.blockTags, db.revisions, db.outbox, db.conflicts], async () => {
+    await db.days.delete(date)
+    await db.mentions.where('day').equals(date).delete()
+    await db.blocks.where('day').equals(date).delete()
+    await db.occurrences.where('day').equals(date).delete()
+    await db.tasks.where('day').equals(date).delete()
+    await db.blockProperties.where('day').equals(date).delete()
+    await db.blockTags.where('day').equals(date).delete()
+    await db.revisions.where('day').equals(date).delete()
+    await db.outbox.delete(`day:${date}`)
+    await db.conflicts.where('aggregateId').equals(date).filter((item) => item.scope === 'day').delete()
+  })
+  for (const threadId of mentionedThreadIds) await pruneThreadIfOrphan(threadId)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('thread:day-external-update', { detail: { day: date, markdown: '- ' } }))
+  }
+}
+
+export async function deleteRemoteThreadNote(threadId: string): Promise<void> {
+  await db.transaction('rw', [db.threadNotes, db.threadProperties, db.outbox, db.conflicts], async () => {
+    await db.threadNotes.delete(threadId)
+    await db.threadProperties.where('threadId').equals(threadId).delete()
+    await db.outbox.delete(`thread-note:${threadId}`)
+    await db.conflicts.where('aggregateId').equals(threadId).filter((item) => item.scope === 'thread-note').delete()
+  })
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('thread:day-external-update', { detail: { day: `thread:${threadId}`, markdown: '- ' } }))
   }
 }
 

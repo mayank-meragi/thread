@@ -4,7 +4,6 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
 import { generateText } from 'ai'
 import { db, type PersonaRecord } from '../db'
-import { isoToday } from '../lib/dates'
 import { clearAIConfig, getAIConfig, resolveModel, saveAIConfig, type AIConfig, type AIProvider } from '../lib/ai'
 import { DynamicIcon } from '../lib/icons'
 import { archivePersona, createPersona, GENERAL_PERSONA_ID, updatePersona } from '../lib/personas'
@@ -13,10 +12,9 @@ import { IconPicker } from '../components/IconPicker'
 import {
   clearGitHubConfig,
   getGitHubConfig,
-  pullDay,
+  runGitHubSyncCycle,
   resolveConflict,
   saveGitHubConfig,
-  syncPending,
   validateGitHub,
   type GitHubConfig,
 } from '../lib/github'
@@ -56,6 +54,10 @@ export function SettingsPage() {
   const [error, setError] = useState('')
   const [theme, setTheme] = useState<ThemeId>(() => getTheme())
   const pending = useLiveQuery(() => db.outbox.count(), [], 0)
+  const syncStatus = useLiveQuery(
+    async () => existing ? db.syncStates.get(`${existing.repo}@${existing.branch}`) : undefined,
+    [existing?.repo, existing?.branch],
+  )
   const conflicts = useLiveQuery(
     async () => {
       const unresolved = await db.conflicts.filter((conflict) => !conflict.resolvedAt).toArray()
@@ -117,7 +119,7 @@ export function SettingsPage() {
       await validateGitHub(config)
       saveGitHubConfig(config)
       setState('syncing')
-      await syncPending()
+      await runGitHubSyncCycle()
       setState('done')
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
@@ -129,7 +131,7 @@ export function SettingsPage() {
     setError('')
     setState('syncing')
     try {
-      await syncPending()
+      await runGitHubSyncCycle()
       setState('done')
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
@@ -141,7 +143,7 @@ export function SettingsPage() {
     setError('')
     setState('pulling')
     try {
-      await pullDay(isoToday())
+      await runGitHubSyncCycle({ forceFull: true })
       setState('done')
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
@@ -353,6 +355,17 @@ export function SettingsPage() {
         </div>
         <label><span>Fine-grained token</span><input type="password" value={token} onChange={(event) => setToken(event.target.value)} placeholder="github_pat_…" /></label>
         <div className="security-note"><ShieldCheck size={16} /><span>Stored only in this browser and sent only to api.github.com. Restrict it to the data repository with Contents read/write access.</span></div>
+        {syncStatus && (
+          <p className="settings-hint">
+            {syncStatus.retryAt
+              ? `GitHub sync is paused until ${new Date(syncStatus.retryAt).toLocaleString()}.`
+              : syncStatus.totalFiles !== undefined && syncStatus.processedFiles !== undefined && syncStatus.processedFiles < syncStatus.totalFiles
+              ? `Catching up ${syncStatus.processedFiles} of ${syncStatus.totalFiles} files…`
+              : syncStatus.lastCheckedAt
+                ? `GitHub checked ${new Date(syncStatus.lastCheckedAt).toLocaleString()}.`
+                : 'Waiting for the first full GitHub check.'}
+          </p>
+        )}
         {error && <p className="banner banner-error form-error">{error}</p>}
         <div className="settings-actions">
           <button className="primary-button" onClick={() => void connect()} disabled={state !== 'idle' || !repo || !token}>
@@ -363,7 +376,7 @@ export function SettingsPage() {
             <button className="secondary-button" onClick={() => void sync()} disabled={state !== 'idle'}>Sync {pending} changes</button>
             <button className="secondary-button" onClick={() => void pull()} disabled={state !== 'idle'}>
               {state === 'pulling' ? <LoaderCircle className="spin" size={16} /> : null}
-              Pull latest for today
+              Check all GitHub data now
             </button>
             <button className="text-button" onClick={() => { clearGitHubConfig(); setToken('') }}><Unplug size={15} /> Disconnect</button>
           </>}

@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db, saveDay, saveThreadNote } from '../db'
-import { pullThreadNote, resolveRepoAssetURL, saveGitHubConfig, syncPending, uploadRepoAsset } from './github'
+import { catchUpFromGitHub, pullThreadNote, resolveRepoAssetURL, saveGitHubConfig, syncPending, uploadRepoAsset } from './github'
 
 const DATE = '2026-08-19'
 
@@ -32,6 +32,90 @@ afterEach(() => {
 })
 
 afterAll(() => db.close())
+
+describe('repository catch-up', () => {
+  const stateKey = 'owner/repo@main'
+
+  it('stops after an unchanged conditional head request', async () => {
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+    await db.syncStates.put({
+      key: stateKey, repo: 'owner/repo', branch: 'main', headSha: 'same-head', etag: '"head-etag"',
+      baselineComplete: true, failureCount: 0,
+    })
+    const fetchMock = vi.fn(async (...request: [string, RequestInit?]) => {
+      void request
+      return new Response(null, { status: 304, headers: { etag: '"head-etag"' } })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await catchUpFromGitHub()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ headers: expect.objectContaining({ 'If-None-Match': '"head-etag"' }) })
+    expect((await db.syncStates.get(stateKey))?.headSha).toBe('same-head')
+  })
+
+  it('applies only files changed between branch heads and advances the cursor', async () => {
+    await saveDay(DATE, '- stale')
+    await db.days.update(DATE, { remoteSha: 'old-file-sha', lastSyncedMarkdown: '- stale' })
+    await db.outbox.clear()
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+    await db.syncStates.put({
+      key: stateKey, repo: 'owner/repo', branch: 'main', headSha: 'old-head', etag: '"old-etag"',
+      baselineComplete: true, failureCount: 0,
+    })
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/commits/')) return new Response(JSON.stringify({ sha: 'new-head' }), { status: 200, headers: { etag: '"new-etag"' } })
+      if (url.includes('/compare/')) return new Response(JSON.stringify({ status: 'ahead', files: [{ filename: `days/2026/${DATE}.md`, status: 'modified' }] }), { status: 200 })
+      if (url.includes('/contents/')) return new Response(JSON.stringify({ content: base64('- fresh from phone'), sha: 'new-file-sha' }), { status: 200 })
+      throw new Error(`Unexpected URL: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await catchUpFromGitHub()
+
+    expect((await db.days.get(DATE))?.markdown).toBe('- fresh from phone')
+    expect((await db.syncStates.get(stateKey))?.headSha).toBe('new-head')
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('treats a remotely removed day as authoritative', async () => {
+    await saveDay(DATE, '- remove me')
+    await db.outbox.clear()
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+    await db.syncStates.put({
+      key: stateKey, repo: 'owner/repo', branch: 'main', headSha: 'old-head', baselineComplete: true, failureCount: 0,
+    })
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.includes('/commits/')) return new Response(JSON.stringify({ sha: 'new-head' }), { status: 200 })
+      if (url.includes('/compare/')) return new Response(JSON.stringify({ status: 'ahead', files: [{ filename: `days/2026/${DATE}.md`, status: 'removed' }] }), { status: 200 })
+      throw new Error(`Unexpected URL: ${url}`)
+    }))
+
+    await catchUpFromGitHub()
+
+    expect(await db.days.get(DATE)).toBeUndefined()
+    expect(await db.blocks.where('day').equals(DATE).count()).toBe(0)
+  })
+
+  it('performs a full managed-file scan when the device has no baseline', async () => {
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.includes('/commits/')) return new Response(JSON.stringify({ sha: 'initial-head' }), { status: 200, headers: { etag: '"initial-etag"' } })
+      if (url.includes('/git/trees/')) return new Response(JSON.stringify({
+        tree: [{ path: `days/2026/${DATE}.md`, type: 'blob', sha: 'day-sha' }], truncated: false,
+      }), { status: 200 })
+      if (url.includes('/contents/')) return new Response(JSON.stringify({ content: base64('- restored everywhere'), sha: 'day-sha' }), { status: 200 })
+      throw new Error(`Unexpected URL: ${url}`)
+    }))
+
+    await catchUpFromGitHub()
+
+    expect((await db.days.get(DATE))?.markdown).toBe('- restored everywhere')
+    expect(await db.outbox.get('workspace')).toBeDefined()
+    expect(await db.syncStates.get(stateKey)).toMatchObject({ headSha: 'initial-head', baselineComplete: true })
+  })
+})
 
 // Reproduces the reported bug: a day that was already synced once (has a
 // remoteSha) goes stale -- something else changed the file on GitHub -- and

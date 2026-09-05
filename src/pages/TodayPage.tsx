@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
 import { db, ensureDay, saveDay } from '../db'
 import { daysBetween, formatDay, isoToday, shiftDay } from '../lib/dates'
-import { getGitHubConfig, pullDay } from '../lib/github'
+import { getGitHubConfig, runGitHubSyncCycle } from '../lib/github'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { TodayTasks } from '../components/TodayTasks'
 import { DatePicker } from '../components/DatePicker'
@@ -267,7 +267,7 @@ function DaySection({ date, isToday, registerSection, onActive, onChange, paramB
     // A pull that lands afterwards is absorbed by MarkdownEditor's own
     // external-update guard.
     const timer = window.setTimeout(finish, 2500)
-    void pullDay(date).finally(() => {
+    void runGitHubSyncCycle({ priorityPaths: [`days/${date.slice(0, 4)}/${date}.md`] }).finally(() => {
       window.clearTimeout(timer)
       finish()
     })

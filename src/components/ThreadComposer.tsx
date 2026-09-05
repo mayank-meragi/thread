@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, ensureThreadNote, saveThreadNote } from '../db'
-import { getGitHubConfig, pullThreadNote } from '../lib/github'
+import { getGitHubConfig, runGitHubSyncCycle } from '../lib/github'
 import { parseThreadDocument } from '../lib/threadDocument'
 import { MarkdownEditor } from './MarkdownEditor'
 
@@ -33,30 +33,12 @@ export function ThreadComposer({ threadId, title }: { threadId: string; title: s
     // A pull that lands afterwards is absorbed by MarkdownEditor's own
     // external-update guard.
     const timer = window.setTimeout(finish, 2500)
-    void pullThreadNote(threadId).finally(() => {
+    void runGitHubSyncCycle({ priorityPaths: [`threads/${threadId}.md`] }).finally(() => {
       window.clearTimeout(timer)
       finish()
     })
     return () => window.clearTimeout(timer)
   }, [threadId, remoteHydrated])
-
-  // Keep the note fresh when returning to the tab or regaining the network --
-  // low-risk moments where the user is unlikely to be mid-keystroke. Mirrors
-  // the day pull triggers in useGitHubSync; MarkdownEditor's external-update
-  // guard is the safety net against clobbering active typing either way.
-  useEffect(() => {
-    if (!getGitHubConfig()) return
-    const pull = () => void pullThreadNote(threadId)
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') pull()
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener('online', pull)
-    return () => {
-      document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('online', pull)
-    }
-  }, [threadId])
 
   const handleChange = useCallback((markdown: string) => {
     void saveThreadNote(threadId, markdown)

@@ -60,7 +60,8 @@ function AppShell() {
     pending: sync.pending,
     conflicts: sync.conflicts,
     error: sync.error,
-    onSync: sync.runSync,
+    progress: sync.progress,
+    onSync: () => { void sync.runSync() },
   }
 
   return (
@@ -106,9 +107,13 @@ function AppShell() {
 }
 
 export default function App() {
+  const [databaseReady, setDatabaseReady] = useState(false)
   useEffect(() => {
-    void initializeDatabase(isoToday())
+    let active = true
+    void initializeDatabase(isoToday()).finally(() => { if (active) setDatabaseReady(true) })
+    return () => { active = false }
   }, [])
 
+  if (!databaseReady) return <div className="page-loading">Opening Thread…</div>
   return <HashRouter><AppShell /></HashRouter>
 }
