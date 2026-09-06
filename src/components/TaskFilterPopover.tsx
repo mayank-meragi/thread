@@ -2,21 +2,20 @@ import { useEffect, useRef, useState } from 'react'
 import { ListFilter } from 'lucide-react'
 import type { TagDefinitionRecord } from '../db'
 
-export type TaskFilterKey = 'priority' | 'tag' | 'thread' | 'sort' | 'internals'
+export type TaskFilterKey = 'priority' | 'tag' | 'thread' | 'sort'
 
 interface TaskFilterPopoverProps {
   priority: string
   tag: string
   thread: string
   sort: string
-  internals: boolean
   tagDefinitions: TagDefinitionRecord[]
   threadOptions: [string, string][]
   onChange: (key: TaskFilterKey, value: string) => void
   activeCount: number
 }
 
-export function TaskFilterPopover({ priority, tag, thread, sort, internals, tagDefinitions, threadOptions, onChange, activeCount }: TaskFilterPopoverProps) {
+export function TaskFilterPopover({ priority, tag, thread, sort, tagDefinitions, threadOptions, onChange, activeCount }: TaskFilterPopoverProps) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
 
@@ -83,10 +82,6 @@ export function TaskFilterPopover({ priority, tag, thread, sort, internals, tagD
                 <option value="updated">Recently updated</option>
               </select>
             </div>
-            <label className="field field-check">
-              <input type="checkbox" checked={internals} onChange={(event) => onChange('internals', event.target.checked ? '1' : '')} />
-              <span className="field-label">Include workout internals</span>
-            </label>
           </div>
         </>
       )}

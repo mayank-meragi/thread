@@ -1739,16 +1739,6 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .workout-group > header h2 { margin: 0; font: 500 10px/1 'IBM Plex Mono', monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .workout-group > header span { color: var(--outline-muted); font: 500 10px 'IBM Plex Mono', monospace; }
 
-.task-row-workout-link {
-  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--thread) 35%, var(--line)); background: var(--thread-soft);
-  color: var(--thread); font-size: 11px; font-weight: 600; white-space: nowrap;
-}
-
-.task-filter-panel .field-check { flex-direction: row; align-items: center; gap: 8px; cursor: pointer; }
-.task-filter-panel .field-check input { width: 15px; height: 15px; flex: none; }
-.task-filter-panel .field-check .field-label { margin: 0; }
-
 .exercise-occurrences { display: grid; }
 .exercise-occurrence-row {
   display: flex; align-items: center; gap: 12px; padding: 9px 2px; border-bottom: 1px solid var(--line);

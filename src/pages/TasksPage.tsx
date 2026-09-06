@@ -10,8 +10,7 @@ import { TaskRow, type TaskDisplayMode } from '../components/TaskRow'
 import { TaskBoard } from '../components/TaskBoard'
 import { TaskFilterPopover, type TaskFilterKey } from '../components/TaskFilterPopover'
 import { Chip } from '../components/ui/Chip'
-import { isWorkoutInternalRole, workoutRolesByBlockId } from '../lib/workouts/integration'
-import type { WorkoutRole } from '../lib/workouts/systemTags'
+import { isWorkoutRole, workoutRolesByBlockId } from '../lib/workouts/integration'
 
 type TaskView = 'my-day' | 'in-progress' | 'overdue' | 'upcoming' | 'blocked' | 'unscheduled' | 'completed' | 'all'
 type TaskSort = 'smart' | 'due' | 'priority' | 'updated'
@@ -101,7 +100,6 @@ export function TasksPage() {
   const tag = params.get('tag') || 'all'
   const thread = params.get('thread') || 'all'
   const sort = (params.get('sort') as TaskSort) || 'smart'
-  const showInternals = params.get('internals') === '1'
   const groupBy = (params.get('group') as GroupBy) || 'schedule'
   const mode = (params.get('mode') as PageMode) || (isMobile ? 'compact' : 'list')
   const query = params.get('q') || ''
@@ -116,12 +114,12 @@ export function TasksPage() {
 
   const threadOptions = useMemo(() => Array.from(new Map(mentions.map((item) => [item.threadId, item.title])).entries()), [mentions])
 
-  // Structural workout role per task. Exercise/set tasks are hidden from the
-  // general task views and every count unless "Include workout internals" is on.
+  // Structurally tagged workout tasks belong to the workout lens, not general
+  // task views or their counts.
   const workoutRoles = useMemo(() => workoutRolesByBlockId(tags), [tags])
   const visibleTasks = useMemo(
-    () => (showInternals ? tasks : tasks.filter((task) => !isWorkoutInternalRole(workoutRoles.get(task.id)))),
-    [tasks, showInternals, workoutRoles],
+    () => tasks.filter((task) => !isWorkoutRole(workoutRoles.get(task.id))),
+    [tasks, workoutRoles],
   )
 
   const filtered = useMemo(() => {
@@ -169,15 +167,15 @@ export function TasksPage() {
     return map
   }, [visibleTasks])
 
-  const activeFilterCount = [priority !== 'all', tag !== 'all', thread !== 'all', sort !== 'smart', showInternals].filter(Boolean).length
+  const activeFilterCount = [priority !== 'all', tag !== 'all', thread !== 'all', sort !== 'smart'].filter(Boolean).length
   const hasActiveFilters = activeFilterCount > 0 || !!query
 
   const onFilterChange = (key: TaskFilterKey, value: string) =>
-    updateParam(key, value, key === 'sort' ? 'smart' : key === 'internals' ? '' : 'all')
+    updateParam(key, value, key === 'sort' ? 'smart' : 'all')
 
   const clearAllFilters = () => {
     const next = new URLSearchParams(params)
-    ;['priority', 'tag', 'thread', 'sort', 'internals', 'q'].forEach((key) => next.delete(key))
+    ;['priority', 'tag', 'thread', 'sort', 'q'].forEach((key) => next.delete(key))
     setParams(next, { replace: true })
   }
 
@@ -214,7 +212,7 @@ export function TasksPage() {
 
       <div className="task-controls-row">
         <label className="task-search"><Search size={15} /><input value={query} onChange={(event) => updateParam('q', event.target.value, '')} placeholder="Search tasks" /></label>
-        <TaskFilterPopover priority={priority} tag={tag} thread={thread} sort={sort} internals={showInternals} tagDefinitions={tagDefinitions} threadOptions={threadOptions} onChange={onFilterChange} activeCount={activeFilterCount} />
+        <TaskFilterPopover priority={priority} tag={tag} thread={thread} sort={sort} tagDefinitions={tagDefinitions} threadOptions={threadOptions} onChange={onFilterChange} activeCount={activeFilterCount} />
         {mode !== 'board' && <FilterSelect label="Group by" value={groupBy} onChange={(value) => updateParam('group', value, 'schedule')} options={GROUP_OPTIONS} />}
         <div className="task-mode-toggle" role="group" aria-label="Display mode">
           <button type="button" aria-pressed={mode === 'list'} aria-label="List view" onClick={() => updateParam('mode', 'list', isMobile ? 'compact' : 'list')}><List size={14} /></button>
@@ -229,7 +227,6 @@ export function TasksPage() {
         {tag !== 'all' && <Chip interactive onRemove={() => updateParam('tag', 'all')}>#{tagName(tag, tagDefinitions)}</Chip>}
         {thread !== 'all' && <Chip interactive accent="thread" onRemove={() => updateParam('thread', 'all')}>{threadTitle(thread, threadOptions)}</Chip>}
         {sort !== 'smart' && <Chip interactive onRemove={() => updateParam('sort', 'smart', 'smart')}>{sortLabel(sort)}</Chip>}
-        {showInternals && <Chip interactive onRemove={() => updateParam('internals', '', '')}>Workout internals</Chip>}
         <button type="button" className="task-filter-clear" onClick={clearAllFilters}>Clear all</button>
       </div>}
 
@@ -263,7 +260,6 @@ export function TasksPage() {
                 tagDefinitions={tagDefinitions}
                 mentions={mentions}
                 mode={mode}
-                workoutRoleById={workoutRoles}
                 onToggle={(id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next })}
                 onSelect={(id, checked) => setSelected((current) => { const next = new Set(current); if (checked) next.add(id); else next.delete(id); return next })}
                 onOpen={openTaskInspector}
@@ -343,7 +339,6 @@ export function TaskBranch(props: {
   tagDefinitions: TagDefinitionRecord[]
   mentions: MentionRecord[]
   mode: TaskDisplayMode
-  workoutRoleById?: Map<string, WorkoutRole>
   onToggle: (id: string) => void
   onSelect: (id: string, checked: boolean) => void
   onOpen: (id: string) => void
@@ -351,7 +346,7 @@ export function TaskBranch(props: {
   const direct = props.children.get(props.task.id) ?? []
   const isExpanded = props.expanded.has(props.task.id)
   return <>
-    <TaskRow task={props.task} depth={props.depth} hasChildren={direct.length > 0} expanded={isExpanded} selected={props.selected.has(props.task.id)} tags={props.tags} tagDefinitions={props.tagDefinitions} mentions={props.mentions} mode={props.mode} workoutRole={props.workoutRoleById?.get(props.task.id)} onToggleExpanded={() => props.onToggle(props.task.id)} onSelect={(checked) => props.onSelect(props.task.id, checked)} onOpen={() => props.onOpen(props.task.id)} />
+    <TaskRow task={props.task} depth={props.depth} hasChildren={direct.length > 0} expanded={isExpanded} selected={props.selected.has(props.task.id)} tags={props.tags} tagDefinitions={props.tagDefinitions} mentions={props.mentions} mode={props.mode} onToggleExpanded={() => props.onToggle(props.task.id)} onSelect={(checked) => props.onSelect(props.task.id, checked)} onOpen={() => props.onOpen(props.task.id)} />
     {isExpanded && direct.map((task) => <TaskBranch {...props} task={task} depth={props.depth + 1} key={task.id} />)}
   </>
 }

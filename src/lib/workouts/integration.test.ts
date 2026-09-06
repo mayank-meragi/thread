@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BlockTagRecord } from '../../db'
 import { WORKOUT_SYSTEM_TAGS } from './systemTags'
-import { isWorkoutInternalRole, workoutRolesByBlockId } from './integration'
+import { isWorkoutRole, workoutRolesByBlockId } from './integration'
 
 function tag(blockId: string, tagId: string): BlockTagRecord {
   return { id: `${blockId}:${tagId}`, blockId, day: '2026-09-01', tagId, source: 'inline', updatedAt: '' }
@@ -22,10 +22,10 @@ describe('workout surface integration helpers', () => {
     expect(roles.has('plain')).toBe(false)
   })
 
-  it('treats exercise and set as internals but not the workout root', () => {
-    expect(isWorkoutInternalRole('workout')).toBe(false)
-    expect(isWorkoutInternalRole('exercise')).toBe(true)
-    expect(isWorkoutInternalRole('set')).toBe(true)
-    expect(isWorkoutInternalRole(undefined)).toBe(false)
+  it('identifies every structural workout role while leaving ordinary tasks visible', () => {
+    expect(isWorkoutRole('workout')).toBe(true)
+    expect(isWorkoutRole('exercise')).toBe(true)
+    expect(isWorkoutRole('set')).toBe(true)
+    expect(isWorkoutRole(undefined)).toBe(false)
   })
 })

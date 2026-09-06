@@ -1,10 +1,8 @@
 import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { CalendarPlus, ChevronRight, Clock3, Dumbbell, ListTree, Tag, Trash2 } from 'lucide-react'
+import { CalendarPlus, ChevronRight, Clock3, ListTree, Tag, Trash2 } from 'lucide-react'
 import type { BlockTagRecord, MentionRecord, TagDefinitionRecord, TaskRecord } from '../db'
 import { formatDay, isoToday, shiftDay } from '../lib/dates'
 import { deleteTask, setTaskDueDate, setTaskStatus } from '../lib/tasks'
-import type { WorkoutRole } from '../lib/workouts/systemTags'
 import { TaskStatusControl } from './TaskStatusControl'
 
 export type TaskDisplayMode = 'list' | 'compact'
@@ -23,7 +21,6 @@ export function TaskRow({
   tagDefinitions,
   mentions,
   mode = 'list',
-  workoutRole,
   onToggleExpanded,
   onSelect,
   onOpen,
@@ -37,7 +34,6 @@ export function TaskRow({
   tagDefinitions: TagDefinitionRecord[]
   mentions: MentionRecord[]
   mode?: TaskDisplayMode
-  workoutRole?: WorkoutRole
   onToggleExpanded: () => void
   onSelect: (selected: boolean) => void
   onOpen: () => void
@@ -127,15 +123,6 @@ export function TaskRow({
             <span><ListTree size={12} /> {task.completedSubtasks}/{task.totalSubtasks}</span>
             {!isCompact && <span className="task-progress-track"><i style={{ width: `${Math.round((task.progress ?? 0) * 100)}%` }} /></span>}
           </> : null}
-          {workoutRole === 'workout' && (
-            <Link
-              className="task-row-workout-link"
-              to={`/workout/${task.day}/${task.id}`}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <Dumbbell size={12} /> {task.status === 'in_progress' ? 'Resume' : 'Open workout'}
-            </Link>
-          )}
         </div>
       </div>
     </div>

@@ -66,9 +66,8 @@ performance results where noted.
       workout — including once on a 320 CSS px viewport with no hardware keyboard.
 - [ ] Set measurement validation is visible and announced; invalid values are rejected without
       rewriting the set title.
-- [ ] Tasks hides exercise/set internals by default and reveals them only via
-      **Include workout internals**; task vitals and view counts are not inflated by internals.
-- [ ] Workout rows in Tasks show progress and an Open/Resume affordance to the lens.
+- [ ] Tasks and Today exclude workout, exercise, and set blocks; task vitals and view counts are not
+      inflated by workout blocks.
 - [ ] An exercise thread lists its Workout occurrences grouped by day with set counts and completion.
 - [ ] Workout properties survive reload, export, GitHub pull, and conflict resolution.
 - [ ] The AI coach receives the active/open workout as read-only context and cannot mutate it.
@@ -126,4 +125,3 @@ runs, median, p75, worst result, fixture size, and whether the run was cold or w
 - [ ] Every other failed item has an owner, impact statement, follow-up issue, and explicit approval.
 - [ ] Performance results and known deviations are attached to the release record.
 - [ ] Final decision recorded: **ship / hold**.
-

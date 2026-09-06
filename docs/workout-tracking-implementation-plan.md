@@ -30,7 +30,7 @@ schemas store workout-specific values. A workout screen is only a specialized vi
 4. Workout measurements use existing block properties supplied by tag schemas.
 5. The outline editor and workout UI edit the same source blocks and properties.
 6. System behavior is resolved from stable tag IDs, not mutable tag names.
-7. General task views show workout roots but hide exercise and set internals by default.
+7. General task views exclude workout, exercise, and set blocks; dedicated workout views own that context.
 8. Derived workout views can always be rebuilt from existing tasks, tags, properties, and blocks.
 9. The first release does not introduce workout templates, charts, TQL changes, or AI mutations.
 
@@ -405,11 +405,9 @@ Do not build a textual set parser. Values are edited as block properties.
 
 ### Tasks
 
-- Show workout roots.
-- Hide exercise and set tasks by default.
-- Add an `Include workout internals` advanced filter.
-- Show workout progress and Open/Resume on workout rows.
-- Apply the same visibility policy to counts.
+- Exclude workout, exercise, and set tasks from the general task list.
+- Keep workout progress, actions, and measurements in the dedicated Workouts views.
+- Apply the same visibility policy to counts and grouping.
 
 ### Exercise threads
 
@@ -460,8 +458,7 @@ ThreadScript workout commands until the trusted UI workflow has shipped and stab
 | `src/components/ContextualInspector.tsx` | Dispatch to role-specific sections. |
 | `src/components/inspector/TaskDraft.tsx` | Add compact property editors. |
 | `src/pages/TodayPage.tsx` | Add New/Open/Resume workout actions. |
-| `src/pages/TasksPage.tsx` | Hide internals by default and render workout roots. |
-| `src/components/TaskRow.tsx` | Add workout-root progress/action treatment. |
+| `src/pages/TasksPage.tsx` | Exclude all structurally tagged workout tasks from general views. |
 | `src/pages/ThreadPage.tsx` | Add basic exercise workout occurrences. |
 | `src/App.tsx` and tab routing | Register workout lens. |
 | `src/lib/aiContext.ts` | Add bounded read-only active-workout context. |
@@ -522,11 +519,10 @@ Exit: a phone user can log, finish, reload, and revisit a workout.
 ### Phase 5: integration
 
 1. Add Today entry points.
-2. Filter workout internals from general Tasks.
-3. Add workout-root row treatment.
-4. Add exercise occurrence history.
-5. Add bounded read-only coach context.
-6. Update documentation and release QA.
+2. Keep workout blocks out of general Tasks.
+3. Add exercise occurrence history.
+4. Add bounded read-only coach context.
+5. Update documentation and release QA.
 
 Exit: workouts feel native without degrading ordinary notes, tasks, threads, or search.
 
@@ -555,7 +551,7 @@ general block identity before shipping; do not add workout-only identity machine
 - Workout lens reflects outline/property changes.
 - Set completion updates parent progress.
 - Validation is visible and announced.
-- Tasks hides internals by default and reveals them through its filter.
+- Tasks and Today exclude all structurally tagged workout blocks.
 - Every workout projection links to its exact source.
 - Create, log, finish, reload, and revisit a workout.
 - Reload during an active workout.
@@ -570,7 +566,7 @@ general block identity before shipping; do not add workout-only identity machine
 - `TaskRecord` has no workout fields and there are no canonical workout tables.
 - No database migration exists without measured need.
 - Workout properties survive reload, export, sync, pull, and conflict resolution.
-- General Tasks counts are not inflated by exercise/set internals.
+- General Tasks counts are not inflated by workout, exercise, or set blocks.
 - Outline and workout lens agree because they share the same source.
 - The core flow works at 320 CSS pixels without a hardware keyboard.
 - Primary controls meet accessibility and touch-target requirements.
