@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { db, initializeDatabase, saveDay, setBlockProperty, setThreadProperty } from '../../db'
 import { createWorkoutSubtask, createWorkoutTask } from '../tasks'
-import { getExerciseOccurrences, getWorkout, getWorkoutForBlock, getWorkoutRole, getWorkoutsForDay } from './selectors'
+import { getExerciseOccurrences, getWorkout, getWorkoutForBlock, getWorkoutHistory, getWorkoutRole, getWorkoutsForDay } from './selectors'
 import { setTaskStatus } from '../tasks'
 import { WORKOUT_SYSTEM_TAGS } from './systemTags'
 
@@ -17,6 +17,17 @@ beforeEach(async () => {
 afterAll(() => db.close())
 
 describe('workout selectors', () => {
+  it('loads the complete workout log in newest-first order from one bulk snapshot', async () => {
+    await saveDay(DATE, '- [x] #[workout] [[Earlier]]\n  - [x] #[exercise] [[Bench Press]]\n    - [x] #[set] Set 1')
+    await setThreadProperty('bench-press', 'exercise-primary-muscles', ['chest'], 'automation')
+    await saveDay('2026-09-03', '- [ ] #[workout] [[Later]]')
+
+    const history = await getWorkoutHistory()
+
+    expect(history.map((view) => view.task.day)).toEqual(['2026-09-03', DATE])
+    expect(history[1].exercises[0].guide?.primaryMuscles).toEqual(['chest'])
+  })
+
   it('assembles a workout from existing tasks, tags, properties, links, and notes', async () => {
     await saveDay(DATE, [
       '- [ ] #[workout] [[Push Day]]',

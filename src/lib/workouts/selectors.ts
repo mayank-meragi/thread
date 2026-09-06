@@ -80,7 +80,11 @@ function buildGuideView(rows: ThreadPropertyRecord[]): ExerciseGuideView | undef
   return hasContent ? guide : undefined
 }
 
-async function buildWorkout(snapshot: DayWorkoutSnapshot, workoutTaskId: string): Promise<WorkoutView | undefined> {
+async function buildWorkout(
+  snapshot: DayWorkoutSnapshot,
+  workoutTaskId: string,
+  hydratedGuides?: Map<string, ThreadPropertyRecord[]>,
+): Promise<WorkoutView | undefined> {
   const taskById = new Map(snapshot.tasks.map((task) => [task.id, task]))
   const tagsByBlock = groupBy(snapshot.tags, (row) => row.blockId)
   const propertiesByBlock = groupBy(snapshot.properties, (row) => row.blockId)
@@ -106,10 +110,10 @@ async function buildWorkout(snapshot: DayWorkoutSnapshot, workoutTaskId: string)
   const exerciseThreadIds = exerciseTasks
     .map((exercise) => occurrencesByBlock.get(exercise.id)?.[0]?.threadId)
     .filter((id): id is string => Boolean(id))
-  const guideRows = exerciseThreadIds.length
-    ? await db.threadProperties.where('threadId').anyOf(exerciseThreadIds).toArray()
-    : []
-  const guideByThread = groupBy(guideRows, (row) => row.threadId)
+  const guideByThread = hydratedGuides ?? groupBy(
+    exerciseThreadIds.length ? await db.threadProperties.where('threadId').anyOf(exerciseThreadIds).toArray() : [],
+    (row) => row.threadId,
+  )
 
   const exercises: WorkoutExerciseView[] = exerciseTasks.map((exercise) => {
     const occurrence = occurrencesByBlock.get(exercise.id)?.[0]
@@ -242,12 +246,45 @@ export async function getExerciseOccurrences(threadId: string): Promise<Exercise
 }
 
 export async function getAllWorkouts(): Promise<WorkoutView[]> {
-  const days = await db.days.orderBy('date').reverse().toArray()
+  return getWorkoutHistory()
+}
+
+/**
+ * Loads the complete workout log in one bulk snapshot. Unlike the original
+ * day-by-day selector, guide properties are fetched once and attached without
+ * issuing another query for every workout.
+ */
+export async function getWorkoutHistory(): Promise<WorkoutView[]> {
+  const [tasks, blocks, tags, properties, occurrences, threadProperties] = await Promise.all([
+    db.tasks.toArray(),
+    db.blocks.toArray(),
+    db.blockTags.toArray(),
+    db.blockProperties.toArray(),
+    db.occurrences.toArray(),
+    db.threadProperties.toArray(),
+  ])
+  const tagsByBlock = groupBy(tags, (row) => row.blockId)
+  const guidesByThread = groupBy(threadProperties, (row) => row.threadId)
+  const dayKeys = new Set(tasks
+    .filter((task) => workoutRoleFromTagIds((tagsByBlock.get(task.id) ?? []).map((tag) => tag.tagId)) === 'workout')
+    .map((task) => task.day))
   const workouts: WorkoutView[] = []
-  for (const day of days) {
-    workouts.push(...await getWorkoutsForDay(day.date))
+  for (const day of dayKeys) {
+    const snapshot: DayWorkoutSnapshot = {
+      tasks: tasks.filter((task) => task.day === day).sort((a, b) => a.order - b.order),
+      blocks: blocks.filter((block) => block.day === day).sort((a, b) => a.order - b.order),
+      tags: tags.filter((tag) => tag.day === day),
+      properties: properties.filter((property) => property.day === day),
+      occurrences: occurrences.filter((occurrence) => occurrence.day === day),
+    }
+    const dayWorkouts = snapshot.tasks.filter((task) =>
+      workoutRoleFromTagIds((tagsByBlock.get(task.id) ?? []).map((tag) => tag.tagId)) === 'workout')
+    for (const task of dayWorkouts) {
+      const view = await buildWorkout(snapshot, task.id, guidesByThread)
+      if (view) workouts.push(view)
+    }
   }
-  return workouts
+  return workouts.sort((a, b) => b.task.day.localeCompare(a.task.day) || b.task.order - a.task.order)
 }
 
 export async function getRecentWorkouts(limit: number): Promise<WorkoutView[]> {
