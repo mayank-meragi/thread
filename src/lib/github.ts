@@ -1,7 +1,8 @@
-import { applyMergedDay, applyMergedThreadNote, applyRemoteDay, applyRemoteThreadNote, db, deleteRemoteDay, deleteRemoteThreadNote, hasOpenConflict, markConflictResolved, markDaySynced, markThreadNoteSynced, queueWorkspaceSync, recordConflict, saveDay, saveThreadNote, type DayRecord, type GitHubSyncState, type ThreadNoteRecord } from '../db'
+import { applyMergedDay, applyMergedThreadNote, applyRemoteDay, applyRemoteThreadNote, db, deleteRemoteDay, deleteRemoteThreadNote, hasOpenConflict, markConflictResolved, markDaySynced, markThreadNoteSynced, queueFeedsSync, queueWorkspaceSync, recordConflict, saveDay, saveThreadNote, type DayRecord, type GitHubSyncState, type ThreadNoteRecord } from '../db'
 import { emptyDayMetadata, parseDayDocument, serializeDayDocument } from './dayDocument'
 import { applyConflictResolutions, mergeMarkdown } from './conflictMerge'
 import { applyWorkspaceManifest, buildWorkspaceManifest, mergeWorkspaceManifests, parseWorkspaceManifest, serializeWorkspaceManifest, type WorkspaceManifestV1 } from './syncManifest'
+import { applyFeedManifest, buildFeedManifest, mergeFeedManifests, parseFeedManifest, serializeFeedManifest, type FeedManifestV1 } from './feedManifest'
 
 const API = 'https://api.github.com'
 const STORAGE_KEY = 'thread.github'
@@ -184,6 +185,36 @@ async function pushWorkspace(config: GitHubConfig, outboxCreatedAt: string): Pro
   return 1
 }
 
+// `feeds.json` counterpart to pushWorkspace: same merge-then-put-with-retry
+// shape, against the FeedManifestV1 last-write-wins + tombstone merge.
+async function pushFeeds(config: GitHubConfig, outboxCreatedAt: string): Promise<number> {
+  const state = await ensureSyncState(config)
+  const local = await buildFeedManifest()
+  let remoteFile = await getRemoteFile(config, 'feeds.json')
+  let merged = remoteFile
+    ? mergeFeedManifests(
+      state.lastSyncedFeeds as FeedManifestV1 | undefined,
+      local,
+      parseFeedManifest(remoteFile.content),
+    )
+    : local
+  try {
+    await putFile(config, 'feeds.json', serializeFeedManifest(merged), remoteFile?.sha)
+  } catch (error) {
+    if (!(error instanceof SyncConflictError)) throw error
+    remoteFile = await getRemoteFile(config, 'feeds.json')
+    merged = remoteFile
+      ? mergeFeedManifests(state.lastSyncedFeeds as FeedManifestV1 | undefined, local, parseFeedManifest(remoteFile.content))
+      : local
+    await putFile(config, 'feeds.json', serializeFeedManifest(merged), remoteFile?.sha)
+  }
+  await applyFeedManifest(merged)
+  await db.syncStates.update(state.key, { lastSyncedFeeds: merged })
+  const current = await db.outbox.get('feeds')
+  if (current?.createdAt === outboxCreatedAt) await db.outbox.delete('feeds')
+  return 1
+}
+
 // Pushes one day, unconditionally -- whether this is the very first sync of
 // a day that might already have remote content, or a resync of a day whose
 // stored remoteSha has since gone stale (another device pushed, a pull
@@ -287,6 +318,10 @@ export async function syncPending(): Promise<number> {
     try {
       if (item.kind === 'workspace') {
         synced += await pushWorkspace(config, item.createdAt)
+        continue
+      }
+      if (item.kind === 'feeds') {
+        synced += await pushFeeds(config, item.createdAt)
         continue
       }
       if (item.kind === 'thread-note') {
@@ -450,6 +485,7 @@ function managedPath(path: string): boolean {
   return /^days\/\d{4}\/\d{4}-\d{2}-\d{2}\.md$/.test(path)
     || /^threads\/[^/]+\.md$/.test(path)
     || path === 'workspace.json'
+    || path === 'feeds.json'
 }
 
 function dayFromPath(path: string): string | null {
@@ -514,6 +550,26 @@ async function pullWorkspace(config: GitHubConfig, headSha: string): Promise<Pul
   return 'applied'
 }
 
+async function pullFeeds(config: GitHubConfig, headSha: string): Promise<PullResult> {
+  const remoteFile = await getRemoteFile(config, 'feeds.json', headSha)
+  if (!remoteFile) {
+    await queueFeedsSync()
+    return 'unchanged'
+  }
+  const state = await ensureSyncState(config)
+  const local = await buildFeedManifest()
+  const remote = parseFeedManifest(remoteFile.content)
+  const pendingLocalManifest = await db.outbox.get('feeds')
+  const merged = !state.lastSyncedFeeds && !pendingLocalManifest
+    ? remote
+    : mergeFeedManifests(state.lastSyncedFeeds as FeedManifestV1 | undefined, local, remote)
+  await applyFeedManifest(merged)
+  await db.syncStates.update(state.key, { lastSyncedFeeds: remote })
+  const normalized = await buildFeedManifest()
+  if (serializeFeedManifest(normalized) !== serializeFeedManifest(remote)) await queueFeedsSync()
+  return 'applied'
+}
+
 async function applyRemotePath(config: GitHubConfig, path: string, headSha: string, deleted = false): Promise<PullResult> {
   const day = dayFromPath(path)
   if (day) {
@@ -528,6 +584,10 @@ async function applyRemotePath(config: GitHubConfig, path: string, headSha: stri
   if (path === 'workspace.json') {
     if (deleted) { await queueWorkspaceSync(); return 'deleted' }
     return pullWorkspace(config, headSha)
+  }
+  if (path === 'feeds.json') {
+    if (deleted) { await queueFeedsSync(); return 'deleted' }
+    return pullFeeds(config, headSha)
   }
   return 'unchanged'
 }
@@ -570,6 +630,7 @@ export async function catchUpFromGitHub(options: { priorityPaths?: string[]; for
         if (!remotePaths.has(path)) work.push({ path, deleted: true })
       }
       if (!remotePaths.has('workspace.json')) await queueWorkspaceSync()
+      if (!remotePaths.has('feeds.json')) await queueFeedsSync()
     } else {
       work = []
       for (const change of changes ?? []) {

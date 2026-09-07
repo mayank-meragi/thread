@@ -100,7 +100,7 @@ export interface MentionRecord {
 
 export interface OutboxRecord {
   key: string
-  kind: 'day' | 'thread-note' | 'workspace'
+  kind: 'day' | 'thread-note' | 'workspace' | 'feeds'
   aggregateId: string
   createdAt: string
   attempts: number
@@ -121,6 +121,7 @@ export interface GitHubSyncState {
   totalFiles?: number
   processedFiles?: number
   lastSyncedWorkspace?: unknown
+  lastSyncedFeeds?: unknown
 }
 
 export interface WorkspaceTombstoneRecord {
@@ -165,6 +166,24 @@ export interface FeedEntryRecord {
   articleError?: string
   fetchedAt: string
   readAt?: string
+}
+
+// Device-independent read/unread state, keyed by `feedEntries.id` (which is
+// itself deterministic across devices: `${feed.id}:${externalId}`). This is the
+// synced source of truth carried in `feeds.json`; a row can exist for an entry
+// this device has not fetched yet, and is adopted when the entry later lands.
+export interface FeedReadRecord {
+  id: string
+  readAt: string | null
+  updatedAt: string
+}
+
+// Deletion marker for a synced feed or folder, mirroring WorkspaceTombstoneRecord.
+export interface FeedTombstoneRecord {
+  key: string
+  collection: 'feeds' | 'folders'
+  recordId: string
+  deletedAt: string
 }
 
 export interface ConflictRecord {
@@ -343,6 +362,8 @@ class ThreadDatabase extends Dexie {
   feeds!: EntityTable<FeedRecord, 'id'>
   feedFolders!: EntityTable<FeedFolderRecord, 'id'>
   feedEntries!: EntityTable<FeedEntryRecord, 'id'>
+  feedReads!: EntityTable<FeedReadRecord, 'id'>
+  feedTombstones!: EntityTable<FeedTombstoneRecord, 'key'>
 
   constructor() {
     super('thread-v1')
@@ -681,6 +702,46 @@ class ThreadDatabase extends Dexie {
       feeds: 'id, url, title, folderId, updatedAt, lastFetchedAt',
       feedEntries: 'id, feedId, externalId, publishedAt, fetchedAt, readAt, [feedId+publishedAt], [feedId+readAt]',
     })
+    // v18 adds the two tables that let feeds, folders and read state sync
+    // through GitHub as `feeds.json`: `feedReads` is the device-independent
+    // read-state source of truth, `feedTombstones` marks deleted subscriptions
+    // and folders. The upgrade seeds `feedReads` from whatever this device has
+    // already marked read so that history syncs on the first push.
+    this.version(18).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, kind, blockId, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, scope, aggregateId, detectedAt, resolvedAt',
+      blocks: 'id, day, parentId, kind, [day+order]',
+      occurrences: 'id, threadId, day, rootBlockId, [threadId+day]',
+      viewState: 'key, view, blockId, collapsed',
+      revisions: 'id, day, archivedAt, [day+localRevision]',
+      tasks: 'id, blockId, day, status, parentTaskId, dueDate, startDate, priority, [day+order], [status+dueDate]',
+      threadNotes: 'threadId, updatedAt',
+      threadProperties: 'id, threadId, propertyId, value, [threadId+propertyId], [propertyId+value]',
+      propertyDefinitions: 'id, name, type, updatedAt',
+      blockProperties: 'id, blockId, day, propertyId, [blockId+propertyId], [propertyId+day]',
+      tagDefinitions: 'id, name, updatedAt',
+      blockTags: 'id, blockId, day, tagId, [blockId+tagId], [tagId+day]',
+      personas: 'id, threadId, updatedAt',
+      chatSessions: 'id, personaId, updatedAt, [personaId+updatedAt]',
+      chatMessages: 'id, sessionId, createdAt, [sessionId+createdAt]',
+      chatProposals: 'id, sessionId, messageId, status, createdAt, [sessionId+createdAt]',
+      syncStates: 'key, repo, branch, lastCheckedAt',
+      workspaceTombstones: 'key, collection, recordId, deletedAt',
+      feedFolders: 'id, &normalizedName, name, updatedAt',
+      feeds: 'id, url, title, folderId, updatedAt, lastFetchedAt',
+      feedEntries: 'id, feedId, externalId, publishedAt, fetchedAt, readAt, [feedId+publishedAt], [feedId+readAt]',
+      feedReads: 'id, updatedAt',
+      feedTombstones: 'key, collection, recordId, deletedAt',
+    }).upgrade(async (tx) => {
+      const rows = await tx.table('feedEntries').toArray()
+      const seeded = rows
+        .filter((entry) => entry.readAt)
+        .map((entry) => ({ id: entry.id, readAt: entry.readAt as string, updatedAt: entry.readAt as string }))
+      if (seeded.length) await tx.table('feedReads').bulkPut(seeded)
+    })
   }
 }
 
@@ -689,6 +750,14 @@ export const db = new ThreadDatabase()
 export async function queueWorkspaceSync(): Promise<void> {
   const now = new Date().toISOString()
   await db.outbox.put({ key: 'workspace', kind: 'workspace', aggregateId: 'workspace', createdAt: now, attempts: 0 })
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('thread:local-write'))
+}
+
+// Feeds, folders and read state sync as a single `feeds.json` file; a coalesced
+// outbox entry (fixed key) is enough to mean "the feed manifest changed".
+export async function queueFeedsSync(): Promise<void> {
+  const now = new Date().toISOString()
+  await db.outbox.put({ key: 'feeds', kind: 'feeds', aggregateId: 'feeds', createdAt: now, attempts: 0 })
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('thread:local-write'))
 }
 

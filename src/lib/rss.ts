@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify'
 import { XMLParser } from 'fast-xml-parser'
-import { db, type FeedEntryRecord, type FeedFolderRecord, type FeedRecord } from '../db'
+import { db, queueFeedsSync, type FeedEntryRecord, type FeedFolderRecord, type FeedRecord, type FeedTombstoneRecord } from '../db'
 import { getRssProxyConfig, rssProxyEndpoint, type RssProxyConfig } from './rssProxy'
 
 export interface NormalizedFeedEntry {
@@ -323,6 +323,20 @@ function newFolderId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `folder-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 }
 
+async function recordFeedTombstone(
+  collection: FeedTombstoneRecord['collection'],
+  recordId: string,
+  deletedAt = new Date().toISOString(),
+): Promise<void> {
+  await db.feedTombstones.put({ key: `${collection}:${recordId}`, collection, recordId, deletedAt })
+}
+
+// A subscription or folder that comes back (re-added after a delete) must
+// outlive its own tombstone, so clear any stale marker on create/subscribe.
+async function clearFeedTombstone(collection: FeedTombstoneRecord['collection'], recordId: string): Promise<void> {
+  await db.feedTombstones.delete(`${collection}:${recordId}`)
+}
+
 export async function createFeedFolder(value: string): Promise<FeedFolderRecord> {
   const name = value.trim().replace(/\s+/g, ' ')
   if (!name) throw new Error('Folder names cannot be empty.')
@@ -333,6 +347,8 @@ export async function createFeedFolder(value: string): Promise<FeedFolderRecord>
   const now = new Date().toISOString()
   const folder: FeedFolderRecord = { id: newFolderId(), name, normalizedName, createdAt: now, updatedAt: now }
   await db.feedFolders.add(folder)
+  await clearFeedTombstone('folders', folder.id)
+  await queueFeedsSync()
   return folder
 }
 
@@ -346,6 +362,7 @@ export async function renameFeedFolder(folderId: string, value: string): Promise
   if (duplicate && duplicate.id !== folderId) throw new Error('A folder with this name already exists.')
   const next = { ...current, name, normalizedName, updatedAt: new Date().toISOString() }
   await db.feedFolders.put(next)
+  await queueFeedsSync()
   return next
 }
 
@@ -353,22 +370,32 @@ export async function deleteFeedFolder(folderId: string, mode: 'ungroup' | 'dele
   const folder = await db.feedFolders.get(folderId)
   if (!folder) return
   const feeds = await db.feeds.where('folderId').equals(folderId).toArray()
-  await db.transaction('rw', [db.feedFolders, db.feeds, db.feedEntries], async () => {
-    if (mode === 'delete') {
-      for (const feed of feeds) {
-        await db.feedEntries.where('feedId').equals(feed.id).delete()
-        await db.feeds.delete(feed.id)
+  const deletedAt = new Date().toISOString()
+  await db.transaction(
+    'rw',
+    [db.feedFolders, db.feeds, db.feedEntries, db.feedReads, db.feedTombstones],
+    async () => {
+      if (mode === 'delete') {
+        for (const feed of feeds) {
+          const readKeys = await db.feedReads.where('id').startsWith(`${feed.id}:`).primaryKeys()
+          if (readKeys.length) await db.feedReads.bulkDelete(readKeys)
+          await db.feedEntries.where('feedId').equals(feed.id).delete()
+          await db.feeds.delete(feed.id)
+          await recordFeedTombstone('feeds', feed.id, deletedAt)
+        }
+      } else {
+        for (const feed of feeds) {
+          const next = { ...feed }
+          delete next.folderId
+          next.updatedAt = deletedAt
+          await db.feeds.put(next)
+        }
       }
-    } else {
-      for (const feed of feeds) {
-        const next = { ...feed }
-        delete next.folderId
-        next.updatedAt = new Date().toISOString()
-        await db.feeds.put(next)
-      }
-    }
-    await db.feedFolders.delete(folderId)
-  })
+      await db.feedFolders.delete(folderId)
+      await recordFeedTombstone('folders', folderId, deletedAt)
+    },
+  )
+  await queueFeedsSync()
 }
 
 export async function moveFeedToFolder(feedId: string, folderId: string | undefined): Promise<void> {
@@ -379,6 +406,7 @@ export async function moveFeedToFolder(feedId: string, folderId: string | undefi
   if (folderId) next.folderId = folderId
   else delete next.folderId
   await db.feeds.put(next)
+  await queueFeedsSync()
 }
 
 export async function subscribeToFeed(value: string, gateway: FeedGateway = feedGateway, options: SubscribeFeedOptions = {}): Promise<FeedRecord> {
@@ -401,6 +429,8 @@ export async function subscribeToFeed(value: string, gateway: FeedGateway = feed
     lastFetchedAt: now,
   }
   await persistFeedSnapshot(feed, normalized)
+  await clearFeedTombstone('feeds', id)
+  await queueFeedsSync()
   return feed
 }
 
@@ -437,6 +467,18 @@ export async function recordFeedError(feed: FeedRecord, error: unknown): Promise
   await db.feeds.update(feed.id, { lastError: message, updatedAt: new Date().toISOString() })
 }
 
+// Fields of a feed that are carried in `feeds.json`; a change to any of them
+// means the feed manifest needs another push, whereas a routine refresh that
+// only bumps `lastFetchedAt` does not.
+function syncedFeedFieldsChanged(before: FeedRecord | undefined, after: FeedRecord): boolean {
+  if (!before) return true
+  return before.title !== after.title
+    || before.description !== after.description
+    || before.siteUrl !== after.siteUrl
+    || before.folderId !== after.folderId
+    || before.url !== after.url
+}
+
 async function persistFeedSnapshot(feed: FeedRecord, normalized: NormalizedFeed): Promise<void> {
   const fetchedAt = feed.lastFetchedAt ?? new Date().toISOString()
   const entries: FeedEntryRecord[] = normalized.entries.map((entry) => ({
@@ -450,13 +492,20 @@ async function persistFeedSnapshot(feed: FeedRecord, normalized: NormalizedFeed)
     summaryHtml: sanitizeFeedHtml(entry.summaryHtml, entry.url ?? feed.siteUrl ?? feed.url),
     fetchedAt,
   }))
-  await db.transaction('rw', [db.feeds, db.feedEntries], async () => {
+  let metadataChanged = false
+  await db.transaction('rw', [db.feeds, db.feedEntries, db.feedReads], async () => {
+    const previous = await db.feeds.get(feed.id)
+    metadataChanged = syncedFeedFieldsChanged(previous, feed)
     await db.feeds.put(feed)
     for (const entry of entries) {
       const current = await db.feedEntries.get(entry.id)
+      // Synced read state wins over whatever this device last had cached, so an
+      // entry that was read on another device comes back read here too.
+      const readRow = await db.feedReads.get(entry.id)
+      const readAt = readRow ? (readRow.readAt ?? undefined) : current?.readAt
       await db.feedEntries.put({
         ...entry,
-        readAt: current?.readAt,
+        readAt,
         articleHtml: current?.articleHtml,
         articleFetchedAt: current?.articleFetchedAt,
         articleError: current?.articleError,
@@ -464,6 +513,7 @@ async function persistFeedSnapshot(feed: FeedRecord, normalized: NormalizedFeed)
     }
     await pruneFeedEntries(feed.id)
   })
+  if (metadataChanged) await queueFeedsSync()
 }
 
 export async function pruneFeedEntries(feedId?: string): Promise<void> {
@@ -483,27 +533,44 @@ export async function pruneFeedEntries(feedId?: string): Promise<void> {
 }
 
 export async function markFeedEntryRead(entryId: string, read: boolean): Promise<void> {
-  await db.feedEntries.update(entryId, { readAt: read ? new Date().toISOString() : undefined })
+  const now = new Date().toISOString()
+  await db.transaction('rw', [db.feedEntries, db.feedReads], async () => {
+    await db.feedEntries.update(entryId, { readAt: read ? now : undefined })
+    await db.feedReads.put({ id: entryId, readAt: read ? now : null, updatedAt: now })
+  })
+  await queueFeedsSync()
 }
 
 export async function markAllFeedEntriesRead(feedId?: string): Promise<void> {
   const entries = feedId ? await db.feedEntries.where('feedId').equals(feedId).toArray() : await db.feedEntries.toArray()
   const now = new Date().toISOString()
-  await db.transaction('rw', db.feedEntries, async () => {
-    for (const entry of entries) if (!entry.readAt) await db.feedEntries.update(entry.id, { readAt: now })
+  const changed = entries.filter((entry) => !entry.readAt)
+  await db.transaction('rw', [db.feedEntries, db.feedReads], async () => {
+    for (const entry of changed) await db.feedEntries.update(entry.id, { readAt: now })
+    if (changed.length) await db.feedReads.bulkPut(changed.map((entry) => ({ id: entry.id, readAt: now, updatedAt: now })))
   })
+  if (changed.length) await queueFeedsSync()
 }
 
 export async function markAllFeedEntriesUnread(feedId?: string): Promise<void> {
   const entries = feedId ? await db.feedEntries.where('feedId').equals(feedId).toArray() : await db.feedEntries.toArray()
-  await db.transaction('rw', db.feedEntries, async () => {
-    for (const entry of entries) if (entry.readAt) await db.feedEntries.update(entry.id, { readAt: undefined })
+  const now = new Date().toISOString()
+  const changed = entries.filter((entry) => entry.readAt)
+  await db.transaction('rw', [db.feedEntries, db.feedReads], async () => {
+    for (const entry of changed) await db.feedEntries.update(entry.id, { readAt: undefined })
+    if (changed.length) await db.feedReads.bulkPut(changed.map((entry) => ({ id: entry.id, readAt: null, updatedAt: now })))
   })
+  if (changed.length) await queueFeedsSync()
 }
 
 export async function removeFeed(feedId: string): Promise<void> {
-  await db.transaction('rw', [db.feeds, db.feedEntries], async () => {
+  const deletedAt = new Date().toISOString()
+  await db.transaction('rw', [db.feeds, db.feedEntries, db.feedReads, db.feedTombstones], async () => {
     await db.feeds.delete(feedId)
     await db.feedEntries.where('feedId').equals(feedId).delete()
+    const readKeys = await db.feedReads.where('id').startsWith(`${feedId}:`).primaryKeys()
+    if (readKeys.length) await db.feedReads.bulkDelete(readKeys)
+    await recordFeedTombstone('feeds', feedId, deletedAt)
   })
+  await queueFeedsSync()
 }

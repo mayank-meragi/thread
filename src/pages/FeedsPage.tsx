@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type TouchEvent as ReactTouchEvent } from 'react'
 import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ExternalLink, FileUp, Folder, FolderPlus, MoreHorizontal, Pencil, Plus, RefreshCw, Rss, Trash2, X } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type FeedEntryRecord, type FeedFolderRecord, type FeedRecord } from '../db'
@@ -368,6 +368,23 @@ export function FeedsPage() {
     await refreshMany(source)
   }, [feeds, refreshMany, runRefresh, selectedSource])
 
+  // Shared prev/next entry step used by the J/K keys and the mobile swipe. A
+  // positive delta advances toward older entries ("next"); it clamps at both
+  // ends rather than wrapping, matching the keyboard behaviour.
+  const goToRelativeEntry = useCallback((delta: 1 | -1) => {
+    if (visibleEntries.length === 0) return
+    const currentIndex = selectedEntry
+      ? visibleEntries.findIndex((entry) => entry.id === selectedEntry.id)
+      : delta === 1 ? -1 : visibleEntries.length
+    const nextIndex = Math.max(0, Math.min(visibleEntries.length - 1, currentIndex + delta))
+    const next = visibleEntries[nextIndex]
+    if (!next || next.id === selectedEntry?.id) return
+    setSelectedEntryId(next.id)
+    setMobilePane('reader')
+    void markFeedEntryRead(next.id, true)
+    window.setTimeout(() => document.querySelector<HTMLElement>(`[data-feed-entry-id="${next.id}"]`)?.scrollIntoView({ block: 'nearest' }), 0)
+  }, [visibleEntries, selectedEntry])
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.isComposing || dialog || isEditableTarget(event.target)) return
@@ -375,13 +392,7 @@ export function FeedsPage() {
       if (key === 'j' || key === 'k') {
         if (visibleEntries.length === 0) return
         event.preventDefault()
-        const currentIndex = selectedEntry ? visibleEntries.findIndex((entry) => entry.id === selectedEntry.id) : key === 'j' ? -1 : visibleEntries.length
-        const nextIndex = Math.max(0, Math.min(visibleEntries.length - 1, currentIndex + (key === 'j' ? 1 : -1)))
-        const next = visibleEntries[nextIndex]
-        setSelectedEntryId(next.id)
-        setMobilePane('reader')
-        void markFeedEntryRead(next.id, true)
-        window.setTimeout(() => document.querySelector<HTMLElement>(`[data-feed-entry-id="${next.id}"]`)?.scrollIntoView({ block: 'nearest' }), 0)
+        goToRelativeEntry(key === 'j' ? 1 : -1)
       } else if (key === 'f' && selectedEntry?.url) {
         event.preventDefault()
         void fetchFullArticle(selectedEntry)
@@ -403,7 +414,28 @@ export function FeedsPage() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [dialog, fetchFullArticle, filter, refreshCurrentSource, selectedEntry, visibleEntries])
+  }, [dialog, fetchFullArticle, filter, goToRelativeEntry, refreshCurrentSource, selectedEntry, visibleEntries])
+
+  // Horizontal swipe on the reader pane steps between articles on touch devices.
+  // A dedicated pan-y touch-action (see features.css) keeps vertical scrolling
+  // of the article body intact; we only act on a clearly horizontal drag.
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
+  const onReaderTouchStart = useCallback((event: ReactTouchEvent) => {
+    if (dialog || event.touches.length !== 1) { swipeStartRef.current = null; return }
+    if ((event.target as HTMLElement).closest('a, button')) { swipeStartRef.current = null; return }
+    const touch = event.touches[0]
+    swipeStartRef.current = { x: touch.clientX, y: touch.clientY }
+  }, [dialog])
+  const onReaderTouchEnd = useCallback((event: ReactTouchEvent) => {
+    const start = swipeStartRef.current
+    swipeStartRef.current = null
+    if (!start) return
+    const touch = event.changedTouches[0]
+    const dx = touch.clientX - start.x
+    const dy = touch.clientY - start.y
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+    goToRelativeEntry(dx < 0 ? 1 : -1)
+  }, [goToRelativeEntry])
 
   const renderFeedRow = (feed: FeedRecord) => (
     <div className="feed-source-row-wrap" key={feed.id}>
@@ -424,7 +456,7 @@ export function FeedsPage() {
 
         <section className="feeds-inbox" aria-label="Feed inbox"><div className="feeds-inbox-head"><button type="button" className="feed-mobile-back" onClick={() => setMobilePane('sources')}><ArrowLeft size={15} /> Sources</button><div className="feeds-tabs" role="tablist"><button type="button" role="tab" aria-selected={filter === 'all'} className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>All <span>{entries.length}</span></button><button type="button" role="tab" aria-selected={filter === 'unread'} className={filter === 'unread' ? 'is-active' : ''} onClick={() => setFilter('unread')}>Unread <span>{entries.filter((entry) => !entry.readAt).length}</span></button></div><div className="feeds-bulk-actions"><button type="button" className="feeds-mark-all" onClick={() => void markCurrentSource(true)} disabled={!entries.some((entry) => !entry.readAt)}><Check size={14} /> Mark all read</button><button type="button" className="feeds-mark-all" onClick={() => void markCurrentSource(false)} disabled={!entries.some((entry) => entry.readAt)}>Mark all unread</button></div></div><div className="feeds-entry-list">{groupedEntries.map((group) => <div className="feed-entry-group" key={group.label}><div className="feed-entry-group-label">{group.label}</div>{group.entries.map((entry) => { const source = feeds.find((feed) => feed.id === entry.feedId); return <button type="button" data-feed-entry-id={entry.id} className={`feed-entry-row${selectedEntry?.id === entry.id ? ' is-active' : ''}${entry.readAt ? '' : ' is-unread'}`} onClick={() => void selectEntry(entry)} key={entry.id}><span className="feed-entry-copy"><strong>{entry.title}</strong><span className="feed-entry-sub"><span className="feed-entry-source">{source?.title ?? 'Feed'}</span><time className="feed-entry-time">{entryTime(entry.publishedAt ?? entry.fetchedAt)}</time></span></span></button> })}</div>)}{visibleEntries.length === 0 && <div className="feeds-empty-list"><Rss size={25} /><strong>{feeds.length === 0 ? 'Your reading list starts here.' : filter === 'unread' ? 'You are caught up.' : 'No entries cached yet.'}</strong><p>{feeds.length === 0 ? 'Add a feed to bring a little more signal into your day.' : 'Refresh a subscription to check for new entries.'}</p></div>}</div></section>
 
-        <section className="feed-reader" aria-label="Article detail"><div className="feed-reader-head"><button type="button" className="feed-mobile-back" onClick={() => setMobilePane('entries')}><ArrowLeft size={15} /> Entries</button><span>{selectedFeed?.title ?? selectedFolder?.name ?? (selectedSource.kind === 'all' ? 'All feeds' : 'Feed')}</span>{selectedEntry && <div className="feed-reader-head-actions">{selectedEntry.url && <a className="icon-button" href={selectedEntry.url} target="_blank" rel="noreferrer" aria-label="Open original article"><ExternalLink size={15} /></a>}<button type="button" className="icon-button" aria-label={selectedEntry.readAt ? 'Mark unread' : 'Mark read'} onClick={() => void markFeedEntryRead(selectedEntry.id, !selectedEntry.readAt)}>{selectedEntry.readAt ? <span className="feed-read-indicator" aria-hidden="true" /> : <Check size={16} />}</button></div>}</div>{selectedEntry ? <div className="feed-reader-scroll"><div className="feed-reader-body"><h2>{selectedEntry.title}</h2><div className="feed-reader-meta">{readerMeta(selectedEntry)}</div>{selectedEntry.articleError && <p className="feed-article-error" role="alert">{selectedEntry.articleError}</p>}{selectedEntry.articleHtml ? <><div className="feed-article-badge">Full article{selectedEntry.articleFetchedAt ? ` · fetched ${relativeDate(selectedEntry.articleFetchedAt).toLowerCase()}` : ''}</div><div className="feed-reader-content" dangerouslySetInnerHTML={{ __html: selectedEntry.articleHtml }} /></> : selectedEntry.summaryHtml ? <div className="feed-reader-content" dangerouslySetInnerHTML={{ __html: sanitizeFeedHtml(selectedEntry.summaryHtml, selectedEntry.url ?? selectedFeed?.siteUrl) }} /> : <p className="feed-reader-empty">This entry has no summary. Fetch the full article or open the original article to continue reading.</p>}{selectedEntry.url && <div className="feed-reader-actions"><button type="button" className="feed-fetch-article" onClick={() => void fetchFullArticle(selectedEntry)} disabled={fullArticleLoadingId === selectedEntry.id}>{fullArticleLoadingId === selectedEntry.id ? 'Fetching article…' : selectedEntry.articleHtml ? 'Refresh full article' : 'Get full article'} <kbd>F</kbd></button><a className="feed-original-link" href={selectedEntry.url} target="_blank" rel="noreferrer">Open original article <ExternalLink size={14} /></a></div>}</div></div> : <div className="feed-reader-empty-state"><Rss size={28} /><strong>Select an entry to read.</strong><p>Your selected feed’s summaries will appear here.</p></div>}</section>
+        <section className="feed-reader" aria-label="Article detail" onTouchStart={onReaderTouchStart} onTouchEnd={onReaderTouchEnd}><div className="feed-reader-head"><button type="button" className="feed-mobile-back" onClick={() => setMobilePane('entries')}><ArrowLeft size={15} /> Entries</button><span>{selectedFeed?.title ?? selectedFolder?.name ?? (selectedSource.kind === 'all' ? 'All feeds' : 'Feed')}</span>{selectedEntry && <div className="feed-reader-head-actions">{selectedEntry.url && <a className="icon-button" href={selectedEntry.url} target="_blank" rel="noreferrer" aria-label="Open original article"><ExternalLink size={15} /></a>}<button type="button" className="icon-button" aria-label={selectedEntry.readAt ? 'Mark unread' : 'Mark read'} onClick={() => void markFeedEntryRead(selectedEntry.id, !selectedEntry.readAt)}>{selectedEntry.readAt ? <span className="feed-read-indicator" aria-hidden="true" /> : <Check size={16} />}</button></div>}</div>{selectedEntry ? <div className="feed-reader-scroll">{visibleEntries.length > 1 && <p className="feed-swipe-hint">Swipe to move between articles</p>}<div className="feed-reader-body"><h2>{selectedEntry.title}</h2><div className="feed-reader-meta">{readerMeta(selectedEntry)}</div>{selectedEntry.articleError && <p className="feed-article-error" role="alert">{selectedEntry.articleError}</p>}{selectedEntry.articleHtml ? <><div className="feed-article-badge">Full article{selectedEntry.articleFetchedAt ? ` · fetched ${relativeDate(selectedEntry.articleFetchedAt).toLowerCase()}` : ''}</div><div className="feed-reader-content" dangerouslySetInnerHTML={{ __html: selectedEntry.articleHtml }} /></> : selectedEntry.summaryHtml ? <div className="feed-reader-content" dangerouslySetInnerHTML={{ __html: sanitizeFeedHtml(selectedEntry.summaryHtml, selectedEntry.url ?? selectedFeed?.siteUrl) }} /> : <p className="feed-reader-empty">This entry has no summary. Fetch the full article or open the original article to continue reading.</p>}{selectedEntry.url && <div className="feed-reader-actions"><button type="button" className="feed-fetch-article" onClick={() => void fetchFullArticle(selectedEntry)} disabled={fullArticleLoadingId === selectedEntry.id}>{fullArticleLoadingId === selectedEntry.id ? 'Fetching article…' : selectedEntry.articleHtml ? 'Refresh full article' : 'Get full article'} <kbd>F</kbd></button><a className="feed-original-link" href={selectedEntry.url} target="_blank" rel="noreferrer">Open original article <ExternalLink size={14} /></a></div>}</div></div> : <div className="feed-reader-empty-state"><Rss size={28} /><strong>Select an entry to read.</strong><p>Your selected feed’s summaries will appear here.</p></div>}</section>
       </div>
 
       {dialog === 'subscribe' && <div className="layer-backdrop layer-backdrop-center feeds-dialog-backdrop"><form className="dialog feed-dialog" onSubmit={(event) => void submitSubscription(event)}><div className="feed-dialog-head"><div><Rss size={16} /><strong>Subscribe to a feed</strong></div><button type="button" className="icon-button" aria-label="Close" onClick={() => setDialog(null)}><X size={16} /></button></div><label className="field"><span className="field-label">Feed URL</span><input className="field-control" autoFocus type="url" value={feedUrl} onChange={(event) => { setFeedUrl(event.target.value); setFeedUrlWarning(feedUrlPrivacyWarning(event.target.value)) }} placeholder="https://example.com/feed.xml" required /></label>{folders.length > 0 && <label className="field"><span className="field-label">Folder</span><select className="field-control" value={subscribeFolderId ?? ''} onChange={(event) => setSubscribeFolderId(event.target.value || undefined)}><option value="">Ungrouped</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>}{feedUrlWarning && <p className="field-hint field-hint-error">{feedUrlWarning}</p>}{subscribeState === 'error' && <p className="banner banner-error" role="alert">{subscribeError}</p>}<div className="feed-dialog-actions"><button type="button" className="secondary-button" onClick={() => setDialog(null)}>Cancel</button><button type="submit" className="primary-button" disabled={subscribeState === 'loading'}>{subscribeState === 'loading' ? 'Checking…' : 'Subscribe'}</button></div></form></div>}

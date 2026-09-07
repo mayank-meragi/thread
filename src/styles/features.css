@@ -19,7 +19,7 @@
 .title-bar-search kbd { color: var(--muted); font: 500 10px/1 'IBM Plex Mono', monospace; }
 .title-bar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
 .title-bar-actions .rail-sync { display: none; }
-.title-bar-search-icon { display: none; }
+.title-bar-search-icon, .title-bar-settings-icon { display: none; }
 .title-bar-toggles { display: flex; align-items: center; gap: 1px; }
 .title-bar-toggle {
   width: 28px; height: 26px; display: grid; place-items: center; padding: 0;
@@ -1227,11 +1227,11 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .title-bar-date { flex: 1; color: var(--ink-soft); font-size: 13px; font-weight: 600; }
   .title-bar-search, .title-bar-toggles { display: none; }
   .title-bar-actions .rail-sync { display: grid; width: 32px; height: 32px; }
-  .title-bar-search-icon {
+  .title-bar-search-icon, .title-bar-settings-icon {
     width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto;
     border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer;
   }
-  .title-bar-search-icon:hover { background: var(--control-hover); color: var(--ink); }
+  .title-bar-search-icon:hover, .title-bar-settings-icon:hover { background: var(--control-hover); color: var(--ink); }
   .dockview-theme-thread .dv-tabs-and-actions-container,
   .dockview-theme-thread .dv-groupview,
   .dockview-theme-thread .dv-content-container { background: transparent; }
@@ -1548,6 +1548,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .feed-fetch-article kbd { padding: 2px 4px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); font: 500 10px 'IBM Plex Mono', monospace; }
 .feed-reader-actions .feed-original-link { margin-top: 0; }
 .feed-mobile-back { display: none; align-items: center; gap: 4px; padding: 5px 7px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
+.feed-swipe-hint { display: none; margin: 0; padding: 6px 22px 0; color: var(--muted); font-size: 11px; text-align: center; }
 .feed-mobile-back:hover { background: var(--control-hover); color: var(--ink); }
 .feeds-dialog-backdrop { z-index: 90; }
 .feed-dialog { display: grid; gap: 14px; }
@@ -1607,6 +1608,10 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .feeds-inbox-head { padding: 0 10px; }
   .feed-reader-head { padding-inline: 10px; }
   .feed-reader-body { padding: 28px 22px 44px; }
+  /* Keep vertical article scrolling native while horizontal drags reach the
+     swipe handler that steps between articles. */
+  .feed-reader { touch-action: pan-y; }
+  .feed-swipe-hint { display: block; }
 }
 
 .query-block-toggle {

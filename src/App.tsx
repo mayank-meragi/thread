@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BookOpenText, Dumbbell, ListTodo, Plus, Settings } from 'lucide-react'
+import { BookOpenText, Dumbbell, ListTodo, Plus, Rss } from 'lucide-react'
 import { HashRouter, NavLink, useNavigate } from 'react-router-dom'
 import { initializeDatabase } from './db'
 import { isoToday } from './lib/dates'
@@ -97,7 +97,7 @@ function AppShell() {
           <span className="mobile-create-mark"><Plus size={19} /></span><span>Create</span>
         </button>
         <NavLink to="/workouts" className={({ isActive }) => isActive ? 'active' : ''}><Dumbbell size={19} /><span>Workouts</span></NavLink>
-        <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''}><Settings size={19} /><span>Settings</span></NavLink>
+        <NavLink to="/feeds" className={({ isActive }) => isActive ? 'active' : ''}><Rss size={19} /><span>Feeds</span></NavLink>
       </nav>
 
       <Omnibox open={omnibox.open} initialMode={omnibox.mode} onClose={closeOmnibox} onTogglePanel={toggleRail} />

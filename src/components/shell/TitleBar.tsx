@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Sparkle } from 'lucide-react'
+import { Search, Settings, Sparkle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { formatShortDate, isoToday } from '../../lib/dates'
 import { isUserRailHidden, RAIL_VISIBILITY_EVENT, TOGGLE_RAIL_EVENT } from '../../lib/dockviewActions'
@@ -62,6 +62,14 @@ export function TitleBar({ activityBarHidden, onToggleActivityBar, onOpenCommand
         >
           <Search size={16} />
         </button>
+        <Link
+          to="/settings"
+          className="title-bar-settings-icon"
+          aria-label="Settings"
+          title="Settings"
+        >
+          <Settings size={16} />
+        </Link>
         <div className="title-bar-toggles">
           <button
             type="button"
