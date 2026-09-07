@@ -693,6 +693,14 @@ export function runGitHubSyncCycle(options: { priorityPaths?: string[]; forceFul
         emitSyncProgress({ phase: 'backing-off', retryAt: state.retryAt, lastCheckedAt: state.lastCheckedAt, lastSuccessfulPullAt: state.lastSuccessfulPullAt })
         return
       }
+      // A device that GitHub-synced under a build without feed sync has no feed
+      // baseline (`lastSyncedFeeds` unset) and its sync cursor is already past
+      // the commit that introduced feeds.json, so the incremental pull never
+      // surfaces it. Queue one feed sync; pushFeeds merges the remote file in
+      // and sets the baseline, after which this is a no-op.
+      if (!state.lastSyncedFeeds && !(await db.outbox.get('feeds'))) {
+        await db.outbox.put({ key: 'feeds', kind: 'feeds', aggregateId: 'feeds', createdAt: new Date().toISOString(), attempts: 0 })
+      }
       await syncPending()
       await catchUpFromGitHub(cycleOptions)
       await syncPending()
