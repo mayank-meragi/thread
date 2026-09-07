@@ -76,8 +76,22 @@ export function parseFeedManifest(value: string): FeedManifestV1 {
   }
 }
 
+// Deterministic JSON: object keys sorted recursively (arrays keep their order)
+// so two manifests that are semantically equal always serialize to identical
+// bytes, whatever order their records were built, merged, or hand-edited into
+// the file in. Without this, a key-order difference alone makes the sync engine
+// re-queue no-op pushes every cycle (see pullFeeds' normalized-vs-remote check).
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize)
+  if (value && typeof value === 'object') {
+    const source = value as Record<string, unknown>
+    return Object.fromEntries(Object.keys(source).sort().map((key) => [key, canonicalize(source[key])]))
+  }
+  return value
+}
+
 export function serializeFeedManifest(manifest: FeedManifestV1): string {
-  return `${JSON.stringify(manifest, null, 2)}\n`
+  return `${JSON.stringify(canonicalize(manifest), null, 2)}\n`
 }
 
 function equal(left: unknown, right: unknown): boolean {

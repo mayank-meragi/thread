@@ -2,6 +2,8 @@ import 'fake-indexeddb/auto'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db, saveDay, saveThreadNote } from '../db'
 import { catchUpFromGitHub, pullThreadNote, resolveRepoAssetURL, saveGitHubConfig, syncPending, uploadRepoAsset } from './github'
+import { buildFeedManifest, serializeFeedManifest, type FeedManifestV1 } from './feedManifest'
+import { serializeWorkspaceManifest } from './syncManifest'
 
 const DATE = '2026-08-19'
 
@@ -407,5 +409,138 @@ describe('repo image assets', () => {
 
     expect(resolveRepoAssetURL('https://example.com/cat.png')).toBe('https://example.com/cat.png')
     expect(resolveRepoAssetURL('data:image/png;base64,AAAA')).toBe('data:image/png;base64,AAAA')
+  })
+})
+
+// pushFeeds / pushWorkspace both route through pushManifest: a bounded,
+// converging retry that refetches by immutable head-commit sha when a PUT is
+// rejected for a stale blob sha (the Contents API can serve a stale sha for a
+// mutable branch ref right after a commit), and adopts the remote without a
+// write when it already carries our state.
+describe('manifest push conflict recovery', () => {
+  const stateKey = 'owner/repo@main'
+  const NOW = '2026-09-01T00:00:00.000Z'
+  const EMPTY_FEEDS = serializeFeedManifest({
+    schemaVersion: 1, updatedAt: '1970-01-01T00:00:00.000Z', feeds: {}, folders: {}, reads: {}, tombstones: {},
+  })
+
+  function connect(lastSyncedFeeds: unknown) {
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+    return db.syncStates.put({
+      key: stateKey, repo: 'owner/repo', branch: 'main', headSha: 'h1', etag: '"e1"',
+      baselineComplete: true, failureCount: 0, lastSyncedFeeds,
+    })
+  }
+
+  it('retries a stale-sha 409 by refetching feeds.json at the head commit, then succeeds', async () => {
+    await db.feeds.put({ id: 'feed-1', url: 'https://a.com/f.xml', title: 'Feed One', createdAt: NOW, updatedAt: NOW })
+    await connect(JSON.parse(EMPTY_FEEDS))
+    await db.outbox.put({ key: 'feeds', kind: 'feeds', aggregateId: 'feeds', createdAt: 't0', attempts: 0 })
+
+    let puts = 0
+    const contentRefs: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        puts += 1
+        return puts === 1
+          ? new Response(JSON.stringify({ message: 'sha mismatch' }), { status: 409 })
+          : new Response(JSON.stringify({ content: { sha: 'written' } }), { status: 200 })
+      }
+      if (url.includes('/commits/')) return new Response(JSON.stringify({ sha: 'head9' }), { status: 200, headers: { etag: '"e9"' } })
+      if (url.includes('/contents/feeds.json')) {
+        contentRefs.push(url.match(/ref=([^&]+)/)?.[1] ?? '')
+        return new Response(JSON.stringify({ content: base64(EMPTY_FEEDS), sha: url.includes('ref=head9') ? 'fresh' : 'stale' }), { status: 200 })
+      }
+      throw new Error(`Unexpected URL: ${url}`)
+    }))
+
+    const synced = await syncPending()
+
+    expect(synced).toBe(1)
+    expect(puts).toBe(2)
+    expect(contentRefs).toEqual(['main', 'head9'])
+    expect(await db.outbox.get('feeds')).toBeUndefined()
+    expect((((await db.syncStates.get(stateKey))?.lastSyncedFeeds) as FeedManifestV1).feeds['feed-1']?.title).toBe('Feed One')
+  })
+
+  it('adopts the remote without a PUT when feeds.json already carries this device’s state', async () => {
+    await db.feeds.put({ id: 'feed-1', url: 'https://a.com/f.xml', title: 'Feed One', createdAt: NOW, updatedAt: NOW })
+    const current = serializeFeedManifest(await buildFeedManifest())
+    await connect(JSON.parse(current))
+    await db.outbox.put({ key: 'feeds', kind: 'feeds', aggregateId: 'feeds', createdAt: 't0', attempts: 0 })
+
+    let puts = 0
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') { puts += 1; return new Response(JSON.stringify({ message: 'no' }), { status: 409 }) }
+      if (url.includes('/contents/feeds.json')) return new Response(JSON.stringify({ content: base64(current), sha: 's1' }), { status: 200 })
+      throw new Error(`Unexpected URL: ${url}`)
+    }))
+
+    const synced = await syncPending()
+
+    expect(synced).toBe(1)
+    expect(puts).toBe(0)
+    expect(await db.outbox.get('feeds')).toBeUndefined()
+  })
+
+  it('gives up after four stale-sha 409s and leaves the outbox entry with the error', async () => {
+    await db.feeds.put({ id: 'feed-1', url: 'https://a.com/f.xml', title: 'Feed One', createdAt: NOW, updatedAt: NOW })
+    await connect(JSON.parse(EMPTY_FEEDS))
+    await db.outbox.put({ key: 'feeds', kind: 'feeds', aggregateId: 'feeds', createdAt: 't0', attempts: 0 })
+
+    let puts = 0
+    let heads = 0
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') { puts += 1; return new Response(JSON.stringify({ message: 'sha mismatch' }), { status: 409 }) }
+      if (url.includes('/commits/')) { heads += 1; return new Response(JSON.stringify({ sha: `head${heads}` }), { status: 200, headers: { etag: `"e${heads}"` } }) }
+      if (url.includes('/contents/feeds.json')) return new Response(JSON.stringify({ content: base64(EMPTY_FEEDS), sha: `stale${puts}` }), { status: 200 })
+      throw new Error(`Unexpected URL: ${url}`)
+    }))
+
+    await expect(syncPending()).rejects.toThrow(/changed in the data repository/)
+
+    expect(puts).toBe(4)
+    expect(heads).toBe(3)
+    const outbox = await db.outbox.get('feeds')
+    expect(outbox?.attempts).toBe(1)
+    expect(outbox?.error).toMatch(/changed in the data repository/)
+  })
+
+  it('applies the same stale-sha retry to workspace.json', async () => {
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 'test-token' })
+    await db.threads.put({ id: 'thr-1', title: 'T', normalizedTitle: 't', createdAt: NOW, updatedAt: NOW, origin: 'manual' })
+    const emptyWorkspace = serializeWorkspaceManifest({
+      schemaVersion: 1, updatedAt: '1970-01-01T00:00:00.000Z',
+      threads: {}, propertyDefinitions: {}, tagDefinitions: {}, personas: {}, tombstones: {},
+    })
+    await db.syncStates.put({
+      key: stateKey, repo: 'owner/repo', branch: 'main', headSha: 'h1', etag: '"e1"',
+      baselineComplete: true, failureCount: 0, lastSyncedWorkspace: JSON.parse(emptyWorkspace),
+    })
+    await db.outbox.put({ key: 'workspace', kind: 'workspace', aggregateId: 'workspace', createdAt: 't0', attempts: 0 })
+
+    let puts = 0
+    const contentRefs: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        puts += 1
+        return puts === 1
+          ? new Response(JSON.stringify({ message: 'unprocessable' }), { status: 422 })
+          : new Response(JSON.stringify({ content: { sha: 'written' } }), { status: 200 })
+      }
+      if (url.includes('/commits/')) return new Response(JSON.stringify({ sha: 'wh9' }), { status: 200, headers: { etag: '"we9"' } })
+      if (url.includes('/contents/workspace.json')) {
+        contentRefs.push(url.match(/ref=([^&]+)/)?.[1] ?? '')
+        return new Response(JSON.stringify({ content: base64(emptyWorkspace), sha: url.includes('ref=wh9') ? 'fresh' : 'stale' }), { status: 200 })
+      }
+      throw new Error(`Unexpected URL: ${url}`)
+    }))
+
+    const synced = await syncPending()
+
+    expect(synced).toBe(1)
+    expect(puts).toBe(2)
+    expect(contentRefs).toEqual(['main', 'wh9'])
+    expect(await db.outbox.get('workspace')).toBeUndefined()
   })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FeedFolderRecord, FeedReadRecord, FeedTombstoneRecord } from '../db'
-import { mergeFeedManifests, type FeedManifestV1, type SyncedFeed } from './feedManifest'
+import { mergeFeedManifests, serializeFeedManifest, type FeedManifestV1, type SyncedFeed } from './feedManifest'
 
 function feed(id: string, title: string, updatedAt: string, folderId?: string): SyncedFeed {
   return { id, url: `https://example.com/${id}.xml`, title, folderId, createdAt: updatedAt, updatedAt }
@@ -106,5 +106,24 @@ describe('feed manifest merge', () => {
     expect(merged.folders.f1.name).toBe('Design')
     expect(merged.feeds.a.folderId).toBe('f1')
     expect(merged.reads['a:1'].readAt).toBe('2026-01-02T00:00:00.000Z')
+  })
+})
+
+describe('serializeFeedManifest', () => {
+  it('is byte-identical regardless of record insertion order', () => {
+    const at = '2026-01-02T00:00:00.000Z'
+    const forward: FeedManifestV1 = {
+      schemaVersion: 1, updatedAt: at, folders: {}, tombstones: {},
+      feeds: { a: feed('a', 'A', at), b: feed('b', 'B', at), c: feed('c', 'C', at) },
+      reads: { 'a:1': read('a:1', at, at), 'a:2': read('a:2', at, at) },
+    }
+    const shuffled: FeedManifestV1 = {
+      tombstones: {}, updatedAt: at, schemaVersion: 1,
+      reads: { 'a:2': read('a:2', at, at), 'a:1': read('a:1', at, at) },
+      feeds: { c: feed('c', 'C', at), a: feed('a', 'A', at), b: feed('b', 'B', at) },
+      folders: {},
+    }
+    expect(serializeFeedManifest(shuffled)).toBe(serializeFeedManifest(forward))
+    expect(serializeFeedManifest(forward).endsWith('\n')).toBe(true)
   })
 })

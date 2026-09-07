@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ThreadRecord, WorkspaceTombstoneRecord } from '../db'
-import { mergeWorkspaceManifests, type WorkspaceManifestV1 } from './syncManifest'
+import { mergeWorkspaceManifests, serializeWorkspaceManifest, type WorkspaceManifestV1 } from './syncManifest'
 
 function thread(id: string, title: string, updatedAt: string): ThreadRecord {
   return { id, title, normalizedTitle: title.toLocaleLowerCase(), createdAt: updatedAt, updatedAt }
@@ -45,5 +45,21 @@ describe('workspace manifest merge', () => {
 
     expect(merged.threads.one).toBeUndefined()
     expect(merged.tombstones['threads:one']).toEqual(tombstone)
+  })
+})
+
+describe('serializeWorkspaceManifest', () => {
+  it('is byte-identical regardless of record insertion order', () => {
+    const at = '2026-01-02T00:00:00.000Z'
+    const forward: WorkspaceManifestV1 = {
+      schemaVersion: 1, updatedAt: at, propertyDefinitions: {}, tagDefinitions: {}, personas: {}, tombstones: {},
+      threads: { a: thread('a', 'A', at), b: thread('b', 'B', at), c: thread('c', 'C', at) },
+    }
+    const shuffled: WorkspaceManifestV1 = {
+      tombstones: {}, personas: {}, tagDefinitions: {}, propertyDefinitions: {}, updatedAt: at, schemaVersion: 1,
+      threads: { c: thread('c', 'C', at), a: thread('a', 'A', at), b: thread('b', 'B', at) },
+    }
+    expect(serializeWorkspaceManifest(shuffled)).toBe(serializeWorkspaceManifest(forward))
+    expect(serializeWorkspaceManifest(forward).endsWith('\n')).toBe(true)
   })
 })

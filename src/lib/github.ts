@@ -157,62 +157,78 @@ async function putFile(config: GitHubConfig, path: string, content: string, sha?
   return result.content.sha
 }
 
-async function pushWorkspace(config: GitHubConfig, outboxCreatedAt: string): Promise<number> {
-  const state = await ensureSyncState(config)
-  const local = await buildWorkspaceManifest()
-  let remoteFile = await getRemoteFile(config, 'workspace.json')
-  let merged = remoteFile
-    ? mergeWorkspaceManifests(
-      state.lastSyncedWorkspace as WorkspaceManifestV1 | undefined,
-      local,
-      parseWorkspaceManifest(remoteFile.content),
-    )
-    : local
-  try {
-    await putFile(config, 'workspace.json', serializeWorkspaceManifest(merged), remoteFile?.sha)
-  } catch (error) {
-    if (!(error instanceof SyncConflictError)) throw error
-    remoteFile = await getRemoteFile(config, 'workspace.json')
-    merged = remoteFile
-      ? mergeWorkspaceManifests(state.lastSyncedWorkspace as WorkspaceManifestV1 | undefined, local, parseWorkspaceManifest(remoteFile.content))
-      : local
-    await putFile(config, 'workspace.json', serializeWorkspaceManifest(merged), remoteFile?.sha)
+// Merge the local manifest against the remote file and write it back, retrying
+// a bounded number of times on SyncConflictError. A conflict means the sha we
+// sent was stale: the retry refetches by the immutable head-commit sha (the
+// Contents API can keep serving the previous blob sha for a mutable branch ref
+// for a short window after a commit, so refetching by branch alone loops on the
+// same doomed sha) and re-merges. The manifest merge is structured
+// last-write-wins + tombstones, so this always converges without user input --
+// unlike day/thread-note pushes there is no conflict to record. If the remote
+// already carries our state we adopt it without a write.
+async function pushManifest<M>(
+  config: GitHubConfig,
+  path: 'workspace.json' | 'feeds.json',
+  outboxCreatedAt: string,
+  ops: {
+    baseline: M | undefined
+    build: () => Promise<M>
+    parse: (content: string) => M
+    serialize: (manifest: M) => string
+    merge: (base: M | undefined, local: M, remote: M) => M
+    apply: (manifest: M) => Promise<void>
+    saveBaseline: (manifest: M) => Promise<void>
+  },
+): Promise<number> {
+  const local = await ops.build()
+  let merged = local
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const ref = attempt === 0 ? undefined : (await getBranchHead(config)).sha
+    const remoteFile = await getRemoteFile(config, path, ref)
+    merged = remoteFile ? ops.merge(ops.baseline, local, ops.parse(remoteFile.content)) : local
+    const desired = ops.serialize(merged)
+    if (remoteFile && desired === remoteFile.content) break // remote already in sync
+    try {
+      await putFile(config, path, desired, remoteFile?.sha)
+      break
+    } catch (error) {
+      if (!(error instanceof SyncConflictError) || attempt === 3) throw error
+    }
   }
-  await applyWorkspaceManifest(merged)
-  await db.syncStates.update(state.key, { lastSyncedWorkspace: merged })
-  const current = await db.outbox.get('workspace')
-  if (current?.createdAt === outboxCreatedAt) await db.outbox.delete('workspace')
+  await ops.apply(merged)
+  await ops.saveBaseline(merged)
+  const current = await db.outbox.get(path === 'workspace.json' ? 'workspace' : 'feeds')
+  if (current?.createdAt === outboxCreatedAt) await db.outbox.delete(path === 'workspace.json' ? 'workspace' : 'feeds')
   return 1
 }
 
+async function pushWorkspace(config: GitHubConfig, outboxCreatedAt: string): Promise<number> {
+  const state = await ensureSyncState(config)
+  return pushManifest<WorkspaceManifestV1>(config, 'workspace.json', outboxCreatedAt, {
+    baseline: state.lastSyncedWorkspace as WorkspaceManifestV1 | undefined,
+    build: buildWorkspaceManifest,
+    parse: parseWorkspaceManifest,
+    serialize: serializeWorkspaceManifest,
+    merge: mergeWorkspaceManifests,
+    apply: applyWorkspaceManifest,
+    saveBaseline: async (merged) => { await db.syncStates.update(state.key, { lastSyncedWorkspace: merged }) },
+  })
+}
+
 // `feeds.json` counterpart to pushWorkspace: same merge-then-put-with-retry
-// shape, against the FeedManifestV1 last-write-wins + tombstone merge.
+// shape via pushManifest, against the FeedManifestV1 last-write-wins + tombstone
+// merge.
 async function pushFeeds(config: GitHubConfig, outboxCreatedAt: string): Promise<number> {
   const state = await ensureSyncState(config)
-  const local = await buildFeedManifest()
-  let remoteFile = await getRemoteFile(config, 'feeds.json')
-  let merged = remoteFile
-    ? mergeFeedManifests(
-      state.lastSyncedFeeds as FeedManifestV1 | undefined,
-      local,
-      parseFeedManifest(remoteFile.content),
-    )
-    : local
-  try {
-    await putFile(config, 'feeds.json', serializeFeedManifest(merged), remoteFile?.sha)
-  } catch (error) {
-    if (!(error instanceof SyncConflictError)) throw error
-    remoteFile = await getRemoteFile(config, 'feeds.json')
-    merged = remoteFile
-      ? mergeFeedManifests(state.lastSyncedFeeds as FeedManifestV1 | undefined, local, parseFeedManifest(remoteFile.content))
-      : local
-    await putFile(config, 'feeds.json', serializeFeedManifest(merged), remoteFile?.sha)
-  }
-  await applyFeedManifest(merged)
-  await db.syncStates.update(state.key, { lastSyncedFeeds: merged })
-  const current = await db.outbox.get('feeds')
-  if (current?.createdAt === outboxCreatedAt) await db.outbox.delete('feeds')
-  return 1
+  return pushManifest<FeedManifestV1>(config, 'feeds.json', outboxCreatedAt, {
+    baseline: state.lastSyncedFeeds as FeedManifestV1 | undefined,
+    build: buildFeedManifest,
+    parse: parseFeedManifest,
+    serialize: serializeFeedManifest,
+    merge: mergeFeedManifests,
+    apply: applyFeedManifest,
+    saveBaseline: async (merged) => { await db.syncStates.update(state.key, { lastSyncedFeeds: merged }) },
+  })
 }
 
 // Pushes one day, unconditionally -- whether this is the very first sync of

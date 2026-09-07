@@ -150,6 +150,39 @@ describe('feed push when feeds.json exists but is empty', () => {
   })
 })
 
+describe('feeds.json key-order churn', () => {
+  function reorderedFeedsJson() {
+    const parsed = JSON.parse(deviceAFeedsJson()) as Record<string, unknown>
+    const reversed = Object.fromEntries(Object.entries(parsed).reverse())
+    return JSON.stringify(reversed, null, 2) + '\n'
+  }
+
+  it('does not re-queue a push when the remote differs only in key order', async () => {
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 't' })
+    await db.feeds.put({ id: 'feed-abc', url: 'https://a.com/f.xml', title: 'Feed ABC', createdAt: NOW, updatedAt: NOW })
+    await db.feedFolders.put({ id: 'fold-1', name: 'News', normalizedName: 'news', createdAt: NOW, updatedAt: NOW })
+    await db.feedReads.put({ id: 'feed-abc:e1', readAt: NOW, updatedAt: NOW })
+    await db.syncStates.put({
+      key: 'owner/repo@main', repo: 'owner/repo', branch: 'main', headSha: 'head1', etag: '"e1"',
+      baselineComplete: true, failureCount: 0, lastSyncedFeeds: JSON.parse(deviceAFeedsJson()),
+    })
+
+    let puts = 0
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') { puts += 1; return new Response(JSON.stringify({ content: { sha: 'x' } }), { status: 200 }) }
+      if (url.includes('/commits/')) return new Response(JSON.stringify({ sha: 'head2' }), { status: 200, headers: { etag: '"e2"' } })
+      if (url.includes('/compare/')) return new Response(JSON.stringify({ status: 'ahead', files: [{ filename: 'feeds.json', status: 'modified' }] }), { status: 200 })
+      if (url.includes('/contents/feeds.json')) return new Response(JSON.stringify({ content: base64(reorderedFeedsJson()), sha: 'fsha' }), { status: 200 })
+      throw new Error(`Unexpected URL: ${url}`)
+    }))
+
+    await runGitHubSyncCycle()
+
+    expect(puts).toBe(0)
+    expect(await db.outbox.get('feeds')).toBeUndefined()
+  })
+})
+
 describe('applyFeedManifest read-marker reconciliation', () => {
   it('drops a read marker the merge omitted when no local entry remains, keeps it when the entry is still cached', async () => {
     await db.feedReads.bulkPut([
