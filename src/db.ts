@@ -706,7 +706,11 @@ class ThreadDatabase extends Dexie {
     // through GitHub as `feeds.json`: `feedReads` is the device-independent
     // read-state source of truth, `feedTombstones` marks deleted subscriptions
     // and folders. The upgrade seeds `feedReads` from whatever this device has
-    // already marked read so that history syncs on the first push.
+    // already marked read so that history syncs on the first push, and — for a
+    // device that was already GitHub-synced under an older build — queues one
+    // feed sync so the next cycle reconciles `feeds.json` (the incremental
+    // pull would otherwise never surface a file whose introducing commit this
+    // device already scrolled past).
     this.version(18).stores({
       days: 'date, updatedAt',
       threads: 'id, normalizedTitle, updatedAt',
@@ -741,6 +745,12 @@ class ThreadDatabase extends Dexie {
         .filter((entry) => entry.readAt)
         .map((entry) => ({ id: entry.id, readAt: entry.readAt as string, updatedAt: entry.readAt as string }))
       if (seeded.length) await tx.table('feedReads').bulkPut(seeded)
+      const githubConnected = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem('thread.github'))
+      if (githubConnected) {
+        await tx.table('outbox').put({
+          key: 'feeds', kind: 'feeds', aggregateId: 'feeds', createdAt: new Date().toISOString(), attempts: 0,
+        })
+      }
     })
   }
 }
