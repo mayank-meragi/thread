@@ -155,14 +155,42 @@ export function parseFeedXml(xml: string, feedUrl: string): NormalizedFeed {
   }
 }
 
-export function sanitizeFeedHtml(value: string | undefined): string {
+export function resolveUrl(value: string | null | undefined, baseUrl?: string): string | undefined {
+  if (!value) return undefined
+  try {
+    return new URL(value, baseUrl || undefined).toString()
+  } catch {
+    return undefined
+  }
+}
+
+export function sanitizeFeedHtml(value: string | undefined, baseUrl?: string): string {
   if (!value) return ''
   if (typeof document === 'undefined') return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
-  return DOMPurify.sanitize(value, {
-    ALLOWED_TAGS: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'figcaption', 'dl', 'dt', 'dd'],
-    ALLOWED_ATTR: ['href', 'title', 'target', 'rel'],
+  const clean = DOMPurify.sanitize(value, {
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'figcaption', 'dl', 'dt', 'dd'],
+    ALLOWED_ATTR: ['href', 'title', 'target', 'rel', 'src', 'alt', 'width', 'height'],
     FORBID_ATTR: ['style', 'class', 'id'],
   })
+  const template = document.createElement('template')
+  template.innerHTML = clean
+  for (const image of template.content.querySelectorAll('img')) {
+    const resolved = resolveUrl(image.getAttribute('src'), baseUrl)
+    if (!resolved || !/^(https?|data):/i.test(resolved)) {
+      image.remove()
+      continue
+    }
+    image.setAttribute('src', resolved)
+    image.removeAttribute('srcset')
+    image.setAttribute('loading', 'lazy')
+    image.setAttribute('decoding', 'async')
+    image.setAttribute('referrerpolicy', 'no-referrer')
+  }
+  for (const anchor of template.content.querySelectorAll('a[href]')) {
+    const resolved = resolveUrl(anchor.getAttribute('href'), baseUrl)
+    if (resolved) anchor.setAttribute('href', resolved)
+  }
+  return template.innerHTML
 }
 
 export interface FeedGateway {
@@ -419,7 +447,7 @@ async function persistFeedSnapshot(feed: FeedRecord, normalized: NormalizedFeed)
     url: entry.url,
     author: entry.author,
     publishedAt: entry.publishedAt,
-    summaryHtml: sanitizeFeedHtml(entry.summaryHtml),
+    summaryHtml: sanitizeFeedHtml(entry.summaryHtml, entry.url ?? feed.siteUrl ?? feed.url),
     fetchedAt,
   }))
   await db.transaction('rw', [db.feeds, db.feedEntries], async () => {

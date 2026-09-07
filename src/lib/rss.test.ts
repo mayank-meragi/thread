@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { db, type FeedEntryRecord } from '../db'
-import { canonicalFeedUrl, createFeedFolder, deleteFeedFolder, FeedFetchError, feedUrlPrivacyWarning, markAllFeedEntriesUnread, markFeedEntryRead, moveFeedToFolder, parseFeedXml, pruneFeedEntries, refreshAllFeeds, refreshFeed, sanitizeFeedHtml, subscribeToFeed, type NormalizedFeed } from './rss'
+import { canonicalFeedUrl, createFeedFolder, deleteFeedFolder, FeedFetchError, feedUrlPrivacyWarning, markAllFeedEntriesUnread, markFeedEntryRead, moveFeedToFolder, parseFeedXml, pruneFeedEntries, refreshAllFeeds, refreshFeed, resolveUrl, sanitizeFeedHtml, subscribeToFeed, type NormalizedFeed } from './rss'
 import { importOpml, parseOpml } from './rssOpml'
 
 beforeEach(async () => {
@@ -62,12 +62,23 @@ describe('RSS and Atom normalization', () => {
     expect(feedUrlPrivacyWarning('https://example.com/feed.xml?token=abc')).toContain('token')
   })
 
-  it('removes unsafe markup when a browser document is available', () => {
-    const input = '<p>Good</p><script>alert(1)</script><img src="https://tracker.test/pixel" /><a href="https://example.com">Link</a>'
+  it('reduces markup to text when no browser document is available', () => {
+    // The DOM-backed path (DOMPurify allowlist + image hardening) is exercised
+    // in the browser; under the Node test environment sanitizeFeedHtml falls
+    // back to stripping every tag.
+    const input = '<p>Good</p><script>alert(1)</script><img src="https://imgs.example.com/pic.png" alt="Pic" /><a href="https://example.com">Link</a>'
     const output = sanitizeFeedHtml(input)
     expect(output).not.toContain('<script')
     expect(output).not.toContain('<img')
     expect(output).toContain('Good')
+  })
+
+  it('resolves relative URLs against a base and rejects bare-relative without one', () => {
+    expect(resolveUrl('https://imgs.xkcd.com/comics/x.png')).toBe('https://imgs.xkcd.com/comics/x.png')
+    expect(resolveUrl('/comics/x.png', 'https://xkcd.com/2000/')).toBe('https://xkcd.com/comics/x.png')
+    expect(resolveUrl('../p', 'https://xkcd.com/a/b/')).toBe('https://xkcd.com/a/p')
+    expect(resolveUrl('/comics/x.png')).toBeUndefined()
+    expect(resolveUrl(null)).toBeUndefined()
   })
 
   it('subscribes, upserts entries, and preserves read state', async () => {
