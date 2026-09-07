@@ -38,6 +38,11 @@ feeds, rejects credentials/private targets, limits responses to 1.5 MB, and cach
 for five minutes. HTTP upstream feeds are supported, but their contents travel over plaintext and should
 be avoided when HTTPS is available.
 
+When a feed only includes a short summary, use **Get full article** in the reader or press `F` to
+fetch the original page, extract its readable content locally, sanitize it, and cache it on the entry.
+With a configured Worker, the article fetch uses the Worker's `/v1/article` endpoint for publishers
+that block browser cross-origin requests.
+
 Automatic refresh runs every 15 minutes while the Feeds workspace is open by default. Change the
 interval (5 minutes, 15 minutes, 30 minutes, hourly, or **Off**) under **Settings → RSS feeds**.
 The **Refresh all feeds now** button remains available for an explicit check.

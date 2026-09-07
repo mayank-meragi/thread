@@ -35,6 +35,7 @@
     "@milkdown/preset-commonmark": "^7.22.1",
     "@milkdown/prose": "^7.22.1",
     "@milkdown/utils": "^7.22.1",
+    "@mozilla/readability": "^0.6.0",
     "@react-spring/web": "^10.1.2",
     "@use-gesture/react": "^10.3.1",
     "ai": "^7.0.77",

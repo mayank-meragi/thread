@@ -159,7 +159,7 @@ export function sanitizeFeedHtml(value: string | undefined): string {
   if (!value) return ''
   if (typeof document === 'undefined') return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
   return DOMPurify.sanitize(value, {
-    ALLOWED_TAGS: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'a'],
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'figcaption', 'dl', 'dt', 'dd'],
     ALLOWED_ATTR: ['href', 'title', 'target', 'rel'],
     FORBID_ATTR: ['style', 'class', 'id'],
   })
@@ -426,7 +426,13 @@ async function persistFeedSnapshot(feed: FeedRecord, normalized: NormalizedFeed)
     await db.feeds.put(feed)
     for (const entry of entries) {
       const current = await db.feedEntries.get(entry.id)
-      await db.feedEntries.put({ ...entry, readAt: current?.readAt })
+      await db.feedEntries.put({
+        ...entry,
+        readAt: current?.readAt,
+        articleHtml: current?.articleHtml,
+        articleFetchedAt: current?.articleFetchedAt,
+        articleError: current?.articleError,
+      })
     }
     await pruneFeedEntries(feed.id)
   })

@@ -1535,6 +1535,14 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .feed-reader-head { flex: 0 0 auto; }
 .feed-reader-scroll { flex: 1 1 auto; }
 .feed-reader-body { max-width: 720px; }
+.feed-article-badge { display: inline-flex; align-items: center; width: fit-content; margin: 0 0 18px; padding: 4px 8px; border-radius: var(--radius-pill); background: var(--thread-soft); color: var(--thread); font: 500 11px 'IBM Plex Mono', monospace; }
+.feed-article-error { margin: 0 0 16px; padding: 9px 11px; border-radius: var(--radius-sm); background: var(--danger-soft); color: var(--danger); font-size: 12px; line-height: 1.4; }
+.feed-reader-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 27px; }
+.feed-fetch-article { display: inline-flex; align-items: center; gap: 7px; padding: 0; border: 0; background: transparent; color: var(--thread); font-size: 12px; cursor: pointer; }
+.feed-fetch-article:hover { text-decoration: underline; }
+.feed-fetch-article:disabled { opacity: .55; cursor: progress; text-decoration: none; }
+.feed-fetch-article kbd { padding: 2px 4px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); font: 500 10px 'IBM Plex Mono', monospace; }
+.feed-reader-actions .feed-original-link { margin-top: 0; }
 .feed-mobile-back { display: none; align-items: center; gap: 4px; padding: 5px 7px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
 .feed-mobile-back:hover { background: var(--control-hover); color: var(--ink); }
 .feeds-dialog-backdrop { z-index: 90; }

@@ -54,6 +54,18 @@ describe('RSS Worker', () => {
     expect(execution.waitUntil).toHaveBeenCalledOnce()
   })
 
+  it('proxies public article HTML through the article endpoint', async () => {
+    const upstream = vi.fn().mockResolvedValue(new Response('<html><main><h1>Story</h1><p>Full text</p></main></html>', { headers: { 'Content-Type': 'text/html' } }))
+    vi.stubGlobal('fetch', upstream)
+    const execution = context()
+    const response = await worker.fetch(request(`/v1/article?url=${encodeURIComponent('https://example.com/story')}`, { headers: { Authorization: `Bearer ${env.RSS_PROXY_KEY}` } }), env, execution.value)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Content-Type')).toContain('text/html')
+    expect(await response.text()).toContain('Full text')
+    expect(upstream).toHaveBeenCalledWith('https://example.com/story', expect.objectContaining({ redirect: 'manual' }))
+    expect(execution.waitUntil).toHaveBeenCalledOnce()
+  })
+
   it('rejects credentials and private/local targets', async () => {
     const auth = `Bearer ${env.RSS_PROXY_KEY}`
     const privateTarget = await worker.fetch(request(`/v1/feed?url=${encodeURIComponent('http://127.0.0.1/feed.xml')}`, { headers: { Authorization: auth } }), env, context().value)

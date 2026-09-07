@@ -160,6 +160,9 @@ export interface FeedEntryRecord {
   author?: string
   publishedAt?: string
   summaryHtml?: string
+  articleHtml?: string
+  articleFetchedAt?: string
+  articleError?: string
   fetchedAt: string
   readAt?: string
 }

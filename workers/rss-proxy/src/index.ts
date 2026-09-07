@@ -90,8 +90,8 @@ function validateTarget(value: string): URL {
   return url
 }
 
-function cacheRequest(url: string, digest: string): Request {
-  return new Request(`https://rss-proxy-cache.invalid/v1/feed/${digest}?url=${encodeURIComponent(url)}`)
+function cacheRequest(kind: 'feed' | 'article', url: string, digest: string): Request {
+  return new Request(`https://rss-proxy-cache.invalid/v1/${kind}/${digest}?url=${encodeURIComponent(url)}`)
 }
 
 async function sha256Hex(value: string): Promise<string> {
@@ -126,7 +126,7 @@ async function readLimitedBody(response: Response): Promise<string> {
   return new TextDecoder().decode(merged)
 }
 
-async function fetchUpstream(url: URL): Promise<{ body: string; status: number }> {
+async function fetchUpstream(url: URL, accept: string): Promise<{ body: string; status: number }> {
   let current = url
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
     const controller = new AbortController()
@@ -136,7 +136,7 @@ async function fetchUpstream(url: URL): Promise<{ body: string; status: number }
         redirect: 'manual',
         signal: controller.signal,
         headers: {
-          Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.1',
+          Accept: accept,
           'User-Agent': 'Thread RSS proxy (+https://github.com/mayank-meragi/thread)',
         },
       })
@@ -170,7 +170,7 @@ async function serveFeed(request: Request, env: Env, ctx: ExecutionContext): Pro
   }
   const canonicalUrl = target.toString()
   const digest = await sha256Hex(canonicalUrl)
-  const cacheKey = cacheRequest(canonicalUrl, digest)
+  const cacheKey = cacheRequest('feed', canonicalUrl, digest)
   const cached = await workerCache().match(cacheKey)
   if (cached) {
     const headers = corsHeaders(request, env)
@@ -183,7 +183,7 @@ async function serveFeed(request: Request, env: Env, ctx: ExecutionContext): Pro
     return new Response(cached.body, { status: 200, headers })
   }
   try {
-    const upstream = await fetchUpstream(target)
+    const upstream = await fetchUpstream(target, 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.1')
     if (upstream.status < 200 || upstream.status >= 300) return errorResponse(request, env, 502, 'upstream', `The upstream feed returned HTTP ${upstream.status}.`)
     const cacheHeaders = new Headers({ 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': `public, max-age=${CACHE_TTL_SECONDS}`, 'X-RSS-Proxy-Version': '1', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' })
     const cacheResponse = new Response(upstream.body, { status: 200, headers: cacheHeaders })
@@ -201,6 +201,48 @@ async function serveFeed(request: Request, env: Env, ctx: ExecutionContext): Pro
   }
 }
 
+async function serveArticle(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const rawUrl = new URL(request.url).searchParams.get('url')
+  if (!rawUrl) return errorResponse(request, env, 400, 'target', 'An article URL is required.')
+  let target: URL
+  try {
+    target = validateTarget(rawUrl)
+  } catch (error) {
+    return errorResponse(request, env, 400, 'target', error instanceof Error ? error.message : 'The article URL is not allowed.')
+  }
+  const canonicalUrl = target.toString()
+  const digest = await sha256Hex(canonicalUrl)
+  const cacheKey = cacheRequest('article', canonicalUrl, digest)
+  const cached = await workerCache().match(cacheKey)
+  if (cached) {
+    const headers = corsHeaders(request, env)
+    headers.set('Content-Type', 'text/html; charset=utf-8')
+    headers.set('Cache-Control', 'no-store')
+    headers.set('X-RSS-Proxy-Cache', 'HIT')
+    headers.set('X-RSS-Proxy-Version', '1')
+    headers.set('X-Content-Type-Options', 'nosniff')
+    headers.set('Referrer-Policy', 'no-referrer')
+    return new Response(cached.body, { status: 200, headers })
+  }
+  try {
+    const upstream = await fetchUpstream(target, 'text/html, application/xhtml+xml;q=0.9, */*;q=0.1')
+    if (upstream.status < 200 || upstream.status >= 300) return errorResponse(request, env, 502, 'upstream', `The upstream article returned HTTP ${upstream.status}.`)
+    const cacheHeaders = new Headers({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': `public, max-age=${CACHE_TTL_SECONDS}`, 'X-RSS-Proxy-Version': '1', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' })
+    const cacheResponse = new Response(upstream.body, { status: 200, headers: cacheHeaders })
+    ctx.waitUntil(workerCache().put(cacheKey, cacheResponse.clone()))
+    const headers = corsHeaders(request, env)
+    for (const [key, value] of cacheHeaders) headers.set(key, value)
+    headers.set('Cache-Control', 'no-store')
+    headers.set('X-RSS-Proxy-Cache', 'MISS')
+    return new Response(upstream.body, { status: 200, headers })
+  } catch (error) {
+    const code = (error as { code?: ErrorCode }).code
+    if (code === 'timeout') return errorResponse(request, env, 504, 'timeout', error instanceof Error ? error.message : 'The upstream article timed out.')
+    if (error instanceof Error && error.message.includes('1.5 MB')) return errorResponse(request, env, 413, 'oversize', error.message)
+    return errorResponse(request, env, 502, 'upstream', error instanceof Error ? error.message : 'The upstream article could not be fetched.')
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
@@ -215,6 +257,7 @@ export default {
     if (!authorization.startsWith('Bearer ') || !constantTimeEqual(authorization.slice(7), env.RSS_PROXY_KEY)) return errorResponse(request, env, 401, 'auth', 'A valid Worker access key is required.')
     if (url.pathname === '/v1/status') return jsonResponse(request, env, 200, { ok: true, version: 1 })
     if (url.pathname === '/v1/feed') return serveFeed(request, env, ctx)
+    if (url.pathname === '/v1/article') return serveArticle(request, env, ctx)
     return errorResponse(request, env, 404, 'target', 'Unknown RSS Worker endpoint.')
   },
 }
