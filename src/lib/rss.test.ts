@@ -98,24 +98,39 @@ describe('RSS and Atom normalization', () => {
     expect((await db.feedEntries.get(entry!.id))?.readAt).toBeUndefined()
   })
 
-  it('prunes read history while retaining unread entries', async () => {
+  it('prunes read history and its read markers while retaining unread entries', async () => {
     const feedId = 'feed-test'
     await db.feeds.put({ id: feedId, url: 'https://example.com/feed.xml', title: 'Test', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
     const now = Date.now()
-    const entries: FeedEntryRecord[] = Array.from({ length: 502 }, (_, index) => ({
+    // 110 recent read entries: the 10 past the newest-100 window are pruned.
+    const entries: FeedEntryRecord[] = Array.from({ length: 110 }, (_, index) => ({
       id: `${feedId}:entry-${index}`,
       feedId,
       externalId: `entry-${index}`,
       title: `Entry ${index}`,
-      publishedAt: new Date(now - index * 60_000).toISOString(),
+      publishedAt: new Date(now - (index + 1) * 60_000).toISOString(),
       fetchedAt: new Date(now).toISOString(),
       readAt: new Date(now).toISOString(),
     }))
+    // Read but published 30 days ago: pruned by the age rule.
+    entries.push({ id: `${feedId}:old-read`, feedId, externalId: 'old-read', title: 'Old read', publishedAt: new Date(now - 30 * 86_400_000).toISOString(), fetchedAt: new Date(now).toISOString(), readAt: new Date(now).toISOString() })
+    // Published 120 days ago but unread: always kept.
     entries.push({ id: `${feedId}:old-unread`, feedId, externalId: 'old-unread', title: 'Old unread', publishedAt: new Date(now - 120 * 86_400_000).toISOString(), fetchedAt: new Date(now).toISOString(), readAt: undefined })
     await db.feedEntries.bulkPut(entries)
-    await pruneFeedEntries(feedId)
+    await db.feedReads.bulkPut(entries.filter((e) => e.readAt).map((e) => ({ id: e.id, readAt: e.readAt as string, updatedAt: e.readAt as string })))
+
+    const pruned = await pruneFeedEntries(feedId)
+
+    expect(pruned).toBe(true)
     expect(await db.feedEntries.get(`${feedId}:old-unread`)).toBeDefined()
-    expect(await db.feedEntries.count()).toBe(501)
+    expect(await db.feedEntries.get(`${feedId}:old-read`)).toBeUndefined()
+    // 112 total - 10 past the window - 1 aged-out.
+    expect(await db.feedEntries.count()).toBe(101)
+    // Read markers for pruned entries are gone; markers for kept entries remain.
+    expect(await db.feedReads.get(`${feedId}:old-read`)).toBeUndefined()
+    expect(await db.feedReads.get(`${feedId}:entry-105`)).toBeUndefined()
+    expect(await db.feedReads.get(`${feedId}:entry-0`)).toBeDefined()
+    expect(await db.feedReads.count()).toBe(100)
   })
 
   it('refreshes all subscriptions and records individual failures', async () => {

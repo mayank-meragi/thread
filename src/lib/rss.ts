@@ -493,6 +493,7 @@ async function persistFeedSnapshot(feed: FeedRecord, normalized: NormalizedFeed)
     fetchedAt,
   }))
   let metadataChanged = false
+  let readsPruned = false
   await db.transaction('rw', [db.feeds, db.feedEntries, db.feedReads], async () => {
     const previous = await db.feeds.get(feed.id)
     metadataChanged = syncedFeedFieldsChanged(previous, feed)
@@ -511,25 +512,40 @@ async function persistFeedSnapshot(feed: FeedRecord, normalized: NormalizedFeed)
         articleError: current?.articleError,
       })
     }
-    await pruneFeedEntries(feed.id)
+    readsPruned = await pruneFeedEntries(feed.id)
   })
-  if (metadataChanged) await queueFeedsSync()
+  if (metadataChanged || readsPruned) await queueFeedsSync()
 }
 
-export async function pruneFeedEntries(feedId?: string): Promise<void> {
+// Read entries are cleared once they age out of local history: past the newest
+// PRUNE_KEEP_PER_FEED for their feed, or read more than PRUNE_READ_MAX_AGE_MS
+// ago. Unread entries are always kept. The matching feedReads markers are
+// dropped alongside them so `feeds.json` stays bounded; other devices mirror
+// the removal through the manifest merge. Returns whether any read marker was
+// dropped, so the caller can queue a feed sync.
+const PRUNE_KEEP_PER_FEED = 100
+const PRUNE_READ_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000
+
+export async function pruneFeedEntries(feedId?: string): Promise<boolean> {
   const feeds = feedId ? [feedId] : (await db.feeds.toArray()).map((feed) => feed.id)
-  const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000
+  const cutoff = Date.now() - PRUNE_READ_MAX_AGE_MS
+  let prunedRead = false
   for (const id of feeds) {
     const entries = await db.feedEntries.where('feedId').equals(id).toArray()
     const newestFirst = entries.sort((a, b) => (b.publishedAt ?? b.fetchedAt).localeCompare(a.publishedAt ?? a.fetchedAt))
-    const remove = newestFirst.slice(500).filter((entry) => Boolean(entry.readAt))
+    const remove = newestFirst.slice(PRUNE_KEEP_PER_FEED).filter((entry) => Boolean(entry.readAt))
     for (const entry of newestFirst) {
       const timestamp = Date.parse(entry.publishedAt ?? entry.fetchedAt)
       if (entry.readAt && Number.isFinite(timestamp) && timestamp < cutoff) remove.push(entry)
     }
     const seen = new Set<string>()
-    await db.feedEntries.bulkDelete(remove.filter((entry) => !seen.has(entry.id) && seen.add(entry.id)).map((entry) => entry.id))
+    const removeIds = remove.filter((entry) => !seen.has(entry.id) && seen.add(entry.id)).map((entry) => entry.id)
+    if (removeIds.length === 0) continue
+    await db.feedEntries.bulkDelete(removeIds)
+    await db.feedReads.bulkDelete(removeIds)
+    prunedRead = true
   }
+  return prunedRead
 }
 
 export async function markFeedEntryRead(entryId: string, read: boolean): Promise<void> {

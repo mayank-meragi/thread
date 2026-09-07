@@ -187,6 +187,17 @@ export async function applyFeedManifest(manifest: FeedManifestV1): Promise<void>
           await db.feedEntries.update(read.id, { readAt: read.readAt ?? undefined })
         }
       }
+
+      // A read marker the merge dropped (pruned on another device once the
+      // entry aged out) is removed here too — but only when this device also
+      // has no cached entry for it. If we still show the entry, its marker
+      // stays and re-publishes on the next push.
+      const kept = new Set(reads.map((read) => read.id))
+      const localReadIds = await db.feedReads.toCollection().primaryKeys()
+      for (const id of localReadIds) {
+        if (kept.has(id as string)) continue
+        if (!(await db.feedEntries.get(id as string))) await db.feedReads.delete(id)
+      }
     },
   )
 }

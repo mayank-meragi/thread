@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '../db'
 import { catchUpFromGitHub, runGitHubSyncCycle, saveGitHubConfig, syncPending } from './github'
+import { applyFeedManifest, type FeedManifestV1 } from './feedManifest'
 
 class MemoryStorage {
   private store = new Map<string, string>()
@@ -14,6 +15,11 @@ function base64(value: string): string {
   let binary = ''
   bytes.forEach((b) => { binary += String.fromCharCode(b) })
   return btoa(binary)
+}
+function decodePutContent(init: RequestInit | undefined): { feeds?: Record<string, { title?: string }> } {
+  const encoded = JSON.parse(init?.body as string).content as string
+  const binary = atob(encoded.replace(/\s/g, ''))
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0))))
 }
 
 beforeEach(async () => {
@@ -95,5 +101,69 @@ describe('feed sync across devices', () => {
 
     expect((await db.feeds.get('feed-abc'))?.title).toBe('Feed ABC')
     expect(await db.outbox.get('feeds')).toBeUndefined()
+  })
+})
+
+describe('feed push when feeds.json exists but is empty', () => {
+  const EMPTY = JSON.stringify({ schemaVersion: 1, updatedAt: '1970-01-01T00:00:00.000Z', feeds: {}, folders: {}, reads: {}, tombstones: {} }, null, 2) + '\n'
+
+  async function seedLocalFeed() {
+    const now = '2026-09-02T00:00:00.000Z'
+    await db.feeds.put({ id: 'feed-local', url: 'https://x.com/f.xml', title: 'My Local Feed', createdAt: now, updatedAt: now, lastFetchedAt: now })
+  }
+
+  it('pushes local feeds when lastSyncedFeeds is unset and remote is empty', async () => {
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 't' })
+    await seedLocalFeed()
+    await db.syncStates.put({ key: 'owner/repo@main', repo: 'owner/repo', branch: 'main', headSha: 'h1', etag: '"e1"', baselineComplete: true, failureCount: 0 })
+    let putBody: { feeds?: Record<string, { title?: string }> } | undefined
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') { putBody = decodePutContent(init); return new Response(JSON.stringify({ content: { sha: 's2' } }), { status: 200 }) }
+      if (url.includes('/commits/')) return new Response(null, { status: 304, headers: { etag: '"e1"' } })
+      if (url.includes('/contents/feeds.json')) return new Response(JSON.stringify({ content: base64(EMPTY), sha: 's1' }), { status: 200 })
+      throw new Error(`Unexpected URL: ${url}`)
+    }))
+
+    await runGitHubSyncCycle()
+
+    expect(putBody?.feeds?.['feed-local']?.title).toBe('My Local Feed')
+  })
+
+  it('re-pushes local feeds after pulling an empty feeds.json (lastSyncedFeeds set to empty)', async () => {
+    saveGitHubConfig({ repo: 'owner/repo', branch: 'main', token: 't' })
+    await seedLocalFeed()
+    await db.syncStates.put({ key: 'owner/repo@main', repo: 'owner/repo', branch: 'main', headSha: 'h1', etag: '"e1"', baselineComplete: true, failureCount: 0, lastSyncedFeeds: JSON.parse(EMPTY) })
+    // A compare that reports feeds.json changed, so pullFeeds runs.
+    let lastPut: { feeds?: Record<string, { title?: string }> } | undefined
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') { lastPut = decodePutContent(init); return new Response(JSON.stringify({ content: { sha: 's3' } }), { status: 200 }) }
+      if (url.includes('/commits/')) return new Response(JSON.stringify({ sha: 'h2' }), { status: 200, headers: { etag: '"e2"' } })
+      if (url.includes('/compare/')) return new Response(JSON.stringify({ status: 'ahead', files: [{ filename: 'feeds.json', status: 'modified' }] }), { status: 200 })
+      if (url.includes('/contents/feeds.json')) return new Response(JSON.stringify({ content: base64(EMPTY), sha: 's1' }), { status: 200 })
+      throw new Error(`Unexpected URL: ${url}`)
+    }))
+
+    await runGitHubSyncCycle()
+
+    expect(await db.feeds.get('feed-local')).toBeTruthy()
+    expect(lastPut?.feeds?.['feed-local']?.title).toBe('My Local Feed')
+  })
+})
+
+describe('applyFeedManifest read-marker reconciliation', () => {
+  it('drops a read marker the merge omitted when no local entry remains, keeps it when the entry is still cached', async () => {
+    await db.feedReads.bulkPut([
+      { id: 'feed-x:pruned-elsewhere', readAt: NOW, updatedAt: NOW },
+      { id: 'feed-x:still-shown', readAt: NOW, updatedAt: NOW },
+    ])
+    await db.feedEntries.put({ id: 'feed-x:still-shown', feedId: 'feed-x', externalId: 'still-shown', title: 'Still shown', fetchedAt: NOW, readAt: NOW })
+
+    const manifest: FeedManifestV1 = {
+      schemaVersion: 1, updatedAt: NOW, feeds: {}, folders: {}, reads: {}, tombstones: {},
+    }
+    await applyFeedManifest(manifest)
+
+    expect(await db.feedReads.get('feed-x:pruned-elsewhere')).toBeUndefined()
+    expect(await db.feedReads.get('feed-x:still-shown')).toBeTruthy()
   })
 })
