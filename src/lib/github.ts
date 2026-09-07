@@ -166,7 +166,7 @@ async function putFile(config: GitHubConfig, path: string, content: string, sha?
 // last-write-wins + tombstones, so this always converges without user input --
 // unlike day/thread-note pushes there is no conflict to record. If the remote
 // already carries our state we adopt it without a write.
-async function pushManifest<M>(
+async function pushManifest<M extends WorkspaceManifestV1 | FeedManifestV1>(
   config: GitHubConfig,
   path: 'workspace.json' | 'feeds.json',
   outboxCreatedAt: string,
