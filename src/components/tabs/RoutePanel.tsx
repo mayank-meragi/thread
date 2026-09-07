@@ -10,6 +10,7 @@ import { WorkoutPage } from '../../pages/WorkoutPage'
 import { WorkoutOverviewPage } from '../../pages/WorkoutOverviewPage'
 import { WorkoutsPage } from '../../pages/WorkoutsPage'
 import { DocsPage } from '../../pages/DocsPage'
+import { FeedsPage } from '../../pages/FeedsPage'
 
 export interface RoutePanelParams {
   path: string
@@ -26,6 +27,7 @@ export function RoutePanel({ params }: IDockviewPanelProps<RoutePanelParams>) {
         <Route path="/workouts" element={<WorkoutsPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/feeds" element={<FeedsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/docs" element={<DocsPage />} />

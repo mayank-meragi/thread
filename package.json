@@ -8,6 +8,15 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:app": "vitest run src",
+    "test:worker": "vitest run --config workers/rss-proxy/vitest.config.ts",
+    "rss-worker:login": "wrangler login",
+    "rss-worker:dev": "wrangler dev --config workers/rss-proxy/wrangler.jsonc",
+    "rss-worker:secret": "wrangler secret put RSS_PROXY_KEY --config workers/rss-proxy/wrangler.jsonc",
+    "rss-worker:origins": "wrangler secret put ALLOWED_ORIGINS --config workers/rss-proxy/wrangler.jsonc",
+    "rss-worker:deploy": "wrangler deploy --config workers/rss-proxy/wrangler.jsonc",
+    "rss-worker:dry-run": "wrangler deploy --config workers/rss-proxy/wrangler.jsonc --dry-run",
+    "rss-worker:typecheck": "tsc --noEmit -p workers/rss-proxy/tsconfig.json",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -34,6 +43,8 @@
     "dexie-react-hooks": "latest",
     "dockview": "^8.2.0",
     "dockview-react": "^8.2.0",
+    "dompurify": "^3.4.15",
+    "fast-xml-parser": "^5.11.1",
     "lucide-react": "latest",
     "node-diff3": "^3.2.1",
     "react": "latest",
@@ -43,6 +54,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260907.1",
     "@eslint/js": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
@@ -55,6 +67,7 @@
     "typescript": "latest",
     "typescript-eslint": "latest",
     "vite": "latest",
-    "vitest": "latest"
+    "vitest": "latest",
+    "wrangler": "^4.129.0"
   }
 }

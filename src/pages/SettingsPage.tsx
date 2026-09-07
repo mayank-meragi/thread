@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, BookOpen, Bot, Check, FileText, GitBranch, LoaderCircle, Palette, Plus, ShieldCheck, Trash2, Unplug, Users, Wand2 } from 'lucide-react'
+import { AlertTriangle, BookOpen, Bot, Check, Eye, EyeOff, FileText, GitBranch, LoaderCircle, Palette, Plus, RefreshCw, Rss, ShieldCheck, Trash2, Unplug, Users, Wand2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
 import { generateText } from 'ai'
@@ -22,9 +22,13 @@ import { applyTheme, getTheme, themes, type ThemeId } from '../lib/theme'
 import { commandRegistry } from '../lib/commands'
 import { revokeCapability, useTrustedCapabilities } from '../lib/threadscript/trustedCapabilities'
 import { MetadataSchemas } from '../components/MetadataSchemas'
+import { clearRssProxyConfig, generateRssProxyAccessKey, getRssProxyConfig, saveRssProxyConfig, testRssProxyConnection } from '../lib/rssProxy'
+import { refreshAllFeeds } from '../lib/rss'
+import { getRssSettings, RSS_REFRESH_INTERVALS, saveRssSettings, type RssRefreshInterval } from '../lib/rssSettings'
 
 const SETTINGS_CATEGORIES = [
   { id: 'appearance', label: 'Appearance', description: 'Theme and display', Icon: Palette },
+  { id: 'rss', label: 'RSS feeds', description: 'Fetching and proxy', Icon: Rss },
   { id: 'sync', label: 'Data & sync', description: 'Storage and GitHub', Icon: GitBranch },
   { id: 'ai', label: 'AI & personas', description: 'Provider and assistants', Icon: Bot },
   { id: 'workspace', label: 'Workspace', description: 'Schemas and templates', Icon: FileText },
@@ -53,6 +57,17 @@ export function SettingsPage() {
   const [state, setState] = useState<'idle' | 'checking' | 'syncing' | 'pulling' | 'done'>('idle')
   const [error, setError] = useState('')
   const [theme, setTheme] = useState<ThemeId>(() => getTheme())
+  const existingRssProxy = getRssProxyConfig()
+  const [rssProxyUrl, setRssProxyUrl] = useState(existingRssProxy?.baseUrl ?? '')
+  const [rssProxyKey, setRssProxyKey] = useState(existingRssProxy?.accessKey ?? '')
+  const [showRssProxyKey, setShowRssProxyKey] = useState(false)
+  const [rssProxyState, setRssProxyState] = useState<'idle' | 'checking' | 'done'>('idle')
+  const [rssProxyError, setRssProxyError] = useState('')
+  const initialRssSettings = getRssSettings()
+  const [rssRefreshIntervalMs, setRssRefreshIntervalMs] = useState<RssRefreshInterval>(initialRssSettings.refreshIntervalMs)
+  const [rssManualState, setRssManualState] = useState<'idle' | 'refreshing' | 'done'>('idle')
+  const [rssManualMessage, setRssManualMessage] = useState('')
+  const rssFeeds = useLiveQuery(() => db.feeds.toArray(), [], [])
   const pending = useLiveQuery(() => db.outbox.count(), [], 0)
   const syncStatus = useLiveQuery(
     async () => existing ? db.syncStates.get(`${existing.repo}@${existing.branch}`) : undefined,
@@ -155,6 +170,51 @@ export function SettingsPage() {
     setTheme(nextTheme)
     applyTheme(nextTheme)
   }
+
+  async function connectRssProxy() {
+    setRssProxyError('')
+    const config = { baseUrl: rssProxyUrl.trim(), accessKey: rssProxyKey.trim() }
+    setRssProxyState('checking')
+    try {
+      await testRssProxyConnection(config)
+      const saved = saveRssProxyConfig(config)
+      setRssProxyUrl(saved.baseUrl)
+      setRssProxyKey(saved.accessKey)
+      setRssProxyState('done')
+    } catch (caught) {
+      setRssProxyError(caught instanceof Error ? caught.message : String(caught))
+      setRssProxyState('idle')
+    }
+  }
+
+  function changeRssRefreshInterval(value: string) {
+    const next = saveRssSettings({ refreshIntervalMs: Number(value) as RssRefreshInterval })
+    setRssRefreshIntervalMs(next.refreshIntervalMs)
+    setRssManualMessage(next.refreshIntervalMs === 0 ? 'Automatic refresh is off. Manual refresh is still available.' : 'Refresh schedule updated.')
+  }
+
+  async function refreshRssFeedsNow() {
+    setRssManualState('refreshing')
+    setRssManualMessage('Refreshing feeds…')
+    try {
+      const result = await refreshAllFeeds()
+      setRssManualMessage(result.total === 0
+        ? 'No subscriptions yet.'
+        : result.failed === 0
+          ? `Refreshed ${result.refreshed} ${result.refreshed === 1 ? 'feed' : 'feeds'}.`
+          : `Refreshed ${result.refreshed} of ${result.total} feeds; ${result.failed} failed.`)
+      setRssManualState('done')
+    } catch (caught) {
+      setRssManualMessage(caught instanceof Error ? caught.message : String(caught))
+      setRssManualState('idle')
+    }
+  }
+
+  useEffect(() => {
+    if (rssProxyState !== 'done') return
+    const timer = window.setTimeout(() => setRssProxyState('idle'), 1800)
+    return () => window.clearTimeout(timer)
+  }, [rssProxyState])
 
   const existingAI = getAIConfig()
   const [aiProvider, setAIProvider] = useState<AIProvider>(existingAI?.provider ?? 'anthropic')
@@ -263,6 +323,51 @@ export function SettingsPage() {
                   </div>
                 ))}
               </div>
+            </section>
+          </section>
+
+          <section className="settings-category" hidden={activeCategory !== 'rss'} aria-labelledby="settings-category-rss">
+            <header className="settings-category-header"><h2 id="settings-category-rss">RSS feeds</h2><p>Use your own Cloudflare Worker when a publisher blocks direct browser access.</p></header>
+
+            <section className="settings-card">
+              <div className="settings-title"><Rss size={20} /><div><h2>RSS proxy</h2><p>Each Thread user deploys and controls their own stateless proxy. Public HTTP and HTTPS feeds are supported; private feeds with credentials are intentionally rejected.</p></div></div>
+              <label><span>Worker URL</span><input type="url" value={rssProxyUrl} onChange={(event) => setRssProxyUrl(event.target.value)} placeholder="https://thread-rss-proxy.your-name.workers.dev" /></label>
+              <label><span>Worker access key</span><input type={showRssProxyKey ? 'text' : 'password'} value={rssProxyKey} onChange={(event) => setRssProxyKey(event.target.value)} placeholder="Generate a key, then add the same secret to Wrangler" autoComplete="off" /></label>
+              <div className="settings-actions">
+                <button type="button" className="secondary-button" onClick={() => { setRssProxyKey(generateRssProxyAccessKey()); setShowRssProxyKey(true) }}><Rss size={15} /> Generate key</button>
+                <button type="button" className="text-button" onClick={() => setShowRssProxyKey((current) => !current)}>{showRssProxyKey ? <EyeOff size={15} /> : <Eye size={15} />}{showRssProxyKey ? 'Hide key' : 'Show key'}</button>
+                <button type="button" className="primary-button" onClick={() => void connectRssProxy()} disabled={rssProxyState === 'checking' || !rssProxyUrl.trim() || !rssProxyKey.trim()}>
+                  {rssProxyState === 'checking' ? <LoaderCircle className="spin" size={16} /> : rssProxyState === 'done' ? <Check size={16} /> : <Rss size={16} />}
+                  {rssProxyState === 'checking' ? 'Testing…' : rssProxyState === 'done' ? 'Connected' : existingRssProxy ? 'Reconnect' : 'Test and connect'}
+                </button>
+                {existingRssProxy && <button type="button" className="text-button" onClick={() => { clearRssProxyConfig(); setRssProxyUrl(''); setRssProxyKey(''); setRssProxyError('') }}><Unplug size={15} /> Disconnect</button>}
+              </div>
+              {rssProxyError && <p className="banner banner-error form-error">{rssProxyError}</p>}
+              <div className="security-note"><ShieldCheck size={16} /><span>The key is stored only in this browser and sent only to your Worker. Never paste a Cloudflare API token here; Wrangler uses that token on your machine.</span></div>
+            </section>
+
+            <section className="settings-card rss-refresh-card">
+              <div className="settings-title"><RefreshCw size={20} /><div><h2>Refresh schedule</h2><p>Choose how often Thread checks subscribed feeds while the Feeds screen is open. Turning this off never deletes cached entries.</p></div></div>
+              <label><span>Automatic refresh</span><select value={rssRefreshIntervalMs} onChange={(event) => changeRssRefreshInterval(event.target.value)}>{RSS_REFRESH_INTERVALS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+              <div className="settings-actions">
+                <button type="button" className="secondary-button" onClick={() => void refreshRssFeedsNow()} disabled={rssManualState === 'refreshing' || rssFeeds.length === 0}>
+                  {rssManualState === 'refreshing' ? <LoaderCircle className="spin" size={16} /> : <RefreshCw size={16} />}
+                  {rssManualState === 'refreshing' ? 'Refreshing…' : 'Refresh all feeds now'}
+                </button>
+              </div>
+              {rssManualMessage && <p className="settings-hint rss-refresh-status">{rssManualMessage}</p>}
+            </section>
+
+            <section className="settings-card rss-proxy-instructions">
+              <div className="settings-title"><BookOpen size={20} /><div><h2>Setup instructions</h2><p>Run these commands from the Thread repository. Your Worker configuration lives in <code>workers/rss-proxy</code>.</p></div></div>
+              <ol>
+                <li>Generate a key above and copy it somewhere safe.</li>
+                <li>Run <code>npm run rss-worker:login</code> once to authenticate Wrangler.</li>
+                <li>Run <code>npm run rss-worker:secret</code> and paste the generated key when prompted.</li>
+                <li>Run <code>npm run rss-worker:origins</code> and enter this app’s exact origin (comma-separated if you use local and production origins).</li>
+                <li>Run <code>npm run rss-worker:deploy</code>, copy the resulting <code>workers.dev</code> URL, then paste it above.</li>
+              </ol>
+              <p className="settings-hint">For local Worker development, copy <code>workers/rss-proxy/.dev.vars.example</code> to <code>.dev.vars</code> (it is ignored by Git) and run <code>npm run rss-worker:dev</code>. Rotate a key with <code>npm run rss-worker:secret</code>, then update it here.</p>
             </section>
           </section>
 

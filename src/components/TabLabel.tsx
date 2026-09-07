@@ -5,6 +5,7 @@ export function TabLabel({ path }: { path: string }) {
   const pathname = path.split('?')[0] || '/'
   if (pathname === '/') return <>Today</>
   if (pathname === '/search') return <>Search</>
+  if (pathname === '/feeds') return <>Feeds</>
   if (pathname === '/tasks') return <>Tasks</>
   if (pathname === '/workouts') return <>Workouts</>
   if (pathname === '/settings') return <>Settings</>

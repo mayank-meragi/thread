@@ -130,6 +130,40 @@ export interface WorkspaceTombstoneRecord {
   deletedAt: string
 }
 
+export interface FeedRecord {
+  id: string
+  url: string
+  title: string
+  folderId?: string
+  description?: string
+  siteUrl?: string
+  createdAt: string
+  updatedAt: string
+  lastFetchedAt?: string
+  lastError?: string
+}
+
+export interface FeedFolderRecord {
+  id: string
+  name: string
+  normalizedName: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface FeedEntryRecord {
+  id: string
+  feedId: string
+  externalId: string
+  title: string
+  url?: string
+  author?: string
+  publishedAt?: string
+  summaryHtml?: string
+  fetchedAt: string
+  readAt?: string
+}
+
 export interface ConflictRecord {
   id: string
   scope: 'day' | 'thread-note'
@@ -303,6 +337,9 @@ class ThreadDatabase extends Dexie {
   chatProposals!: EntityTable<ChatProposalRecord, 'id'>
   syncStates!: EntityTable<GitHubSyncState, 'key'>
   workspaceTombstones!: EntityTable<WorkspaceTombstoneRecord, 'key'>
+  feeds!: EntityTable<FeedRecord, 'id'>
+  feedFolders!: EntityTable<FeedFolderRecord, 'id'>
+  feedEntries!: EntityTable<FeedEntryRecord, 'id'>
 
   constructor() {
     super('thread-v1')
@@ -558,6 +595,88 @@ class ThreadDatabase extends Dexie {
       chatProposals: 'id, sessionId, messageId, status, createdAt, [sessionId+createdAt]',
       syncStates: 'key, repo, branch, lastCheckedAt',
       workspaceTombstones: 'key, collection, recordId, deletedAt',
+    })
+    this.version(15).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, kind, blockId, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, scope, aggregateId, detectedAt, resolvedAt',
+      blocks: 'id, day, parentId, kind, [day+order]',
+      occurrences: 'id, threadId, day, rootBlockId, [threadId+day]',
+      viewState: 'key, view, blockId, collapsed',
+      revisions: 'id, day, archivedAt, [day+localRevision]',
+      tasks: 'id, blockId, day, status, parentTaskId, dueDate, startDate, priority, [day+order], [status+dueDate]',
+      threadNotes: 'threadId, updatedAt',
+      threadProperties: 'id, threadId, propertyId, value, [threadId+propertyId], [propertyId+value]',
+      propertyDefinitions: 'id, name, type, updatedAt',
+      blockProperties: 'id, blockId, day, propertyId, [blockId+propertyId], [propertyId+day]',
+      tagDefinitions: 'id, name, updatedAt',
+      blockTags: 'id, blockId, day, tagId, [blockId+tagId], [tagId+day]',
+      personas: 'id, threadId, updatedAt',
+      chatSessions: 'id, personaId, updatedAt, [personaId+updatedAt]',
+      chatMessages: 'id, sessionId, createdAt, [sessionId+createdAt]',
+      chatProposals: 'id, sessionId, messageId, status, createdAt, [sessionId+createdAt]',
+      syncStates: 'key, repo, branch, lastCheckedAt',
+      workspaceTombstones: 'key, collection, recordId, deletedAt',
+      feeds: 'id, url, title, updatedAt, lastFetchedAt',
+      feedEntries: 'id, feedId, externalId, publishedAt, fetchedAt, readAt, [feedId+publishedAt], [feedId+readAt]',
+    })
+    // v16 repairs the title index added for the Feeds source list. Keep this
+    // migration separate so a development build that opened v15 before the
+    // index was present is repaired just like an installed client.
+    this.version(16).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, kind, blockId, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, scope, aggregateId, detectedAt, resolvedAt',
+      blocks: 'id, day, parentId, kind, [day+order]',
+      occurrences: 'id, threadId, day, rootBlockId, [threadId+day]',
+      viewState: 'key, view, blockId, collapsed',
+      revisions: 'id, day, archivedAt, [day+localRevision]',
+      tasks: 'id, blockId, day, status, parentTaskId, dueDate, startDate, priority, [day+order], [status+dueDate]',
+      threadNotes: 'threadId, updatedAt',
+      threadProperties: 'id, threadId, propertyId, value, [threadId+propertyId], [propertyId+value]',
+      propertyDefinitions: 'id, name, type, updatedAt',
+      blockProperties: 'id, blockId, day, propertyId, [blockId+propertyId], [propertyId+day]',
+      tagDefinitions: 'id, name, updatedAt',
+      blockTags: 'id, blockId, day, tagId, [blockId+tagId], [tagId+day]',
+      personas: 'id, threadId, updatedAt',
+      chatSessions: 'id, personaId, updatedAt, [personaId+updatedAt]',
+      chatMessages: 'id, sessionId, createdAt, [sessionId+createdAt]',
+      chatProposals: 'id, sessionId, messageId, status, createdAt, [sessionId+createdAt]',
+      syncStates: 'key, repo, branch, lastCheckedAt',
+      workspaceTombstones: 'key, collection, recordId, deletedAt',
+      feeds: 'id, url, title, updatedAt, lastFetchedAt',
+      feedEntries: 'id, feedId, externalId, publishedAt, fetchedAt, readAt, [feedId+publishedAt], [feedId+readAt]',
+    })
+    this.version(17).stores({
+      days: 'date, updatedAt',
+      threads: 'id, normalizedTitle, updatedAt',
+      mentions: 'id, threadId, day, kind, blockId, [threadId+day]',
+      outbox: 'key, kind, aggregateId, createdAt',
+      conflicts: 'id, scope, aggregateId, detectedAt, resolvedAt',
+      blocks: 'id, day, parentId, kind, [day+order]',
+      occurrences: 'id, threadId, day, rootBlockId, [threadId+day]',
+      viewState: 'key, view, blockId, collapsed',
+      revisions: 'id, day, archivedAt, [day+localRevision]',
+      tasks: 'id, blockId, day, status, parentTaskId, dueDate, startDate, priority, [day+order], [status+dueDate]',
+      threadNotes: 'threadId, updatedAt',
+      threadProperties: 'id, threadId, propertyId, value, [threadId+propertyId], [propertyId+value]',
+      propertyDefinitions: 'id, name, type, updatedAt',
+      blockProperties: 'id, blockId, day, propertyId, [blockId+propertyId], [propertyId+day]',
+      tagDefinitions: 'id, name, updatedAt',
+      blockTags: 'id, blockId, day, tagId, [blockId+tagId], [tagId+day]',
+      personas: 'id, threadId, updatedAt',
+      chatSessions: 'id, personaId, updatedAt, [personaId+updatedAt]',
+      chatMessages: 'id, sessionId, createdAt, [sessionId+createdAt]',
+      chatProposals: 'id, sessionId, messageId, status, createdAt, [sessionId+createdAt]',
+      syncStates: 'key, repo, branch, lastCheckedAt',
+      workspaceTombstones: 'key, collection, recordId, deletedAt',
+      feedFolders: 'id, &normalizedName, name, updatedAt',
+      feeds: 'id, url, title, folderId, updatedAt, lastFetchedAt',
+      feedEntries: 'id, feedId, externalId, publishedAt, fetchedAt, readAt, [feedId+publishedAt], [feedId+readAt]',
     })
   }
 }
