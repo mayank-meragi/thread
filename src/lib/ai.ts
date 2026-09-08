@@ -1,7 +1,10 @@
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createGoogle } from '@ai-sdk/google'
-import type { LanguageModel } from 'ai'
+import { wrapLanguageModel, type LanguageModel } from 'ai'
+import { createAIUsageMiddleware, type AIUsageFeature } from './aiUsage'
+
+type WrappableLanguageModel = Parameters<typeof wrapLanguageModel>[0]['model']
 
 const STORAGE_KEY = 'thread.ai'
 
@@ -36,7 +39,7 @@ export function clearAIConfig(): void {
 // Switching providers is entirely a config change -- this is the one place
 // that branches on which provider is selected. `ai`'s streamText/tool calls
 // elsewhere never need to know which provider produced the model.
-export function resolveModel(config: AIConfig): LanguageModel {
+function resolveRawModel(config: AIConfig): WrappableLanguageModel {
   if (config.provider === 'anthropic') {
     // Anthropic's API rejects direct browser calls unless this header is
     // present -- the same "bring your own key, call it from the client"
@@ -53,4 +56,11 @@ export function resolveModel(config: AIConfig): LanguageModel {
   }
   const openai = createOpenAI({ apiKey: config.apiKey })
   return openai(config.model)
+}
+
+export function resolveModel(config: AIConfig, feature: AIUsageFeature): LanguageModel {
+  return wrapLanguageModel({
+    model: resolveRawModel(config),
+    middleware: createAIUsageMiddleware({ provider: config.provider, model: config.model, feature }),
+  })
 }

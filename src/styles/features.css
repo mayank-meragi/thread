@@ -1044,6 +1044,32 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .settings-card input, .settings-card select { height: 40px; }
 .settings-card textarea { padding: 9px 11px; resize: vertical; }
 .settings-card input:focus, .settings-card select:focus, .settings-card textarea:focus { border-color: var(--thread); box-shadow: 0 0 0 3px var(--thread-soft); }
+.ai-price-settings { margin-top: 17px; padding-top: 16px; border-top: 1px solid var(--line); }
+.ai-price-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.ai-price-heading > div { display: grid; gap: 3px; }
+.ai-price-heading strong { color: var(--ink-soft); font-size: var(--text-meta); }
+.ai-price-heading span { color: var(--muted); font-size: 11px; line-height: 1.4; }
+.ai-price-heading small { color: var(--muted); font: 400 8px 'IBM Plex Mono', monospace; text-align: right; text-transform: uppercase; }
+.ai-price-settings .field-grid { margin-top: 10px; }
+.ai-price-actions { margin-top: 10px; }
+.ai-price-message { margin-top: 9px !important; }
+.ai-usage-period { display: inline-flex; gap: 3px; margin: 4px 0 18px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--control); }
+.ai-usage-period button { min-height: 32px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; }
+.ai-usage-period button.is-active { background: var(--paper); color: var(--ink); box-shadow: var(--shadow-1); }
+.ai-usage-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-block: 1px solid var(--line); }
+.ai-usage-metrics > div { display: grid; gap: 4px; padding: 15px 12px; border-right: 1px solid var(--line); }
+.ai-usage-metrics > div:last-child { border-right: 0; }
+.ai-usage-metrics span { color: var(--muted); font-size: 11px; }
+.ai-usage-metrics strong { font: 500 20px/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+.ai-usage-note { margin-top: 12px !important; }
+.ai-usage-table-wrap { margin-top: 16px; overflow-x: auto; }
+.ai-usage-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.ai-usage-table th { padding: 0 8px 8px; color: var(--muted); font: 500 8px 'IBM Plex Mono', monospace; text-align: right; text-transform: uppercase; white-space: nowrap; }
+.ai-usage-table th:first-child, .ai-usage-table th:nth-child(2), .ai-usage-table td:first-child, .ai-usage-table td:nth-child(2) { text-align: left; }
+.ai-usage-table td { padding: 10px 8px; border-top: 1px solid var(--line-soft); color: var(--ink-soft); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ai-usage-table td:first-child { min-width: 145px; display: grid; gap: 2px; }
+.ai-usage-table td:first-child strong { overflow: hidden; color: var(--ink); font-size: 12px; text-overflow: ellipsis; }
+.ai-usage-table td:first-child small { color: var(--muted); font-size: 9px; text-transform: uppercase; }
 .rss-proxy-instructions ol { display: grid; gap: 9px; margin: 0; padding-left: 20px; color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
 .rss-proxy-instructions code { padding: 1px 4px; border-radius: 4px; background: var(--control); color: var(--ink); font: 500 11px var(--font-mono); }
 .rss-proxy-instructions .settings-hint { margin-top: 16px; }
@@ -1196,6 +1222,13 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .settings-card { padding: 20px; }
   .settings-card .field-grid { grid-template-columns: 1fr; gap: 0; }
   .settings-card .theme-groups { grid-template-columns: 1fr; }
+  .ai-price-heading { display: grid; gap: 5px; }
+  .ai-price-heading small { text-align: left; }
+  .ai-usage-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ai-usage-metrics > div:nth-child(odd) { border-right: 1px solid var(--line); }
+  .ai-usage-metrics > div:nth-child(-n + 3) { border-bottom: 1px solid var(--line); }
+  .ai-usage-metrics > div:nth-child(2n) { border-right: 0; }
+  .ai-usage-metrics > div:last-child { grid-column: 1 / -1; border-right: 0; border-bottom: 0; }
   .conflict-hunk-sides { grid-template-columns: 1fr; }
   .tasks-page { padding: 28px 16px 100px; }
   .task-quick-add { grid-template-columns: auto minmax(0, 1fr) auto; padding-left: 12px; }

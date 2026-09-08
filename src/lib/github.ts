@@ -1,8 +1,9 @@
-import { applyMergedDay, applyMergedThreadNote, applyRemoteDay, applyRemoteThreadNote, db, deleteRemoteDay, deleteRemoteThreadNote, hasOpenConflict, markConflictResolved, markDaySynced, markThreadNoteSynced, queueFeedsSync, queueWorkspaceSync, recordConflict, saveDay, saveThreadNote, type DayRecord, type GitHubSyncState, type ThreadNoteRecord } from '../db'
+import { applyMergedDay, applyMergedThreadNote, applyRemoteDay, applyRemoteThreadNote, db, deleteRemoteDay, deleteRemoteThreadNote, hasOpenConflict, markConflictResolved, markDaySynced, markThreadNoteSynced, queueAIUsageSync, queueFeedsSync, queueWorkspaceSync, recordConflict, saveDay, saveThreadNote, type DayRecord, type GitHubSyncState, type ThreadNoteRecord } from '../db'
 import { emptyDayMetadata, parseDayDocument, serializeDayDocument } from './dayDocument'
 import { applyConflictResolutions, mergeMarkdown } from './conflictMerge'
 import { applyWorkspaceManifest, buildWorkspaceManifest, mergeWorkspaceManifests, parseWorkspaceManifest, serializeWorkspaceManifest, type WorkspaceManifestV1 } from './syncManifest'
 import { applyFeedManifest, buildFeedManifest, mergeFeedManifests, parseFeedManifest, serializeFeedManifest, type FeedManifestV1 } from './feedManifest'
+import { applyAIUsageManifest, buildAIUsageManifest, mergeAIUsageManifests, parseAIUsageManifest, serializeAIUsageManifest, type AIUsageManifestV1 } from './aiUsageManifest'
 
 const API = 'https://api.github.com'
 const STORAGE_KEY = 'thread.github'
@@ -166,9 +167,9 @@ async function putFile(config: GitHubConfig, path: string, content: string, sha?
 // last-write-wins + tombstones, so this always converges without user input --
 // unlike day/thread-note pushes there is no conflict to record. If the remote
 // already carries our state we adopt it without a write.
-async function pushManifest<M extends WorkspaceManifestV1 | FeedManifestV1>(
+async function pushManifest<M extends WorkspaceManifestV1 | FeedManifestV1 | AIUsageManifestV1>(
   config: GitHubConfig,
-  path: 'workspace.json' | 'feeds.json',
+  path: 'workspace.json' | 'feeds.json' | 'ai-usage.json',
   outboxCreatedAt: string,
   ops: {
     baseline: M | undefined
@@ -197,8 +198,9 @@ async function pushManifest<M extends WorkspaceManifestV1 | FeedManifestV1>(
   }
   await ops.apply(merged)
   await ops.saveBaseline(merged)
-  const current = await db.outbox.get(path === 'workspace.json' ? 'workspace' : 'feeds')
-  if (current?.createdAt === outboxCreatedAt) await db.outbox.delete(path === 'workspace.json' ? 'workspace' : 'feeds')
+  const outboxKey = path === 'workspace.json' ? 'workspace' : path === 'feeds.json' ? 'feeds' : 'ai-usage'
+  const current = await db.outbox.get(outboxKey)
+  if (current?.createdAt === outboxCreatedAt) await db.outbox.delete(outboxKey)
   return 1
 }
 
@@ -228,6 +230,19 @@ async function pushFeeds(config: GitHubConfig, outboxCreatedAt: string): Promise
     merge: mergeFeedManifests,
     apply: applyFeedManifest,
     saveBaseline: async (merged) => { await db.syncStates.update(state.key, { lastSyncedFeeds: merged }) },
+  })
+}
+
+async function pushAIUsage(config: GitHubConfig, outboxCreatedAt: string): Promise<number> {
+  const state = await ensureSyncState(config)
+  return pushManifest<AIUsageManifestV1>(config, 'ai-usage.json', outboxCreatedAt, {
+    baseline: state.lastSyncedAIUsage as AIUsageManifestV1 | undefined,
+    build: buildAIUsageManifest,
+    parse: parseAIUsageManifest,
+    serialize: serializeAIUsageManifest,
+    merge: mergeAIUsageManifests,
+    apply: applyAIUsageManifest,
+    saveBaseline: async (merged) => { await db.syncStates.update(state.key, { lastSyncedAIUsage: merged }) },
   })
 }
 
@@ -338,6 +353,10 @@ export async function syncPending(): Promise<number> {
       }
       if (item.kind === 'feeds') {
         synced += await pushFeeds(config, item.createdAt)
+        continue
+      }
+      if (item.kind === 'ai-usage') {
+        synced += await pushAIUsage(config, item.createdAt)
         continue
       }
       if (item.kind === 'thread-note') {
@@ -502,6 +521,7 @@ function managedPath(path: string): boolean {
     || /^threads\/[^/]+\.md$/.test(path)
     || path === 'workspace.json'
     || path === 'feeds.json'
+    || path === 'ai-usage.json'
 }
 
 function dayFromPath(path: string): string | null {
@@ -586,6 +606,26 @@ async function pullFeeds(config: GitHubConfig, headSha: string): Promise<PullRes
   return 'applied'
 }
 
+async function pullAIUsage(config: GitHubConfig, headSha: string): Promise<PullResult> {
+  const remoteFile = await getRemoteFile(config, 'ai-usage.json', headSha)
+  if (!remoteFile) {
+    await queueAIUsageSync()
+    return 'unchanged'
+  }
+  const state = await ensureSyncState(config)
+  const local = await buildAIUsageManifest()
+  const remote = parseAIUsageManifest(remoteFile.content)
+  const pendingLocalManifest = await db.outbox.get('ai-usage')
+  const merged = !state.lastSyncedAIUsage && !pendingLocalManifest
+    ? remote
+    : mergeAIUsageManifests(state.lastSyncedAIUsage as AIUsageManifestV1 | undefined, local, remote)
+  await applyAIUsageManifest(merged)
+  await db.syncStates.update(state.key, { lastSyncedAIUsage: remote })
+  const normalized = await buildAIUsageManifest()
+  if (serializeAIUsageManifest(normalized) !== serializeAIUsageManifest(remote)) await queueAIUsageSync()
+  return 'applied'
+}
+
 async function applyRemotePath(config: GitHubConfig, path: string, headSha: string, deleted = false): Promise<PullResult> {
   const day = dayFromPath(path)
   if (day) {
@@ -604,6 +644,10 @@ async function applyRemotePath(config: GitHubConfig, path: string, headSha: stri
   if (path === 'feeds.json') {
     if (deleted) { await queueFeedsSync(); return 'deleted' }
     return pullFeeds(config, headSha)
+  }
+  if (path === 'ai-usage.json') {
+    if (deleted) { await queueAIUsageSync(); return 'deleted' }
+    return pullAIUsage(config, headSha)
   }
   return 'unchanged'
 }
@@ -647,6 +691,10 @@ export async function catchUpFromGitHub(options: { priorityPaths?: string[]; for
       }
       if (!remotePaths.has('workspace.json')) await queueWorkspaceSync()
       if (!remotePaths.has('feeds.json')) await queueFeedsSync()
+      // There is nothing useful to publish for a new installation until its
+      // first tracked call. Once local usage exists, queueing the missing file
+      // bootstraps older installations that have no usage baseline yet.
+      if (!remotePaths.has('ai-usage.json') && (await db.aiUsageAggregates.count()) > 0) await queueAIUsageSync()
     } else {
       work = []
       for (const change of changes ?? []) {
@@ -716,6 +764,9 @@ export function runGitHubSyncCycle(options: { priorityPaths?: string[]; forceFul
       // and sets the baseline, after which this is a no-op.
       if (!state.lastSyncedFeeds && !(await db.outbox.get('feeds'))) {
         await db.outbox.put({ key: 'feeds', kind: 'feeds', aggregateId: 'feeds', createdAt: new Date().toISOString(), attempts: 0 })
+      }
+      if (!state.lastSyncedAIUsage && !(await db.outbox.get('ai-usage')) && (await db.aiUsageAggregates.count()) > 0) {
+        await db.outbox.put({ key: 'ai-usage', kind: 'ai-usage', aggregateId: 'ai-usage', createdAt: new Date().toISOString(), attempts: 0 })
       }
       await syncPending()
       await catchUpFromGitHub(cycleOptions)

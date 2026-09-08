@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, BookOpen, Bot, Check, Eye, EyeOff, FileText, GitBranch, LoaderCircle, Palette, Plus, RefreshCw, Rss, ShieldCheck, Trash2, Unplug, Users, Wand2 } from 'lucide-react'
+import { AlertTriangle, BarChart3, BookOpen, Bot, Check, Eye, EyeOff, FileText, GitBranch, LoaderCircle, Palette, Plus, RefreshCw, Rss, ShieldCheck, Trash2, Unplug, Users, Wand2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
 import { generateText } from 'ai'
@@ -25,6 +25,7 @@ import { MetadataSchemas } from '../components/MetadataSchemas'
 import { clearRssProxyConfig, generateRssProxyAccessKey, getRssProxyConfig, saveRssProxyConfig, testRssProxyConnection } from '../lib/rssProxy'
 import { refreshAllFeeds } from '../lib/rss'
 import { getRssSettings, RSS_REFRESH_INTERVALS, saveRssSettings, type RssRefreshInterval } from '../lib/rssSettings'
+import { clearModelPriceOverride, formatAIUsageCost, getBuiltInModelPrice, getEffectiveModelPrice, getModelPriceOverride, groupAIUsage, saveModelPriceOverride, summarizeAIUsage, type AIUsageFeature, type AIUsagePeriod } from '../lib/aiUsage'
 
 const SETTINGS_CATEGORIES = [
   { id: 'appearance', label: 'Appearance', description: 'Theme and display', Icon: Palette },
@@ -37,6 +38,14 @@ const SETTINGS_CATEGORIES = [
 ] as const
 
 type SettingsCategory = typeof SETTINGS_CATEGORIES[number]['id']
+
+const AI_USAGE_FEATURE_LABELS: Record<AIUsageFeature, string> = {
+  chat: 'Chat',
+  'persona-builder': 'Persona builder',
+  'connection-test': 'Connection test',
+}
+
+const integerFormat = new Intl.NumberFormat('en-US')
 
 function isSettingsCategory(value: string | null): value is SettingsCategory {
   return SETTINGS_CATEGORIES.some((category) => category.id === value)
@@ -222,6 +231,40 @@ export function SettingsPage() {
   const [aiModel, setAIModel] = useState(existingAI?.model ?? '')
   const [aiState, setAIState] = useState<'idle' | 'checking' | 'done'>('idle')
   const [aiError, setAIError] = useState('')
+  const [usagePeriod, setUsagePeriod] = useState<AIUsagePeriod>('30-days')
+  const usageRecords = useLiveQuery(() => db.aiUsageAggregates.toArray(), [], [])
+  const usageSummary = summarizeAIUsage(usageRecords, usagePeriod)
+  const usageBreakdown = groupAIUsage(usageRecords, usagePeriod)
+  const [inputPriceOverride, setInputPriceOverride] = useState(() => {
+    const price = getModelPriceOverride(aiProvider, aiModel.trim())
+    return price ? String(price.inputUsdPerMillion) : ''
+  })
+  const [outputPriceOverride, setOutputPriceOverride] = useState(() => {
+    const price = getModelPriceOverride(aiProvider, aiModel.trim())
+    return price ? String(price.outputUsdPerMillion) : ''
+  })
+  const [priceMessage, setPriceMessage] = useState('')
+  const normalizedAIModel = aiModel.trim()
+  const builtInPrice = getBuiltInModelPrice(aiProvider, normalizedAIModel)
+  const effectivePrice = getEffectiveModelPrice(aiProvider, normalizedAIModel)
+  const hasPriceOverride = Boolean(getModelPriceOverride(aiProvider, normalizedAIModel))
+
+  function resetAIPriceInputs(provider: AIProvider, model: string) {
+    const price = getModelPriceOverride(provider, model.trim())
+    setInputPriceOverride(price ? String(price.inputUsdPerMillion) : '')
+    setOutputPriceOverride(price ? String(price.outputUsdPerMillion) : '')
+    setPriceMessage('')
+  }
+
+  function changeAIProvider(provider: AIProvider) {
+    setAIProvider(provider)
+    resetAIPriceInputs(provider, aiModel)
+  }
+
+  function changeAIModel(model: string) {
+    setAIModel(model)
+    resetAIPriceInputs(aiProvider, model)
+  }
 
   async function connectAI() {
     setAIError('')
@@ -229,13 +272,32 @@ export function SettingsPage() {
     if (!config.apiKey || !config.model) return setAIError('An API key and model are both required.')
     setAIState('checking')
     try {
-      await generateText({ model: resolveModel(config), prompt: 'Reply with the single word "ok".' })
+      await generateText({ model: resolveModel(config, 'connection-test'), prompt: 'Reply with the single word "ok".' })
       saveAIConfig(config)
       setAIState('done')
     } catch (caught) {
       setAIError(caught instanceof Error ? caught.message : String(caught))
       setAIState('idle')
     }
+  }
+
+  function saveAIPrice() {
+    const input = Number(inputPriceOverride)
+    const output = Number(outputPriceOverride)
+    if (!normalizedAIModel || inputPriceOverride.trim() === '' || outputPriceOverride.trim() === ''
+      || !Number.isFinite(input) || input < 0 || !Number.isFinite(output) || output < 0) {
+      setPriceMessage('Enter non-negative input and output prices for the selected model.')
+      return
+    }
+    saveModelPriceOverride(aiProvider, normalizedAIModel, { inputUsdPerMillion: input, outputUsdPerMillion: output })
+    setPriceMessage('Custom rates saved. They apply to future usage.')
+  }
+
+  function restoreBuiltInAIPrice() {
+    clearModelPriceOverride(aiProvider, normalizedAIModel)
+    setInputPriceOverride('')
+    setOutputPriceOverride('')
+    setPriceMessage(builtInPrice ? 'Built-in rates restored.' : 'Custom rates removed. Cost is unavailable for this model.')
   }
 
   useEffect(() => {
@@ -503,16 +565,39 @@ export function SettingsPage() {
         <div className="field-grid">
           <label>
             <span>Provider</span>
-            <select value={aiProvider} onChange={(event) => setAIProvider(event.target.value as AIProvider)}>
+            <select value={aiProvider} onChange={(event) => changeAIProvider(event.target.value as AIProvider)}>
               <option value="anthropic">Anthropic</option>
               <option value="openai">OpenAI</option>
               <option value="google">Google (Gemini)</option>
             </select>
           </label>
-          <label><span>Model</span><input value={aiModel} onChange={(event) => setAIModel(event.target.value)} placeholder={aiProvider === 'anthropic' ? 'claude-sonnet-5' : aiProvider === 'google' ? 'gemini-2.5-pro' : 'gpt-5'} /></label>
+          <label><span>Model</span><input value={aiModel} onChange={(event) => changeAIModel(event.target.value)} placeholder={aiProvider === 'anthropic' ? 'claude-sonnet-5' : aiProvider === 'google' ? 'gemini-2.5-pro' : 'gpt-5'} /></label>
         </div>
         <label><span>API key</span><input type="password" value={aiApiKey} onChange={(event) => setAIApiKey(event.target.value)} placeholder="sk-…" /></label>
         <div className="security-note"><ShieldCheck size={16} /><span>Stored only in this browser and sent only to the provider you pick, directly from this device.</span></div>
+        <div className="ai-price-settings">
+          <div className="ai-price-heading">
+            <div><strong>Cost estimate</strong><span>Optional USD rates per 1 million tokens. Custom rates apply only to future usage.</span></div>
+            {effectivePrice ? (
+              <small>{hasPriceOverride ? `Custom rates · saved ${effectivePrice.checkedAt}` : `Built-in rates · checked ${effectivePrice.checkedAt}`}</small>
+            ) : <small>Cost unavailable</small>}
+          </div>
+          {effectivePrice ? (
+            <p className="settings-hint">Using ${effectivePrice.inputUsdPerMillion}/1M input tokens and ${effectivePrice.outputUsdPerMillion}/1M output tokens.</p>
+          ) : null}
+          {aiProvider === 'google' && normalizedAIModel === 'gemini-flash-latest' ? (
+            <p className="settings-hint">This is a moving model alias. Override these rates if Google changes the model behind it.</p>
+          ) : null}
+          <div className="field-grid">
+            <label><span>Input price / 1M</span><input type="number" min="0" step="0.01" value={inputPriceOverride} onChange={(event) => setInputPriceOverride(event.target.value)} placeholder={builtInPrice ? String(builtInPrice.inputUsdPerMillion) : 'Required for cost'} /></label>
+            <label><span>Output price / 1M</span><input type="number" min="0" step="0.01" value={outputPriceOverride} onChange={(event) => setOutputPriceOverride(event.target.value)} placeholder={builtInPrice ? String(builtInPrice.outputUsdPerMillion) : 'Required for cost'} /></label>
+          </div>
+          <div className="settings-actions ai-price-actions">
+            <button type="button" className="secondary-button" onClick={saveAIPrice} disabled={!normalizedAIModel}>Save custom rates</button>
+            {hasPriceOverride ? <button type="button" className="text-button" onClick={restoreBuiltInAIPrice}>{builtInPrice ? 'Use built-in rates' : 'Remove custom rates'}</button> : null}
+          </div>
+          {priceMessage ? <p className="settings-hint ai-price-message">{priceMessage}</p> : null}
+        </div>
         {aiError && <p className="banner banner-error form-error">{aiError}</p>}
         <div className="settings-actions">
           <button className="primary-button" onClick={() => void connectAI()} disabled={aiState !== 'idle' || !aiApiKey || !aiModel}>
@@ -521,6 +606,47 @@ export function SettingsPage() {
           </button>
           {existingAI && <button className="text-button" onClick={() => { clearAIConfig(); setAIApiKey('') }}><Unplug size={15} /> Disconnect</button>}
         </div>
+      </section>
+
+      <section className="settings-card ai-usage-card">
+        <div className="settings-title"><BarChart3 size={20} /><div><h2>AI usage</h2><p>Provider-reported tokens across synced devices. Dollar amounts are estimates, not invoice totals.</p></div></div>
+        <div className="ai-usage-period" role="group" aria-label="AI usage period">
+          {([['today', 'Today'], ['30-days', 'Last 30 days'], ['all-time', 'All time']] as const).map(([value, label]) => (
+            <button type="button" key={value} className={usagePeriod === value ? 'is-active' : ''} aria-pressed={usagePeriod === value} onClick={() => setUsagePeriod(value)}>{label}</button>
+          ))}
+        </div>
+        {usageSummary.runCount === 0 ? (
+          <p className="settings-empty">{usageRecords.length === 0 ? 'No AI usage recorded yet. Usage is tracked from this version onward.' : 'No AI usage was recorded during this period.'}</p>
+        ) : (
+          <>
+            <div className="ai-usage-metrics">
+              <div><span>Model calls</span><strong>{integerFormat.format(usageSummary.runCount)}</strong></div>
+              <div><span>Input tokens</span><strong>{integerFormat.format(usageSummary.inputTokens)}</strong></div>
+              <div><span>Output tokens</span><strong>{integerFormat.format(usageSummary.outputTokens)}</strong></div>
+              <div><span>Total tokens</span><strong>{integerFormat.format(usageSummary.totalTokens)}</strong></div>
+              <div><span>Est. cost</span><strong>{formatAIUsageCost(usageSummary.estimatedCostUsd)}</strong></div>
+            </div>
+            {usageSummary.unpricedRunCount > 0 ? <p className="settings-hint ai-usage-note">Excludes {integerFormat.format(usageSummary.unpricedRunCount)} {usageSummary.unpricedRunCount === 1 ? 'call' : 'calls'} without pricing.</p> : null}
+            <div className="ai-usage-table-wrap">
+              <table className="ai-usage-table">
+                <thead><tr><th>Provider / model</th><th>Feature</th><th>Calls</th><th>Input</th><th>Output</th><th>Total</th><th>Est. cost</th></tr></thead>
+                <tbody>
+                  {usageBreakdown.map((row) => (
+                    <tr key={row.id}>
+                      <td><strong>{row.model}</strong><small>{row.provider}</small></td>
+                      <td>{AI_USAGE_FEATURE_LABELS[row.feature]}</td>
+                      <td>{integerFormat.format(row.runCount)}</td>
+                      <td>{integerFormat.format(row.inputTokens)}</td>
+                      <td>{integerFormat.format(row.outputTokens)}</td>
+                      <td>{integerFormat.format(row.totalTokens)}</td>
+                      <td>{row.unpricedRunCount === row.runCount ? '—' : formatAIUsageCost(row.estimatedCostUsd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </section>
 
       <section className="settings-card">

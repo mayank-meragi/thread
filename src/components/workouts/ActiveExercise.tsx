@@ -34,7 +34,6 @@ function ExerciseHero({ images, name }: { images: string[]; name: string }) {
   const [frame, setFrame] = useState(0)
 
   useEffect(() => {
-    setFrame(0)
     if (images.length < 2) return
     const id = window.setInterval(() => setFrame((current) => (current + 1) % images.length), HERO_FRAME_INTERVAL_MS)
     return () => window.clearInterval(id)
@@ -127,7 +126,7 @@ export function ActiveExercise({
   return (
     <section className="active-exercise">
       <div className="active-exercise-hero">
-        <ExerciseHero images={heroImages} name={name} />
+        <ExerciseHero key={heroImages.join('\u0000')} images={heroImages} name={name} />
         <span className="active-exercise-badge">EXERCISE {index + 1}</span>
       </div>
 

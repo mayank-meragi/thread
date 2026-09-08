@@ -273,7 +273,7 @@ export function createSessionAdapter(sessionId: string, personaId: string): Chat
       const assistantMessageId = crypto.randomUUID()
 
       const result = streamText({
-        model: resolveModel(config),
+        model: resolveModel(config, 'chat'),
         system,
         messages: modelMessages,
         tools: buildThreadScriptTools({ sessionId, personaId, assistantMessageId }),

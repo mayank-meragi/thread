@@ -100,7 +100,7 @@ export interface MentionRecord {
 
 export interface OutboxRecord {
   key: string
-  kind: 'day' | 'thread-note' | 'workspace' | 'feeds'
+  kind: 'day' | 'thread-note' | 'workspace' | 'feeds' | 'ai-usage'
   aggregateId: string
   createdAt: string
   attempts: number
@@ -122,6 +122,7 @@ export interface GitHubSyncState {
   processedFiles?: number
   lastSyncedWorkspace?: unknown
   lastSyncedFeeds?: unknown
+  lastSyncedAIUsage?: unknown
 }
 
 export interface WorkspaceTombstoneRecord {
@@ -271,6 +272,21 @@ export interface ChatMessageRecord {
   status?: { type: 'requires-action'; reason: 'tool-calls' }
 }
 
+export interface AIUsageAggregateRecord {
+  id: string
+  deviceId: string
+  day: string
+  provider: 'anthropic' | 'openai' | 'google'
+  model: string
+  feature: 'chat' | 'persona-builder' | 'connection-test'
+  runCount: number
+  inputTokens: number
+  outputTokens: number
+  estimatedCostUsd: number
+  unpricedRunCount: number
+  updatedAt: string
+}
+
 export type ChatProposalStatus = 'pending' | 'executing' | 'completed' | 'failed' | 'cancelled' | 'stale'
 
 export interface ChatProposalReceipt {
@@ -357,6 +373,7 @@ class ThreadDatabase extends Dexie {
   chatSessions!: EntityTable<ChatSessionRecord, 'id'>
   chatMessages!: EntityTable<ChatMessageRecord, 'id'>
   chatProposals!: EntityTable<ChatProposalRecord, 'id'>
+  aiUsageAggregates!: EntityTable<AIUsageAggregateRecord, 'id'>
   syncStates!: EntityTable<GitHubSyncState, 'key'>
   workspaceTombstones!: EntityTable<WorkspaceTombstoneRecord, 'key'>
   feeds!: EntityTable<FeedRecord, 'id'>
@@ -745,6 +762,9 @@ class ThreadDatabase extends Dexie {
         .map((entry) => ({ id: entry.id, readAt: entry.readAt as string, updatedAt: entry.readAt as string }))
       if (seeded.length) await tx.table('feedReads').bulkPut(seeded)
     })
+    this.version(19).stores({
+      aiUsageAggregates: 'id, deviceId, day, provider, model, feature, updatedAt, [day+provider], [provider+model]',
+    })
   }
 }
 
@@ -761,6 +781,12 @@ export async function queueWorkspaceSync(): Promise<void> {
 export async function queueFeedsSync(): Promise<void> {
   const now = new Date().toISOString()
   await db.outbox.put({ key: 'feeds', kind: 'feeds', aggregateId: 'feeds', createdAt: now, attempts: 0 })
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('thread:local-write'))
+}
+
+export async function queueAIUsageSync(): Promise<void> {
+  const now = new Date().toISOString()
+  await db.outbox.put({ key: 'ai-usage', kind: 'ai-usage', aggregateId: 'ai-usage', createdAt: now, attempts: 0 })
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('thread:local-write'))
 }
 

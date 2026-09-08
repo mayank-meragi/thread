@@ -30,7 +30,7 @@ export async function generatePersonaFromDescription(description: string): Promi
   if (!trimmed) throw new Error('Describe the persona you want first.')
 
   const { object } = await generateObject({
-    model: resolveModel(config),
+    model: resolveModel(config, 'persona-builder'),
     schema: personaSchema,
     prompt: `${APP_CONTEXT}\n\nA user wants a new persona. Here is what they asked for, in their own words:\n"${trimmed}"\n\nDesign the best persona for this request.`,
   })
