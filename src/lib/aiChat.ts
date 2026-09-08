@@ -1,7 +1,7 @@
 import { stepCountIs, streamText, tool, type StopCondition, type ToolSet } from 'ai'
 import { z } from 'zod'
-import type { ChatModelAdapter, ChatModelRunResult, ThreadAssistantMessagePart, ThreadMessage, ThreadMessageLike } from '@assistant-ui/react'
-import { db, type ChatMessagePartRecord, type PersonaRecord } from '../db'
+import type { ChatModelAdapter, ChatModelRunResult, ThreadAssistantMessagePart, ThreadMessage } from '@assistant-ui/react'
+import { db, type PersonaRecord } from '../db'
 import { getAIConfig, resolveModel, resolveReasoningOptions } from './ai'
 import { buildThreadSystemContext, TRAINING_PLAN_THREAD_ID } from './aiContext'
 import { WORKOUT_COACH_PERSONA_ID } from './personas'
@@ -17,21 +17,6 @@ function textOf(message: ThreadMessage): string {
     .filter((part): part is Extract<typeof part, { type: 'text' }> => part.type === 'text')
     .map((part) => part.text)
     .join('')
-}
-
-export async function loadSessionHistory(sessionId: string): Promise<ThreadMessageLike[]> {
-  const rows = await db.chatMessages.where('sessionId').equals(sessionId).sortBy('createdAt')
-  return rows.map((row) => ({
-    id: row.id,
-    role: row.role,
-    // Stored as a bare string (plain text) or an ordered parts array (assistant
-    // replies that carried a tool call). ThreadMessageLike accepts both.
-    content: row.content as ThreadMessageLike['content'],
-    createdAt: new Date(row.createdAt),
-    // Rehydrate a turn that is still paused on an approval gate so the runtime
-    // re-enters `requires-action` and the card's Confirm/Cancel stay live.
-    ...(row.status ? { status: row.status } : {}),
-  }))
 }
 
 // The heading text a note gets filed under is the thread's own (immutable)
@@ -174,17 +159,17 @@ export function buildThreadScriptTools(context: { sessionId: string; personaId: 
   }
 }
 
-// After the user answers a `proposeThreadScript` approval gate (Confirm/Cancel
-// in the card, which already ran the trusted dispatcher / cancel), the runtime
-// resumes the loop and re-invokes `run`. The paused assistant message is not in
-// `messages` (only prior turns are), so we read it from `getMessage()`: it now
-// carries `approval.approved` on the tool-call part. Persist the resolved card
-// state (drop the paused status), then end the turn -- no content, no model
-// call. Returns null when this isn't a resumed approval turn.
-async function finalizeApprovalGate(
-  sessionId: string,
-  getMessage: (() => ThreadMessage) | undefined,
-): Promise<ChatModelRunResult | null> {
+// After the user answers a `proposeThreadScript` approval gate (Confirm/Cancel in
+// the card, which already ran the trusted dispatcher / cancel), the runtime
+// resolves the decision onto the tool-call part and re-invokes `run` to close
+// out the turn. The paused message isn't in `messages` (only prior turns are),
+// so we read it from `getMessage()`: it now carries `approval.approved`. There's
+// nothing to add -- end the turn with no content so the runtime just flips the
+// status to `complete` and the history adapter finalizes the row (dropping the
+// paused status). The card renders its outcome from the live `chatProposals`
+// row, so the tool-call `result` doesn't need backfilling. Returns null when
+// this isn't a resumed approval turn.
+function finalizeApprovalGate(getMessage: (() => ThreadMessage) | undefined): ChatModelRunResult | null {
   let current: ThreadMessage
   try {
     if (!getMessage) return null
@@ -194,44 +179,20 @@ async function finalizeApprovalGate(
   }
   if (current.role !== 'assistant') return null
 
-  const toolPart = current.content.find(
-    (part): part is Extract<typeof part, { type: 'tool-call' }> =>
+  const resolved = current.content.some(
+    (part) =>
       part.type === 'tool-call' && part.toolName === 'proposeThreadScript' && part.approval?.approved !== undefined,
   )
-  if (!toolPart?.approval) return null
-
-  const confirmed = toolPart.approval.approved === true
-  const proposal = await db.chatProposals.get(toolPart.approval.id)
-  const outcome = {
-    confirmed,
-    status: proposal?.status ?? (confirmed ? 'completed' : 'cancelled'),
-    receipts: proposal?.receipts ?? [],
-    ...(proposal?.error ? { error: proposal.error } : {}),
-  }
-  const parts: ChatMessagePartRecord[] = current.content.map((part) =>
-    part.type === 'tool-call'
-      ? part.toolCallId === toolPart.toolCallId
-        ? { type: 'tool-call', toolCallId: part.toolCallId, toolName: part.toolName, args: part.args, argsText: part.argsText, approval: toolPart.approval, result: outcome, isError: !confirmed }
-        : { type: 'tool-call', toolCallId: part.toolCallId, toolName: part.toolName, args: part.args, argsText: part.argsText, result: part.result, isError: part.isError }
-      : { type: 'text', text: part.type === 'text' ? part.text : '' },
-  )
-  const existing = await db.chatMessages.get(current.id)
-  await db.chatMessages.put({
-    id: current.id,
-    sessionId,
-    role: 'assistant',
-    content: parts,
-    createdAt: existing?.createdAt ?? new Date().toISOString(),
-  })
-  await db.chatSessions.update(sessionId, { updatedAt: new Date().toISOString() })
-  // No `content` -> the runtime appends nothing; only the status changes.
+  if (!resolved) return null
   return { status: { type: 'complete', reason: 'stop' } }
 }
 
 export function createSessionAdapter(sessionId: string, personaId: string): ChatModelAdapter {
   return {
-    async *run({ messages, abortSignal, unstable_getMessage }): AsyncGenerator<ChatModelRunResult> {
-      const resumed = await finalizeApprovalGate(sessionId, unstable_getMessage)
+    async *run({ messages, abortSignal, unstable_getMessage, unstable_assistantMessageId }): AsyncGenerator<ChatModelRunResult> {
+      // The runtime resolved a `proposeThreadScript` approval on the paused
+      // message and re-invoked us to close the turn -- nothing to add.
+      const resumed = finalizeApprovalGate(unstable_getMessage)
       if (resumed) {
         yield resumed
         return
@@ -240,24 +201,8 @@ export function createSessionAdapter(sessionId: string, personaId: string): Chat
       const persona = await db.personas.get(personaId)
       if (!persona) throw new Error('This persona no longer exists.')
 
-      const lastMessage = messages[messages.length - 1]
-      let userCreatedAt: string | undefined
-      if (lastMessage?.role === 'user') {
-        // Keyed by the runtime message id (not a fresh uuid) so a regenerate --
-        // which re-runs with the same trailing user message -- upserts the same
-        // row instead of inserting a duplicate. Keep the original timestamp so
-        // the cleanup below can tell "replies from before this regenerate" apart.
-        const existing = await db.chatMessages.get(lastMessage.id)
-        userCreatedAt = existing?.createdAt ?? new Date().toISOString()
-        await db.chatMessages.put({
-          id: lastMessage.id,
-          sessionId,
-          role: 'user',
-          content: textOf(lastMessage),
-          createdAt: userCreatedAt,
-        })
-        await db.chatSessions.update(sessionId, { updatedAt: new Date().toISOString() })
-      }
+      // Persistence (user row, assistant row, regenerate branch handling) is
+      // owned by the ThreadHistoryAdapter (`chatHistory.ts`); `run` only streams.
 
       const config = getAIConfig()
       if (!config) throw new Error('Set up an AI provider in Settings before starting a chat.')
@@ -268,9 +213,11 @@ export function createSessionAdapter(sessionId: string, personaId: string): Chat
         .filter((message): message is ThreadMessage & { role: 'user' | 'assistant' } => message.role === 'user' || message.role === 'assistant')
         .map((message) => ({ role: message.role, content: textOf(message) }))
 
-      // Fixed up front so `proposeThreadScript` can link the proposal it
-      // creates to the assistant message this turn will persist below.
-      const assistantMessageId = crypto.randomUUID()
+      // The runtime hands us the id it will file this assistant turn under, so
+      // `proposeThreadScript` can link the proposal it drafts to that same
+      // message (and a resumed turn reuses the id, keeping the link valid).
+      // Fall back to a fresh id only if the runtime didn't supply one.
+      const assistantMessageId = unstable_assistantMessageId ?? crypto.randomUUID()
 
       const reasoning = resolveReasoningOptions(config)
       const result = streamText({
@@ -299,6 +246,14 @@ export function createSessionAdapter(sessionId: string, personaId: string): Chat
             const last = parts.at(-1)
             if (last?.type === 'text') parts[parts.length - 1] = { type: 'text', text: last.text + event.text }
             else parts.push({ type: 'text', text: event.text })
+          } else if (event.type === 'reasoning-delta') {
+            // The model's thinking. Coalesce into a single leading `reasoning`
+            // part the same way text deltas coalesce; assistant-ui renders it
+            // through the `Reasoning` slot. `reasoning-start` / `-end` carry no
+            // text and fall through to the `continue` below.
+            const last = parts.at(-1)
+            if (last?.type === 'reasoning') parts[parts.length - 1] = { type: 'reasoning', text: last.text + event.text }
+            else parts.push({ type: 'reasoning', text: event.text })
           } else if (event.type === 'tool-call') {
             parts.push({
               type: 'tool-call',
@@ -334,54 +289,24 @@ export function createSessionAdapter(sessionId: string, personaId: string): Chat
         if (!abortSignal.aborted && (error as { name?: string } | undefined)?.name !== 'AbortError') throw error
       }
 
-      // Stop hit before any token arrived -- don't leave a blank assistant row.
+      // Stop hit before any token arrived -- yield nothing; the runtime settles
+      // the (empty) message and the history adapter skips the blank row.
       if (parts.length === 0 && !fullText) return
 
-      // On a regenerate the runtime re-runs with the same trailing user message;
-      // drop the assistant reply(ies) from that turn onward so the rewritten
-      // reply replaces them instead of stacking up. A brand-new turn has none.
-      if (userCreatedAt) {
-        const cutoff = userCreatedAt
-        await db.chatMessages
-          .where('sessionId')
-          .equals(sessionId)
-          .filter((row) => row.role === 'assistant' && row.createdAt >= cutoff)
-          .delete()
-      }
-
-      // Approval gate: `proposeThreadScript` drafted a pending proposal. Persist
-      // the turn as paused on `requires-action` and stop; the card's
-      // Confirm/Cancel resolves it and re-invokes `run` (see finalizeApprovalGate).
+      // Approval gate: `proposeThreadScript` drafted a pending proposal. Pause
+      // the turn on `requires-action`; the runtime persists it via the history
+      // adapter's `append`, and the card's Confirm/Cancel resolves it and
+      // re-invokes `run` (see finalizeApprovalGate).
       const gated = parts.some(
         (part) => part.type === 'tool-call' && part.toolName === 'proposeThreadScript' && part.approval,
       )
       if (gated) {
-        await db.chatMessages.put({
-          id: assistantMessageId,
-          sessionId,
-          role: 'assistant',
-          content: parts as unknown as ChatMessagePartRecord[],
-          createdAt: new Date().toISOString(),
-          status: { type: 'requires-action', reason: 'tool-calls' },
-        })
-        await db.chatSessions.update(sessionId, { updatedAt: new Date().toISOString() })
         yield { content: parts, status: { type: 'requires-action', reason: 'tool-calls' } }
         return
       }
 
-      await db.chatMessages.put({
-        id: assistantMessageId,
-        sessionId,
-        role: 'assistant',
-        // Keep the ordered parts when the reply carried a tool call (so an
-        // inline tool-call UI, e.g. the ThreadScript proposal card, survives a
-        // reload); otherwise a bare string is enough.
-        content: parts.some((part) => part.type !== 'text')
-          ? (parts as unknown as ChatMessagePartRecord[])
-          : fullText,
-        createdAt: new Date().toISOString(),
-      })
-      await db.chatSessions.update(sessionId, { updatedAt: new Date().toISOString() })
+      // Terminal content was already yielded during the loop; the runtime flips
+      // the status to `complete` and the history adapter persists the row.
     },
   }
 }

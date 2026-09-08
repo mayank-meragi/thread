@@ -159,11 +159,14 @@
 .session-list { width: 100%; min-height: 0; overflow-y: auto; padding: 10px; display: grid; gap: 3px; align-content: start; }
 .session-list-new { display: flex; align-items: center; gap: 5px; padding: 8px 9px; margin-bottom: 6px; border: 1px dashed var(--line); border-radius: 8px; background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
 .session-list-new:hover { color: var(--ink); border-color: var(--ink-soft); }
-.session-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-soft); text-align: left; cursor: pointer; }
-.session-row:hover { background: var(--control-hover); }
-.session-row.active { background: var(--paper); color: var(--ink); }
+/* .session-row is ThreadListItemPrimitive.Root (a div, gets data-active when
+   it's the open thread); .session-row-trigger is the clickable Trigger button. */
+.session-row { border-radius: 8px; }
+.session-row-trigger { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; width: 100%; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-soft); text-align: left; cursor: pointer; }
+.session-row-trigger:hover { background: var(--control-hover); }
+.session-row[data-active] .session-row-trigger { background: var(--paper); color: var(--ink); }
 .session-row-title { min-width: 0; font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.session-row small { flex: 0 0 auto; color: var(--muted); font-size: var(--text-meta); }
+.session-row-trigger small { flex: 0 0 auto; color: var(--muted); font-size: var(--text-meta); }
 .chat-thread { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 .chat-thread-loading { flex: 1; display: grid; place-items: center; color: var(--muted); font-size: 12px; }
 /* minmax(0, 1fr) + min-width:0 keep a wide message part (long id, code block,
@@ -215,6 +218,23 @@
 
 .chat-spin { animation: chat-spin 0.9s linear infinite; }
 @keyframes chat-spin { to { transform: rotate(360deg); } }
+
+/* Model thinking -- a collapsed disclosure above the answer, inside the bubble.
+   Reuses .chat-tool-row / .chat-tool-chevron for the trigger. */
+.chat-reasoning { width: 100%; min-width: 0; margin: -2px 0 var(--space-2); }
+.chat-reasoning:only-child { margin-bottom: 0; }
+.chat-reasoning-icon { flex: 0 0 auto; color: var(--muted); }
+.chat-reasoning-body {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--control);
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 .chat-approval { width: 100%; min-width: 0; display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--paper); box-shadow: var(--shadow-soft); color: var(--ink); font-size: var(--text-sm); }
 .chat-approval-loading { color: var(--muted); box-shadow: none; }
@@ -307,9 +327,24 @@
 .chat-running span:nth-child(3) { animation-delay: .3s; }
 @keyframes chat-bounce { 0%, 80%, 100% { opacity: .35; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
 
-/* Caret trailing streaming assistant text. */
-.chat-cursor { display: inline-block; width: 2px; height: 1em; margin-left: 1px; vertical-align: text-bottom; background: currentColor; animation: chat-blink 1s step-end infinite; }
+/* Caret trailing streaming assistant text. MarkdownTextPrimitive stamps
+   data-status on its container; "running" holds until the smooth reveal ends. */
+.chat-markdown[data-status='running']::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  animation: chat-blink 1s step-end infinite;
+}
 @keyframes chat-blink { 50% { opacity: 0; } }
+
+/* Footer under each assistant reply: branch picker + Copy / Retry row. */
+.chat-message-footer { display: flex; align-items: center; gap: var(--space-3); }
+.chat-branch-picker { display: flex; align-items: center; gap: 1px; }
+.chat-branch-count { color: var(--muted); font: 400 var(--text-meta) var(--font-mono); }
 
 /* Per-reply Copy / Retry row (assistant-ui ActionBarPrimitive). */
 .chat-action-bar { display: flex; gap: 2px; margin-top: 4px; }
@@ -328,7 +363,7 @@
 .chat-suggestion:hover { border-color: var(--ink-soft); color: var(--ink); }
 
 @media (prefers-reduced-motion: reduce) {
-  .chat-running span, .chat-cursor { animation: none; }
+  .chat-running span, .chat-markdown[data-status='running']::after { animation: none; }
 }
 
 .mobile-nav { display: none; }

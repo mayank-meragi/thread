@@ -241,6 +241,9 @@ export interface ChatSessionRecord {
   title: string
   createdAt: string
   updatedAt: string
+  // assistant-ui thread-list status. Absent means 'regular' (no migration --
+  // the thread-list adapter treats undefined as regular).
+  status?: 'regular' | 'archived'
 }
 
 // Assistant replies are stored as their ordered parts (text + tool-call, with
@@ -248,6 +251,10 @@ export interface ChatSessionRecord {
 // proposal card -- survives a reload. Plain text messages stay a bare string.
 export type ChatMessagePartRecord =
   | { type: 'text'; text: string }
+  // The model's streamed thinking, when a reasoning-capable model is run with a
+  // thinking effort set. Rendered through assistant-ui's `Reasoning` slot and
+  // never replayed into model context (see `textOf` in aiChat.ts).
+  | { type: 'reasoning'; text: string }
   | {
       type: 'tool-call'
       toolCallId: string
@@ -266,6 +273,11 @@ export interface ChatMessageRecord {
   sessionId: string
   role: 'user' | 'assistant'
   content: string | ChatMessagePartRecord[]
+  // Branch pointer for assistant-ui's message repository: the id of the message
+  // this one replies to (`null` for the first message in a session). Siblings
+  // sharing a `parentId` are regenerate branches. Absent only on rows written
+  // before the v20 upgrade backfilled them.
+  parentId?: string | null
   createdAt: string
   // Set while an assistant turn is paused on an approval gate, so a reload
   // rehydrates the runtime back into its `requires-action` state.
@@ -764,6 +776,27 @@ class ThreadDatabase extends Dexie {
     })
     this.version(19).stores({
       aiUsageAggregates: 'id, deviceId, day, provider, model, feature, updatedAt, [day+provider], [provider+model]',
+    })
+    // v20: chat history now persists through assistant-ui's ThreadHistoryAdapter,
+    // which is branch-aware -- every message carries a `parentId` pointer. The
+    // upgrade linearises existing sessions (no branches existed before) by
+    // chaining each message to the previous one in `createdAt` order.
+    this.version(20).stores({
+      chatMessages: 'id, sessionId, createdAt, parentId, [sessionId+createdAt]',
+    }).upgrade(async (tx) => {
+      const rows = await tx.table('chatMessages').toArray()
+      const bySession = new Map<string, ChatMessageRecord[]>()
+      for (const row of rows) {
+        const list = bySession.get(row.sessionId) ?? []
+        list.push(row as ChatMessageRecord)
+        bySession.set(row.sessionId, list)
+      }
+      for (const list of bySession.values()) {
+        list.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        for (let i = 0; i < list.length; i++) {
+          await tx.table('chatMessages').update(list[i].id, { parentId: i > 0 ? list[i - 1].id : null })
+        }
+      }
     })
   }
 }

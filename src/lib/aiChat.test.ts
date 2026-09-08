@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '../db'
-import { buildThreadScriptTools, createSessionAdapter, loadSessionHistory, stopAfterProposal } from './aiChat'
+import { buildThreadScriptTools, createSessionAdapter, stopAfterProposal } from './aiChat'
 import aiChatSource from './aiChat.ts?raw'
 
 const streamTextMock = vi.fn()
@@ -27,6 +27,18 @@ function textStream(chunks: string[], onChunk?: (index: number) => void) {
   }
 }
 
+/** A `streamText` result whose fullStream emits reasoning deltas, then text deltas. */
+function reasoningStream(reasoningChunks: string[], textChunks: string[]) {
+  return {
+    fullStream: (async function* () {
+      yield { type: 'reasoning-start', id: 'r1' }
+      for (const text of reasoningChunks) yield { type: 'reasoning-delta', id: 'r1', text }
+      yield { type: 'reasoning-end', id: 'r1' }
+      for (const text of textChunks) yield { type: 'text-delta', text }
+    })(),
+  }
+}
+
 function userMessage(id: string, text: string) {
   return { id, role: 'user' as const, content: [{ type: 'text' as const, text }] }
 }
@@ -39,12 +51,6 @@ function proposeStream(proposalId: string) {
       yield { type: 'tool-result', toolCallId: 'tc-1', output: { created: true, proposalId } }
     })(),
   }
-}
-
-async function drain(adapter: ReturnType<typeof createSessionAdapter>, messages: unknown[], abortSignal: AbortSignal) {
-  const stream = adapter.run({ messages, abortSignal, unstable_getMessage: () => ({ role: 'assistant', content: [] }) } as never) as AsyncGenerator<unknown>
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  for await (const _ of stream) { /* consume the stream */ }
 }
 
 async function collect(
@@ -132,6 +138,8 @@ describe('stopAfterProposal', () => {
 })
 
 describe('createSessionAdapter streaming', () => {
+  // `run` is now write-free -- persistence is the ThreadHistoryAdapter's job
+  // (see chatHistory.test.ts). These assert the shape of what it yields.
   beforeEach(async () => {
     streamTextMock.mockReset()
     await db.personas.put({
@@ -143,10 +151,9 @@ describe('createSessionAdapter streaming', () => {
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     })
-    await db.chatSessions.put({ id: 's1', personaId: 'general', title: 'Chat', createdAt: '2026-09-02T10:00:00.000Z', updatedAt: '2026-09-02T10:00:00.000Z' })
   })
 
-  it('keeps the partial reply when the stream is aborted (Stop)', async () => {
+  it('keeps the partial reply and does not throw when the stream is aborted (Stop)', async () => {
     const controller = new AbortController()
     streamTextMock.mockImplementation(({ abortSignal }: { abortSignal: AbortSignal }) =>
       textStream(['Hello ', 'world'], (index) => {
@@ -160,26 +167,25 @@ describe('createSessionAdapter streaming', () => {
       }),
     )
 
-    const adapter = createSessionAdapter('s1', 'general')
-    await expect(drain(adapter, [userMessage('u1', 'hi')], controller.signal)).resolves.toBeUndefined()
-
-    const rows = await db.chatMessages.where('sessionId').equals('s1').sortBy('createdAt')
-    expect(rows.map((row) => row.role)).toEqual(['user', 'assistant'])
-    expect(rows[1].content).toBe('Hello ')
+    const updates = await collect(createSessionAdapter('s1', 'general'), [userMessage('u1', 'hi')], controller.signal)
+    expect(updates.at(-1)?.content).toEqual([{ type: 'text', text: 'Hello ' }])
   })
 
-  it('does not duplicate the user row when the same turn is re-run (Retry)', async () => {
-    streamTextMock.mockImplementation(() => textStream(['first answer']))
+  it('captures streamed reasoning as a leading part, before the answer text', async () => {
+    streamTextMock.mockImplementation(() => reasoningStream(['Let me ', 'think.'], ['The ', 'answer.']))
     const adapter = createSessionAdapter('s1', 'general')
-    await drain(adapter, [userMessage('u1', 'hi')], new AbortController().signal)
 
-    streamTextMock.mockImplementation(() => textStream(['second answer']))
-    await drain(adapter, [userMessage('u1', 'hi')], new AbortController().signal)
+    const updates = await collect(adapter, [userMessage('u1', 'hi')], new AbortController().signal)
+    const finalContent = updates.at(-1)?.content as Array<{ type: string; text: string }>
+    expect(finalContent.map((part) => part.type)).toEqual(['reasoning', 'text'])
+    expect(finalContent[0]).toEqual({ type: 'reasoning', text: 'Let me think.' })
+    expect(finalContent[1]).toEqual({ type: 'text', text: 'The answer.' })
+  })
 
-    const rows = await db.chatMessages.where('sessionId').equals('s1').sortBy('createdAt')
-    expect(rows.filter((row) => row.role === 'user')).toHaveLength(1)
-    expect(rows.filter((row) => row.role === 'assistant')).toHaveLength(1)
-    expect(rows.find((row) => row.role === 'assistant')?.content).toBe('second answer')
+  it('yields nothing when the stream produces no tokens', async () => {
+    streamTextMock.mockImplementation(() => textStream([]))
+    const updates = await collect(createSessionAdapter('s1', 'general'), [userMessage('u1', 'hi')], new AbortController().signal)
+    expect(updates).toEqual([])
   })
 })
 
@@ -190,7 +196,6 @@ describe('createSessionAdapter approval gate', () => {
       id: 'general', name: 'General', icon: 'Bot', systemPrompt: 'You are helpful.',
       threadId: 'general', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
     })
-    await db.chatSessions.put({ id: 's1', personaId: 'general', title: 'Chat', createdAt: '2026-09-02T10:00:00.000Z', updatedAt: '2026-09-02T10:00:00.000Z' })
   })
 
   it('pauses on requires-action with an approval gate instead of dispatching', async () => {
@@ -205,22 +210,10 @@ describe('createSessionAdapter approval gate', () => {
     expect(part.approval).toEqual({ id: 'prop-1' })
     expect(part.result).toBeUndefined()
     expect(await db.threads.count()).toBe(0)
-
-    const row = await db.chatMessages.where('sessionId').equals('s1').and((r) => r.role === 'assistant').first()
-    expect(row?.status).toEqual({ type: 'requires-action', reason: 'tool-calls' })
   })
 
-  it('finalizes the gated tool call from the proposal outcome when resumed', async () => {
-    await db.chatProposals.put({
-      id: 'prop-1', sessionId: 's1', status: 'completed',
-      receipts: [{ actionIndex: 0, capability: 'thread.create', status: 'completed', idempotencyKey: 'k', at: '2026-09-02T10:01:00.000Z' }],
-    } as never)
-    const gatedPart = { type: 'tool-call' as const, toolCallId: 'tc-1', toolName: 'proposeThreadScript', args: {}, argsText: '{}', approval: { id: 'prop-1' } }
-    await db.chatMessages.put({
-      id: 'a1', sessionId: 's1', role: 'assistant', content: [gatedPart] as never,
-      createdAt: '2026-09-02T10:00:30.000Z', status: { type: 'requires-action', reason: 'tool-calls' },
-    })
-
+  it('ends the turn with no content and no model call when resumed after a decision', async () => {
+    const gatedPart = { type: 'tool-call' as const, toolCallId: 'tc-1', toolName: 'proposeThreadScript', args: {}, argsText: '{}' }
     // The runtime resumes with the paused assistant message reachable only via
     // unstable_getMessage(); its tool-call part now carries approval.approved.
     const resumedMessage = { id: 'a1', role: 'assistant' as const, content: [{ ...gatedPart, approval: { id: 'prop-1', approved: true } }] }
@@ -231,69 +224,7 @@ describe('createSessionAdapter approval gate', () => {
       () => resumedMessage,
     )
 
-    const final = updates.at(-1)!
-    expect(final.status).toEqual({ type: 'complete', reason: 'stop' })
-    expect(final.content).toBeUndefined() // nothing appended to the message
-
-    const row = await db.chatMessages.get('a1')
-    expect(row?.status).toBeUndefined()
-    const part = (row?.content as Array<Record<string, unknown>>)[0]
-    expect(part.result).toMatchObject({ confirmed: true, status: 'completed' })
-    expect((part.result as { receipts: unknown[] }).receipts).toHaveLength(1)
+    expect(updates).toEqual([{ status: { type: 'complete', reason: 'stop' } }])
     expect(streamTextMock).not.toHaveBeenCalled()
-  })
-})
-
-describe('loadSessionHistory', () => {
-  it('round-trips a persisted assistant reply that carried a tool-call part', async () => {
-    await db.chatMessages.bulkPut([
-      { id: 'm1', sessionId: 's', role: 'user', content: 'plan me a workout', createdAt: '2026-09-02T10:00:00.000Z' },
-      {
-        id: 'm2',
-        sessionId: 's',
-        role: 'assistant',
-        content: [
-          { type: 'text', text: 'Here is today’s session.' },
-          {
-            type: 'tool-call',
-            toolCallId: 'call-1',
-            toolName: 'proposeThreadScript',
-            args: { source: 'action workout.buildDay' },
-            result: { created: true, proposalId: 'prop-1' },
-          },
-        ],
-        createdAt: '2026-09-02T10:00:01.000Z',
-      },
-    ])
-
-    const history = await loadSessionHistory('s')
-
-    expect(history[0].content).toBe('plan me a workout')
-    expect(Array.isArray(history[1].content)).toBe(true)
-    const parts = history[1].content as unknown as Array<Record<string, unknown>>
-    expect(parts[0]).toMatchObject({ type: 'text', text: 'Here is today’s session.' })
-    expect(parts[1]).toMatchObject({
-      type: 'tool-call',
-      toolName: 'proposeThreadScript',
-      result: { created: true, proposalId: 'prop-1' },
-    })
-  })
-
-  it('rehydrates a paused approval turn (status + tool-call approval)', async () => {
-    await db.chatMessages.bulkPut([
-      { id: 'm1', sessionId: 's', role: 'user', content: 'make a thread', createdAt: '2026-09-02T10:00:00.000Z' },
-      {
-        id: 'm2', sessionId: 's', role: 'assistant', createdAt: '2026-09-02T10:00:01.000Z',
-        status: { type: 'requires-action', reason: 'tool-calls' },
-        content: [{ type: 'tool-call', toolCallId: 'c1', toolName: 'proposeThreadScript', args: {}, argsText: '{}', approval: { id: 'prop-9' } }],
-      },
-    ])
-
-    const history = await loadSessionHistory('s')
-
-    expect(history[1].status).toEqual({ type: 'requires-action', reason: 'tool-calls' })
-    const parts = history[1].content as unknown as Array<Record<string, unknown>>
-    expect(parts[0]).toMatchObject({ type: 'tool-call', toolName: 'proposeThreadScript', approval: { id: 'prop-9' } })
-    expect(history[0].status).toBeUndefined()
   })
 })

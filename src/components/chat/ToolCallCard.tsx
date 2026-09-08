@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Check, ChevronRight, Loader2, X } from 'lucide-react'
-import type { ToolCallMessagePartProps } from '@assistant-ui/react'
+import { useToolArgsStatus, type ToolCallMessagePartProps } from '@assistant-ui/react'
 
 type ToolName = 'threadScriptHelp' | 'validateThreadScript' | 'inspectTql'
 
@@ -43,7 +43,12 @@ export function ToolCallCard({ toolName, status, args, argsText, result }: ToolC
   const name = toolName as ToolName
   const running = status.type === 'running'
   const failed = status.type === 'incomplete'
-  const pill = argPill(name, args)
+  // Per-argument stream status -- don't surface a value in the pill until it has
+  // finished streaming, otherwise a half-typed query flickers as if it were final.
+  const { propStatus } = useToolArgsStatus<{ query?: string; topic?: string }>()
+  const pillKey = name === 'inspectTql' ? 'query' : name === 'threadScriptHelp' ? 'topic' : null
+  const pillReady = pillKey ? propStatus[pillKey] !== 'streaming' : true
+  const pill = pillReady ? argPill(name, args) : null
 
   return (
     <div className="chat-tool">

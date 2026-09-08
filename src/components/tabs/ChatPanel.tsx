@@ -1,31 +1,39 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, Copy, History, Plus, RotateCcw, Square } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Copy, History, Plus, RotateCcw, Square } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ActionBarPrimitive, AssistantRuntimeProvider, ComposerPrimitive, MessagePrimitive, ThreadPrimitive, useLocalRuntime, useMessagePartText, type ThreadMessageLike } from '@assistant-ui/react'
+import {
+  ActionBarPrimitive,
+  AssistantRuntimeProvider,
+  BranchPickerPrimitive,
+  ComposerPrimitive,
+  MessagePrimitive,
+  ThreadListItemPrimitive,
+  ThreadListPrimitive,
+  ThreadPrimitive,
+  useAuiState,
+  useLocalRuntime,
+  useRemoteThreadListRuntime,
+} from '@assistant-ui/react'
 import { MarkdownTextPrimitive } from '@assistant-ui/react-markdown'
-import { db } from '../../db'
-import { createSession, GENERAL_PERSONA_ID, WORKOUT_COACH_PERSONA_ID } from '../../lib/personas'
-import { createSessionAdapter, loadSessionHistory } from '../../lib/aiChat'
+import { db, type PersonaRecord } from '../../db'
+import { GENERAL_PERSONA_ID, WORKOUT_COACH_PERSONA_ID } from '../../lib/personas'
+import { createSessionAdapter } from '../../lib/aiChat'
+import { createChatHistoryAdapter } from '../../lib/chatHistory'
+import { createChatThreadListAdapter } from '../../lib/chatThreadList'
+import { ChatReasoning } from '../chat/ChatReasoning'
 import { ComposerModelBar } from '../chat/ComposerModelBar'
 import { PersonaSwitcher } from '../chat/PersonaSwitcher'
-import { SessionList } from '../chat/SessionList'
 import { ThreadScriptProposal } from '../chat/ThreadScriptProposal'
 import { ToolCallCard } from '../chat/ToolCallCard'
 
 // MarkdownTextPrimitive reads the current message part's text via its own
 // context hook rather than a `text` prop, so it doesn't literally match the
 // `Text` slot's prop type -- wrap it to satisfy that without passing anything.
+// The `chat-markdown` class is the hook the streaming caret CSS targets: the
+// primitive stamps `data-status="running"` on this container while text (or its
+// smooth-reveal tail) is still arriving.
 function AssistantMarkdown() {
-  const part = useMessagePartText()
-  const streaming = part.status.type === 'running' && part.text.length > 0
-  return (
-    <>
-      <MarkdownTextPrimitive />
-      {/* Blinking caret only once text is actually streaming in -- gating on
-          `running` alone shows it under the thinking dots before any token. */}
-      {streaming && <span className="chat-cursor" aria-hidden="true" />}
-    </>
-  )
+  return <MarkdownTextPrimitive className="chat-markdown" />
 }
 
 const SUGGESTIONS: Record<string, string[]> = {
@@ -62,6 +70,16 @@ function activeSessionKey(personaId: string): string {
   return `thread.active-session.${personaId}`
 }
 
+function relativeTime(date: Date | undefined): string {
+  if (!date) return ''
+  const minutes = Math.round((Date.now() - date.getTime()) / 60000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.round(hours / 24)}d ago`
+}
+
 function UserMessage() {
   return (
     <MessagePrimitive.Root className="chat-message chat-message-user">
@@ -88,20 +106,36 @@ function AssistantMessage() {
       <MessagePrimitive.Content
         components={{
           Text: AssistantMarkdown,
+          Reasoning: ChatReasoning,
           tools: { by_name: TOOL_UI },
         }}
       />
       <MessagePrimitive.Error>
         <p className="banner banner-error chat-message-error">Something went wrong. Check your AI provider settings.</p>
       </MessagePrimitive.Error>
-      <ActionBarPrimitive.Root className="chat-action-bar" hideWhenRunning autohide="not-last" autohideFloat="single-branch">
-        <ActionBarPrimitive.Copy className="chat-action-btn" aria-label="Copy">
-          <Copy size={13} />
-        </ActionBarPrimitive.Copy>
-        <ActionBarPrimitive.Reload className="chat-action-btn" aria-label="Retry">
-          <RotateCcw size={13} />
-        </ActionBarPrimitive.Reload>
-      </ActionBarPrimitive.Root>
+      <div className="chat-message-footer">
+        {/* Regenerate (Reload below) forks the turn into branches; without this
+            row the earlier replies would be unreachable. Hidden at 1 branch. */}
+        <BranchPickerPrimitive.Root className="chat-branch-picker" hideWhenSingleBranch>
+          <BranchPickerPrimitive.Previous className="chat-action-btn" aria-label="Previous reply">
+            <ChevronLeft size={13} />
+          </BranchPickerPrimitive.Previous>
+          <span className="chat-branch-count">
+            <BranchPickerPrimitive.Number /> / <BranchPickerPrimitive.Count />
+          </span>
+          <BranchPickerPrimitive.Next className="chat-action-btn" aria-label="Next reply">
+            <ChevronRight size={13} />
+          </BranchPickerPrimitive.Next>
+        </BranchPickerPrimitive.Root>
+        <ActionBarPrimitive.Root className="chat-action-bar" hideWhenRunning autohide="not-last" autohideFloat="single-branch">
+          <ActionBarPrimitive.Copy className="chat-action-btn" aria-label="Copy">
+            <Copy size={13} />
+          </ActionBarPrimitive.Copy>
+          <ActionBarPrimitive.Reload className="chat-action-btn" aria-label="Retry">
+            <RotateCcw size={13} />
+          </ActionBarPrimitive.Reload>
+        </ActionBarPrimitive.Root>
+      </div>
     </MessagePrimitive.Root>
   )
 }
@@ -149,118 +183,113 @@ function ChatThread({ personaId }: { personaId: string }) {
   )
 }
 
-function ChatSessionRuntime({
-  sessionId,
-  personaId,
-  initialMessages,
-}: {
-  sessionId: string
-  personaId: string
-  initialMessages: ThreadMessageLike[]
-}) {
-  const adapter = useMemo(() => createSessionAdapter(sessionId, personaId), [sessionId, personaId])
-  // maxSteps >= 3: model turn -> approval-gate pause -> resume turn that closes
-  // out the tool call.
-  const runtime = useLocalRuntime(adapter, { initialMessages, maxSteps: 4 })
+// One row of the session list -- rendered inside a `threadListItem` scope by
+// ThreadListPrimitive.Items. Selecting one switches the runtime to that thread;
+// `onSelect` flips the panel back to the chat view.
+function SessionRow({ onSelect }: { onSelect: () => void }) {
+  const title = useAuiState((s) => s.threadListItem.title)
+  const lastMessageAt = useAuiState((s) => s.threadListItem.lastMessageAt)
   return (
-    <AssistantRuntimeProvider runtime={runtime}>
-      <ChatThread personaId={personaId} />
-    </AssistantRuntimeProvider>
+    <ThreadListItemPrimitive.Root className="session-row">
+      <ThreadListItemPrimitive.Trigger className="session-row-trigger" onClick={onSelect}>
+        <span className="session-row-title">{title || 'Untitled'}</span>
+        <small>{relativeTime(lastMessageAt)}</small>
+      </ThreadListItemPrimitive.Trigger>
+    </ThreadListItemPrimitive.Root>
   )
 }
 
-// Keyed by sessionId at the call site so switching sessions remounts this
-// fresh (initialMessages starts back at null) rather than needing to reset
-// state from inside the effect.
-function ChatSession({ sessionId, personaId }: { sessionId: string; personaId: string }) {
-  const [initialMessages, setInitialMessages] = useState<ThreadMessageLike[] | null>(null)
-  useEffect(() => {
-    let cancelled = false
-    void loadSessionHistory(sessionId).then((messages) => {
-      if (!cancelled) setInitialMessages(messages)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [sessionId])
+function SessionListView({ onSelect }: { onSelect: () => void }) {
+  return (
+    <div className="session-list">
+      <ThreadListPrimitive.New className="session-list-new" onClick={onSelect}>
+        <Plus size={13} /> New session
+      </ThreadListPrimitive.New>
+      <ThreadListPrimitive.Items>{() => <SessionRow onSelect={onSelect} />}</ThreadListPrimitive.Items>
+    </div>
+  )
+}
 
-  if (!initialMessages) return <div className="chat-thread-loading">Loading…</div>
-  return <ChatSessionRuntime sessionId={sessionId} personaId={personaId} initialMessages={initialMessages} />
+// The chat-model + history adapters both need the active session id. Inside the
+// thread-list runtime's per-thread scope that's `threadListItem.remoteId` once
+// the thread is initialized, or its optimistic local `id` before the first
+// message (our `initialize` returns `remoteId === id`, so this stays stable).
+function useChatSessionRuntime(personaId: string) {
+  const sessionId = useAuiState((s) => s.threadListItem.remoteId ?? s.threadListItem.id)
+  const chatModel = useMemo(() => createSessionAdapter(sessionId, personaId), [sessionId, personaId])
+  const history = useMemo(() => createChatHistoryAdapter(sessionId), [sessionId])
+  // maxSteps >= 3: model turn -> approval-gate pause -> resume turn that closes
+  // out the tool call.
+  return useLocalRuntime(chatModel, { adapters: { history }, maxSteps: 4 })
 }
 
 type ChatView = 'chat' | 'history'
 
-export function ChatPanel() {
-  const personas = useLiveQuery(() => db.personas.filter((persona) => !persona.archivedAt).toArray(), [], [])
-  const [activePersonaId, setActivePersonaId] = useState(() => localStorage.getItem(ACTIVE_PERSONA_KEY) ?? GENERAL_PERSONA_ID)
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+// Keyed by persona at the call site so switching personas fully remounts the
+// thread-list runtime (fresh adapter, fresh remembered-session lookup).
+function PersonaChat({
+  personaId,
+  personas,
+  onChangePersona,
+}: {
+  personaId: string
+  personas: PersonaRecord[]
+  onChangePersona: (personaId: string) => void
+}) {
   const [view, setView] = useState<ChatView>('chat')
+  const adapter = useMemo(() => createChatThreadListAdapter(personaId), [personaId])
 
-  // No default value here -- `undefined` while the query is still loading is
-  // load-bearing: it's what tells the effect below not to treat a
-  // not-yet-resolved query as "this persona genuinely has zero sessions" and
-  // create a redundant one.
-  const sessions = useLiveQuery(
-    () => db.chatSessions.where('personaId').equals(activePersonaId).reverse().sortBy('updatedAt'),
-    [activePersonaId],
+  // Controlled active-thread id: seed from the remembered session, else fall
+  // back once to this persona's newest session; `undefined` = start on a new
+  // (unpersisted) thread.
+  const [threadId, setThreadId] = useState<string | undefined>(
+    () => localStorage.getItem(activeSessionKey(personaId)) ?? undefined,
   )
-
-  const changePersona = (personaId: string) => {
-    setActivePersonaId(personaId)
-    localStorage.setItem(ACTIVE_PERSONA_KEY, personaId)
-    setActiveSessionId(localStorage.getItem(activeSessionKey(personaId)))
-  }
-
-  const changeSession = (sessionId: string) => {
-    setActiveSessionId(sessionId)
-    localStorage.setItem(activeSessionKey(activePersonaId), sessionId)
-  }
-
-  const selectSessionFromHistory = (sessionId: string) => {
-    changeSession(sessionId)
-    setView('chat')
-  }
-
-  const newSession = async () => {
-    const id = await createSession(activePersonaId)
-    changeSession(id)
-    setView('chat')
-  }
-
-  // Once this persona's sessions have loaded, make sure `activeSessionId`
-  // points at a real one -- restore the remembered id if it still exists,
-  // otherwise fall back to the most recently updated session, creating one
-  // if this persona has none yet.
+  const fallbackResolved = useRef(threadId !== undefined)
   useEffect(() => {
-    if (!sessions) return // still loading -- don't decide anything yet
+    if (fallbackResolved.current) return
+    fallbackResolved.current = true
     let cancelled = false
-    if (sessions.length === 0) {
-      void createSession(activePersonaId).then((id) => {
-        if (!cancelled) changeSession(id)
+    void db.chatSessions
+      .where('personaId')
+      .equals(personaId)
+      .reverse()
+      .sortBy('updatedAt')
+      .then((rows) => {
+        const newest = rows.find((row) => (row.status ?? 'regular') === 'regular')
+        if (!cancelled && newest) setThreadId(newest.id)
       })
-      return () => {
-        cancelled = true
-      }
-    }
-    const remembered = localStorage.getItem(activeSessionKey(activePersonaId))
-    const resolved = remembered && sessions.some((session) => session.id === remembered) ? remembered : sessions[0].id
-    void Promise.resolve().then(() => {
-      if (!cancelled) setActiveSessionId(resolved)
-    })
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePersonaId, sessions?.length])
+  }, [personaId])
+
+  const runtime = useRemoteThreadListRuntime({
+    runtimeHook: function RuntimeHook() {
+      return useChatSessionRuntime(personaId)
+    },
+    adapter,
+    threadId,
+    onThreadIdChange: (id) => {
+      setThreadId(id)
+      if (id) localStorage.setItem(activeSessionKey(personaId), id)
+      else localStorage.removeItem(activeSessionKey(personaId))
+    },
+  })
 
   return (
-    <div className="chat-panel">
+    <AssistantRuntimeProvider runtime={runtime}>
       <div className="chat-panel-header">
-        <PersonaSwitcher personas={personas} activePersonaId={activePersonaId} onChange={changePersona} />
+        <PersonaSwitcher personas={personas} activePersonaId={personaId} onChange={onChangePersona} />
         <div className="chat-panel-header-actions">
-          <button type="button" className="header-action" aria-label="New session" title="New session" onClick={() => void newSession()}>
+          <ThreadListPrimitive.New
+            className="header-action"
+            aria-label="New session"
+            title="New session"
+            onClick={() => setView('chat')}
+          >
             <Plus size={15} />
-          </button>
+          </ThreadListPrimitive.New>
           <button
             type="button"
             className={view === 'history' ? 'header-action active' : 'header-action'}
@@ -274,13 +303,32 @@ export function ChatPanel() {
       </div>
       <div className="chat-panel-body">
         {view === 'history' ? (
-          <SessionList sessions={sessions ?? []} activeSessionId={activeSessionId} onSelect={selectSessionFromHistory} onCreate={newSession} />
-        ) : activeSessionId ? (
-          <ChatSession key={activeSessionId} sessionId={activeSessionId} personaId={activePersonaId} />
+          <SessionListView onSelect={() => setView('chat')} />
         ) : (
-          <div className="chat-thread-loading">Loading…</div>
+          <ChatThread personaId={personaId} />
         )}
       </div>
+    </AssistantRuntimeProvider>
+  )
+}
+
+export function ChatPanel() {
+  const personas = useLiveQuery(() => db.personas.filter((persona) => !persona.archivedAt).toArray(), [], [])
+  const [activePersonaId, setActivePersonaId] = useState(() => localStorage.getItem(ACTIVE_PERSONA_KEY) ?? GENERAL_PERSONA_ID)
+
+  const changePersona = (personaId: string) => {
+    setActivePersonaId(personaId)
+    localStorage.setItem(ACTIVE_PERSONA_KEY, personaId)
+  }
+
+  return (
+    <div className="chat-panel">
+      <PersonaChat
+        key={activePersonaId}
+        personaId={activePersonaId}
+        personas={personas}
+        onChangePersona={changePersona}
+      />
     </div>
   )
 }
