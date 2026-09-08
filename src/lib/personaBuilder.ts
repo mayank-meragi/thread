@@ -1,6 +1,6 @@
 import { generateObject } from 'ai'
 import { z } from 'zod'
-import { getAIConfig, resolveModel } from './ai'
+import { getAIConfig, resolveModel, resolveReasoningOptions } from './ai'
 import { PERSONA_ICON_NAMES } from './icons'
 
 const personaSchema = z.object({
@@ -29,8 +29,10 @@ export async function generatePersonaFromDescription(description: string): Promi
   const trimmed = description.trim()
   if (!trimmed) throw new Error('Describe the persona you want first.')
 
+  const reasoning = resolveReasoningOptions(config)
   const { object } = await generateObject({
     model: resolveModel(config, 'persona-builder'),
+    ...(reasoning ? { providerOptions: reasoning } : {}),
     schema: personaSchema,
     prompt: `${APP_CONTEXT}\n\nA user wants a new persona. Here is what they asked for, in their own words:\n"${trimmed}"\n\nDesign the best persona for this request.`,
   })

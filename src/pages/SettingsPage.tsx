@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, BarChart3, BookOpen, Bot, Check, Eye, EyeOff, FileText, GitBranch, LoaderCircle, Palette, Plus, RefreshCw, Rss, ShieldCheck, Trash2, Unplug, Users, Wand2 } from 'lucide-react'
+import { AlertTriangle, BarChart3, BookOpen, Bot, Boxes, Check, Eye, EyeOff, FileText, GitBranch, LoaderCircle, Palette, Plus, RefreshCw, Rss, ShieldCheck, Trash2, Unplug, Users, Wand2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
 import { generateText } from 'ai'
 import { db, type PersonaRecord } from '../db'
-import { clearAIConfig, getAIConfig, resolveModel, saveAIConfig, type AIConfig, type AIProvider } from '../lib/ai'
+import { clearAIConfig, clearProviderKey, hasProviderKey, resolveModel, saveAIConfig, setActiveModel, setEffort, setProviderKey, useAIConfig, type AIConfig, type AIProvider, type ThinkingEffort } from '../lib/ai'
+import { PROVIDER_LABELS, findModel, modelsForProvider } from '../lib/aiModels'
+import { ModelCatalogTable } from '../components/ModelCatalogTable'
 import { DynamicIcon } from '../lib/icons'
 import { archivePersona, createPersona, GENERAL_PERSONA_ID, updatePersona } from '../lib/personas'
 import { generatePersonaFromDescription } from '../lib/personaBuilder'
@@ -25,13 +27,14 @@ import { MetadataSchemas } from '../components/MetadataSchemas'
 import { clearRssProxyConfig, generateRssProxyAccessKey, getRssProxyConfig, saveRssProxyConfig, testRssProxyConnection } from '../lib/rssProxy'
 import { refreshAllFeeds } from '../lib/rss'
 import { getRssSettings, RSS_REFRESH_INTERVALS, saveRssSettings, type RssRefreshInterval } from '../lib/rssSettings'
-import { clearModelPriceOverride, formatAIUsageCost, getBuiltInModelPrice, getEffectiveModelPrice, getModelPriceOverride, groupAIUsage, saveModelPriceOverride, summarizeAIUsage, type AIUsageFeature, type AIUsagePeriod } from '../lib/aiUsage'
+import { formatAIUsageCost, groupAIUsage, summarizeAIUsage, type AIUsageFeature, type AIUsagePeriod } from '../lib/aiUsage'
 
 const SETTINGS_CATEGORIES = [
   { id: 'appearance', label: 'Appearance', description: 'Theme and display', Icon: Palette },
   { id: 'rss', label: 'RSS feeds', description: 'Fetching and proxy', Icon: Rss },
   { id: 'sync', label: 'Data & sync', description: 'Storage and GitHub', Icon: GitBranch },
   { id: 'ai', label: 'AI & personas', description: 'Provider and assistants', Icon: Bot },
+  { id: 'models', label: 'Models', description: 'Catalog and pricing', Icon: Boxes },
   { id: 'workspace', label: 'Workspace', description: 'Schemas and templates', Icon: FileText },
   { id: 'security', label: 'Security', description: 'Trusted actions', Icon: ShieldCheck },
   { id: 'help', label: 'Help', description: 'Guides and reference', Icon: BookOpen },
@@ -225,79 +228,76 @@ export function SettingsPage() {
     return () => window.clearTimeout(timer)
   }, [rssProxyState])
 
-  const existingAI = getAIConfig()
-  const [aiProvider, setAIProvider] = useState<AIProvider>(existingAI?.provider ?? 'anthropic')
-  const [aiApiKey, setAIApiKey] = useState(existingAI?.apiKey ?? '')
-  const [aiModel, setAIModel] = useState(existingAI?.model ?? '')
+  const aiConfig = useAIConfig()
+  // Provider + model are read straight from the one global config -- the same
+  // field the in-composer switcher writes -- so the two never disagree.
+  const aiProvider: AIProvider = aiConfig?.provider ?? 'anthropic'
+  const aiModel = aiConfig?.model || (findModel(aiProvider)?.id ?? '')
+  // Per-provider key inputs -- what's typed but not yet saved. A saved key is
+  // held in aiConfig.keys and shown masked, not echoed back here.
+  const [keyDrafts, setKeyDrafts] = useState<Partial<Record<AIProvider, string>>>({})
   const [aiState, setAIState] = useState<'idle' | 'checking' | 'done'>('idle')
   const [aiError, setAIError] = useState('')
   const [usagePeriod, setUsagePeriod] = useState<AIUsagePeriod>('30-days')
   const usageRecords = useLiveQuery(() => db.aiUsageAggregates.toArray(), [], [])
   const usageSummary = summarizeAIUsage(usageRecords, usagePeriod)
   const usageBreakdown = groupAIUsage(usageRecords, usagePeriod)
-  const [inputPriceOverride, setInputPriceOverride] = useState(() => {
-    const price = getModelPriceOverride(aiProvider, aiModel.trim())
-    return price ? String(price.inputUsdPerMillion) : ''
-  })
-  const [outputPriceOverride, setOutputPriceOverride] = useState(() => {
-    const price = getModelPriceOverride(aiProvider, aiModel.trim())
-    return price ? String(price.outputUsdPerMillion) : ''
-  })
-  const [priceMessage, setPriceMessage] = useState('')
-  const normalizedAIModel = aiModel.trim()
-  const builtInPrice = getBuiltInModelPrice(aiProvider, normalizedAIModel)
-  const effectivePrice = getEffectiveModelPrice(aiProvider, normalizedAIModel)
-  const hasPriceOverride = Boolean(getModelPriceOverride(aiProvider, normalizedAIModel))
 
-  function resetAIPriceInputs(provider: AIProvider, model: string) {
-    const price = getModelPriceOverride(provider, model.trim())
-    setInputPriceOverride(price ? String(price.inputUsdPerMillion) : '')
-    setOutputPriceOverride(price ? String(price.outputUsdPerMillion) : '')
-    setPriceMessage('')
-  }
+  // The key to use for the selected provider: the freshly typed one wins,
+  // otherwise fall back to the one already saved.
+  const activeKeyDraft = keyDrafts[aiProvider]?.trim() ?? ''
+  const savedActiveKey = aiConfig?.keys[aiProvider] ?? ''
+  const effectiveActiveKey = activeKeyDraft || savedActiveKey
+  const hasAnyKey = Object.values(aiConfig?.keys ?? {}).some(Boolean)
 
   function changeAIProvider(provider: AIProvider) {
-    setAIProvider(provider)
-    resetAIPriceInputs(provider, aiModel)
+    // Keep the model valid for the newly selected provider, then write straight
+    // to the global config (same as the in-composer switcher).
+    setActiveModel(provider, modelsForProvider(provider)[0]?.id ?? '')
   }
 
   function changeAIModel(model: string) {
-    setAIModel(model)
-    resetAIPriceInputs(aiProvider, model)
+    setActiveModel(aiProvider, model)
+  }
+
+  function changeAIEffort(effort: ThinkingEffort) {
+    // Effort is a single global field -- apply it immediately, same as the
+    // in-composer control does.
+    setEffort(effort)
+  }
+
+  function saveProviderKey(provider: AIProvider) {
+    const key = keyDrafts[provider]?.trim()
+    if (!key) return
+    setProviderKey(provider, key)
+    setKeyDrafts((current) => ({ ...current, [provider]: '' }))
+  }
+
+  function removeProviderKey(provider: AIProvider) {
+    clearProviderKey(provider)
+    setKeyDrafts((current) => ({ ...current, [provider]: '' }))
   }
 
   async function connectAI() {
     setAIError('')
-    const config: AIConfig = { provider: aiProvider, apiKey: aiApiKey.trim(), model: aiModel.trim() }
-    if (!config.apiKey || !config.model) return setAIError('An API key and model are both required.')
+    if (!effectiveActiveKey) return setAIError(`Add an API key for ${PROVIDER_LABELS[aiProvider]} first.`)
+    if (!aiModel) return setAIError('Pick a model.')
+    const config: AIConfig = {
+      provider: aiProvider,
+      model: aiModel,
+      effort: aiConfig?.effort ?? 'off',
+      keys: { ...(aiConfig?.keys ?? {}), [aiProvider]: effectiveActiveKey },
+    }
     setAIState('checking')
     try {
       await generateText({ model: resolveModel(config, 'connection-test'), prompt: 'Reply with the single word "ok".' })
       saveAIConfig(config)
+      setKeyDrafts((current) => ({ ...current, [aiProvider]: '' }))
       setAIState('done')
     } catch (caught) {
       setAIError(caught instanceof Error ? caught.message : String(caught))
       setAIState('idle')
     }
-  }
-
-  function saveAIPrice() {
-    const input = Number(inputPriceOverride)
-    const output = Number(outputPriceOverride)
-    if (!normalizedAIModel || inputPriceOverride.trim() === '' || outputPriceOverride.trim() === ''
-      || !Number.isFinite(input) || input < 0 || !Number.isFinite(output) || output < 0) {
-      setPriceMessage('Enter non-negative input and output prices for the selected model.')
-      return
-    }
-    saveModelPriceOverride(aiProvider, normalizedAIModel, { inputUsdPerMillion: input, outputUsdPerMillion: output })
-    setPriceMessage('Custom rates saved. They apply to future usage.')
-  }
-
-  function restoreBuiltInAIPrice() {
-    clearModelPriceOverride(aiProvider, normalizedAIModel)
-    setInputPriceOverride('')
-    setOutputPriceOverride('')
-    setPriceMessage(builtInPrice ? 'Built-in rates restored.' : 'Custom rates removed. Cost is unavailable for this model.')
   }
 
   useEffect(() => {
@@ -561,7 +561,7 @@ export function SettingsPage() {
             <header className="settings-category-header"><h2 id="settings-category-ai">AI &amp; personas</h2><p>Connect a model provider and shape the assistants you work with.</p></header>
 
       <section className="settings-card">
-        <div className="settings-title"><Bot size={20} /><div><h2>AI provider</h2><p>Bring your own API key. Switching providers here changes every persona at once -- no other setup needed.</p></div></div>
+        <div className="settings-title"><Bot size={20} /><div><h2>AI provider</h2><p>Bring your own API key. Keep one key per provider; the active model below is what every persona and chat uses.</p></div></div>
         <div className="field-grid">
           <label>
             <span>Provider</span>
@@ -571,40 +571,55 @@ export function SettingsPage() {
               <option value="google">Google (Gemini)</option>
             </select>
           </label>
-          <label><span>Model</span><input value={aiModel} onChange={(event) => changeAIModel(event.target.value)} placeholder={aiProvider === 'anthropic' ? 'claude-sonnet-5' : aiProvider === 'google' ? 'gemini-2.5-pro' : 'gpt-5'} /></label>
+          <label>
+            <span>Model</span>
+            <select value={aiModel} onChange={(event) => changeAIModel(event.target.value)}>
+              {modelsForProvider(aiProvider).map((option) => (
+                <option value={option.id} key={option.id}>{option.label}</option>
+              ))}
+            </select>
+          </label>
         </div>
-        <label><span>API key</span><input type="password" value={aiApiKey} onChange={(event) => setAIApiKey(event.target.value)} placeholder="sk-…" /></label>
-        <div className="security-note"><ShieldCheck size={16} /><span>Stored only in this browser and sent only to the provider you pick, directly from this device.</span></div>
-        <div className="ai-price-settings">
-          <div className="ai-price-heading">
-            <div><strong>Cost estimate</strong><span>Optional USD rates per 1 million tokens. Custom rates apply only to future usage.</span></div>
-            {effectivePrice ? (
-              <small>{hasPriceOverride ? `Custom rates · saved ${effectivePrice.checkedAt}` : `Built-in rates · checked ${effectivePrice.checkedAt}`}</small>
-            ) : <small>Cost unavailable</small>}
-          </div>
-          {effectivePrice ? (
-            <p className="settings-hint">Using ${effectivePrice.inputUsdPerMillion}/1M input tokens and ${effectivePrice.outputUsdPerMillion}/1M output tokens.</p>
-          ) : null}
-          {aiProvider === 'google' && normalizedAIModel === 'gemini-flash-latest' ? (
-            <p className="settings-hint">This is a moving model alias. Override these rates if Google changes the model behind it.</p>
-          ) : null}
-          <div className="field-grid">
-            <label><span>Input price / 1M</span><input type="number" min="0" step="0.01" value={inputPriceOverride} onChange={(event) => setInputPriceOverride(event.target.value)} placeholder={builtInPrice ? String(builtInPrice.inputUsdPerMillion) : 'Required for cost'} /></label>
-            <label><span>Output price / 1M</span><input type="number" min="0" step="0.01" value={outputPriceOverride} onChange={(event) => setOutputPriceOverride(event.target.value)} placeholder={builtInPrice ? String(builtInPrice.outputUsdPerMillion) : 'Required for cost'} /></label>
-          </div>
-          <div className="settings-actions ai-price-actions">
-            <button type="button" className="secondary-button" onClick={saveAIPrice} disabled={!normalizedAIModel}>Save custom rates</button>
-            {hasPriceOverride ? <button type="button" className="text-button" onClick={restoreBuiltInAIPrice}>{builtInPrice ? 'Use built-in rates' : 'Remove custom rates'}</button> : null}
-          </div>
-          {priceMessage ? <p className="settings-hint ai-price-message">{priceMessage}</p> : null}
+        <label>
+          <span>Thinking effort</span>
+          <select value={aiConfig?.effort ?? 'off'} onChange={(event) => changeAIEffort(event.target.value as ThinkingEffort)}>
+            <option value="off">Off</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </label>
+        <div className="ai-key-rows">
+          {(['anthropic', 'openai', 'google'] as AIProvider[]).map((provider) => {
+            const saved = hasProviderKey(aiConfig, provider)
+            return (
+              <div className="ai-key-row" key={provider}>
+                <label>
+                  <span>{PROVIDER_LABELS[provider]} API key{saved ? ' · saved' : ''}</span>
+                  <input
+                    type="password"
+                    value={keyDrafts[provider] ?? ''}
+                    onChange={(event) => setKeyDrafts((current) => ({ ...current, [provider]: event.target.value }))}
+                    placeholder={saved ? '•••••••••• (stored)' : 'sk-…'}
+                  />
+                </label>
+                <div className="ai-key-row-actions">
+                  <button type="button" className="secondary-button" onClick={() => saveProviderKey(provider)} disabled={!(keyDrafts[provider]?.trim())}>Save</button>
+                  {saved ? <button type="button" className="text-button" onClick={() => removeProviderKey(provider)}>Clear</button> : null}
+                </div>
+              </div>
+            )
+          })}
         </div>
+        <div className="security-note"><ShieldCheck size={16} /><span>Keys are stored only in this browser and each is sent only to its own provider, directly from this device.</span></div>
+        <p className="settings-hint">Manage which models appear here and their token prices in <a href="#/settings?section=models">Models</a>.</p>
         {aiError && <p className="banner banner-error form-error">{aiError}</p>}
         <div className="settings-actions">
-          <button className="primary-button" onClick={() => void connectAI()} disabled={aiState !== 'idle' || !aiApiKey || !aiModel}>
+          <button className="primary-button" onClick={() => void connectAI()} disabled={aiState !== 'idle' || !effectiveActiveKey || !aiModel}>
             {aiState === 'checking' ? <LoaderCircle className="spin" size={16} /> : aiState === 'done' ? <Check size={16} /> : <Bot size={16} />}
-            {aiState === 'checking' ? 'Checking…' : aiState === 'done' ? 'Connected' : existingAI ? 'Reconnect' : 'Connect'}
+            {aiState === 'checking' ? 'Checking…' : aiState === 'done' ? 'Connected' : hasAnyKey ? 'Test connection' : 'Connect'}
           </button>
-          {existingAI && <button className="text-button" onClick={() => { clearAIConfig(); setAIApiKey('') }}><Unplug size={15} /> Disconnect</button>}
+          {hasAnyKey && <button className="text-button" onClick={() => { clearAIConfig(); setKeyDrafts({}) }}><Unplug size={15} /> Disconnect all</button>}
         </div>
       </section>
 
@@ -699,6 +714,13 @@ export function SettingsPage() {
           </div>
         )}
       </section>
+
+          </section>
+
+          <section className="settings-category" hidden={activeCategory !== 'models'} aria-labelledby="settings-category-models">
+            <header className="settings-category-header"><h2 id="settings-category-models">Models</h2><p>The model catalog behind the composer picker and the AI provider card, plus token pricing for cost estimates.</p></header>
+
+            <ModelCatalogTable />
 
           </section>
 

@@ -268,13 +268,37 @@
   .chat-spin { animation: none; }
   .chat-tool-chevron { transition: none; }
 }
-.chat-composer { display: flex; align-items: flex-end; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
-.chat-composer-input { flex: 1; min-height: 36px; max-height: 120px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; outline: 0; background: var(--control); color: var(--ink); font: inherit; font-size: 13px; resize: none; }
+.chat-composer { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
+.chat-composer-controls { display: flex; align-items: center; gap: 6px; }
+.chat-composer-input { width: 100%; min-height: 36px; max-height: 120px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; outline: 0; background: var(--control); color: var(--ink); font: inherit; font-size: 13px; resize: none; }
 .chat-composer-input:focus { border-color: var(--thread); box-shadow: 0 0 0 3px var(--thread-soft); }
 .chat-composer-send { width: 36px; height: 36px; flex: 0 0 auto; display: grid; place-items: center; padding: 0; border: 0; border-radius: 9px; background: var(--thread); color: var(--on-solid); cursor: pointer; transition: background .12s ease, color .12s ease; }
 .chat-composer-send:disabled { background: var(--control); color: var(--muted); cursor: default; }
 .chat-composer-stop { background: var(--ink); color: var(--paper); }
 .chat-composer-stop:disabled { background: var(--ink); color: var(--paper); opacity: .6; }
+
+/* Model + thinking-effort switcher, in the composer's bottom controls row. */
+.composer-model-bar { position: relative; flex: 1; min-width: 0; }
+.composer-model-setup { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; background: var(--control); color: var(--muted); font-size: 11px; font-weight: 500; text-decoration: none; }
+.composer-model-setup:hover { background: var(--control-hover); color: var(--ink); }
+.composer-model-trigger { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 500; cursor: pointer; }
+.composer-model-trigger:hover,
+.composer-model-trigger[aria-expanded='true'] { background: var(--control); color: var(--ink); }
+.composer-model-name { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.composer-model-effort { color: var(--muted); font-size: 11px; }
+.composer-model-trigger svg:last-child { color: var(--muted); }
+/* .composer-model-panel composes .menu-panel (border/radius/background/shadow); this only adds positioning. */
+.composer-model-panel { position: absolute; bottom: calc(100% + 4px); left: 0; z-index: 20; min-width: 240px; }
+.composer-model-list { max-height: 280px; overflow-y: auto; }
+/* .composer-model-option composes .menu-item (layout/hover/active/disabled states); this only tightens type. */
+.composer-model-option { justify-content: space-between; gap: 10px; font-size: 12px; }
+.composer-model-lock { color: var(--muted); font-size: 10px; font-weight: 500; }
+.composer-thinking-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; margin-top: 4px; border-top: 1px solid var(--line); font-size: 11px; font-weight: 600; color: var(--muted); }
+.composer-thinking-options { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.composer-thinking-options button { padding: 3px 9px; border: 0; background: transparent; color: var(--muted); font-size: 11px; font-weight: 500; cursor: pointer; }
+.composer-thinking-options button + button { border-left: 1px solid var(--line); }
+.composer-thinking-options button:hover { background: var(--control-hover); color: var(--ink); }
+.composer-thinking-options button.is-active { background: var(--control); color: var(--ink); }
 
 /* Assistant "thinking" dots -- shown until the first token of the last reply. */
 .chat-running { justify-self: start; display: inline-flex; align-items: center; gap: 4px; padding: 10px 12px; border-radius: 12px; background: var(--control); }
@@ -1044,15 +1068,23 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .settings-card input, .settings-card select { height: 40px; }
 .settings-card textarea { padding: 9px 11px; resize: vertical; }
 .settings-card input:focus, .settings-card select:focus, .settings-card textarea:focus { border-color: var(--thread); box-shadow: 0 0 0 3px var(--thread-soft); }
-.ai-price-settings { margin-top: 17px; padding-top: 16px; border-top: 1px solid var(--line); }
-.ai-price-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-.ai-price-heading > div { display: grid; gap: 3px; }
-.ai-price-heading strong { color: var(--ink-soft); font-size: var(--text-meta); }
-.ai-price-heading span { color: var(--muted); font-size: 11px; line-height: 1.4; }
-.ai-price-heading small { color: var(--muted); font: 400 8px 'IBM Plex Mono', monospace; text-align: right; text-transform: uppercase; }
-.ai-price-settings .field-grid { margin-top: 10px; }
-.ai-price-actions { margin-top: 10px; }
-.ai-price-message { margin-top: 9px !important; }
+/* Editable model catalog table (Settings → Models). */
+.models-table-wrap { margin-top: 16px; overflow-x: auto; }
+.models-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.models-table th { padding: 0 8px 8px; color: var(--muted); font: 500 8px 'IBM Plex Mono', monospace; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.models-table td { padding: 8px 8px 0; border-top: 1px solid var(--line-soft); vertical-align: top; }
+.models-table tr:first-child td { border-top: 0; }
+.models-table td:first-child { border-top: 1px solid var(--line-soft); }
+.models-table input, .models-table select { height: 34px; margin-top: 0; font-size: 12px; }
+.models-table label { margin-top: 0; }
+.models-col-center { text-align: center; }
+.models-col-center input[type='checkbox'] { width: auto; height: auto; margin: 9px 0 0; }
+.models-col-num { width: 92px; }
+.models-col-num input { text-align: right; font-variant-numeric: tabular-nums; }
+.models-input-warn { border-color: var(--warning) !important; }
+.models-cell-note { display: block; margin-top: 3px; color: var(--warning); font-size: 10px; }
+.models-remove { padding: 8px 6px 0; color: var(--muted); }
+.models-remove:hover { color: var(--warning); }
 .ai-usage-period { display: inline-flex; gap: 3px; margin: 4px 0 18px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--control); }
 .ai-usage-period button { min-height: 32px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; }
 .ai-usage-period button.is-active { background: var(--paper); color: var(--ink); box-shadow: var(--shadow-1); }
@@ -1222,8 +1254,6 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .settings-card { padding: 20px; }
   .settings-card .field-grid { grid-template-columns: 1fr; gap: 0; }
   .settings-card .theme-groups { grid-template-columns: 1fr; }
-  .ai-price-heading { display: grid; gap: 5px; }
-  .ai-price-heading small { text-align: left; }
   .ai-usage-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ai-usage-metrics > div:nth-child(odd) { border-right: 1px solid var(--line); }
   .ai-usage-metrics > div:nth-child(-n + 3) { border-bottom: 1px solid var(--line); }

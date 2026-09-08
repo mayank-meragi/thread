@@ -10,8 +10,9 @@ vi.mock('ai', async (importActual) => {
   return { ...actual, streamText: (...args: unknown[]) => streamTextMock(...args) }
 })
 vi.mock('./ai', () => ({
-  getAIConfig: () => ({ provider: 'anthropic', apiKey: 'k', model: 'claude-x' }),
+  getAIConfig: () => ({ provider: 'anthropic', model: 'claude-x', effort: 'off', keys: { anthropic: 'k' } }),
   resolveModel: () => ({}),
+  resolveReasoningOptions: () => undefined,
 }))
 
 /** Build a `streamText`-shaped result whose fullStream yields the given text deltas. */

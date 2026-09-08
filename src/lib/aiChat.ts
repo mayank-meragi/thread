@@ -2,7 +2,7 @@ import { stepCountIs, streamText, tool, type StopCondition, type ToolSet } from 
 import { z } from 'zod'
 import type { ChatModelAdapter, ChatModelRunResult, ThreadAssistantMessagePart, ThreadMessage, ThreadMessageLike } from '@assistant-ui/react'
 import { db, type ChatMessagePartRecord, type PersonaRecord } from '../db'
-import { getAIConfig, resolveModel } from './ai'
+import { getAIConfig, resolveModel, resolveReasoningOptions } from './ai'
 import { buildThreadSystemContext, TRAINING_PLAN_THREAD_ID } from './aiContext'
 import { WORKOUT_COACH_PERSONA_ID } from './personas'
 import { loadSource, parseQuery, runQuery } from './query'
@@ -272,8 +272,10 @@ export function createSessionAdapter(sessionId: string, personaId: string): Chat
       // creates to the assistant message this turn will persist below.
       const assistantMessageId = crypto.randomUUID()
 
+      const reasoning = resolveReasoningOptions(config)
       const result = streamText({
         model: resolveModel(config, 'chat'),
+        ...(reasoning ? { providerOptions: reasoning } : {}),
         system,
         messages: modelMessages,
         tools: buildThreadScriptTools({ sessionId, personaId, assistantMessageId }),

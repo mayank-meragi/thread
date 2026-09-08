@@ -6,6 +6,7 @@ import { MarkdownTextPrimitive } from '@assistant-ui/react-markdown'
 import { db } from '../../db'
 import { createSession, GENERAL_PERSONA_ID, WORKOUT_COACH_PERSONA_ID } from '../../lib/personas'
 import { createSessionAdapter, loadSessionHistory } from '../../lib/aiChat'
+import { ComposerModelBar } from '../chat/ComposerModelBar'
 import { PersonaSwitcher } from '../chat/PersonaSwitcher'
 import { SessionList } from '../chat/SessionList'
 import { ThreadScriptProposal } from '../chat/ThreadScriptProposal'
@@ -130,16 +131,19 @@ function ChatThread({ personaId }: { personaId: string }) {
       </ThreadPrimitive.Viewport>
       <ComposerPrimitive.Root className="chat-composer">
         <ComposerPrimitive.Input className="chat-composer-input" placeholder="Message…" rows={1} autoFocus />
-        <ThreadPrimitive.If running={false}>
-          <ComposerPrimitive.Send className="chat-composer-send" aria-label="Send message">
-            <ArrowUp size={16} />
-          </ComposerPrimitive.Send>
-        </ThreadPrimitive.If>
-        <ThreadPrimitive.If running>
-          <ComposerPrimitive.Cancel className="chat-composer-send chat-composer-stop" aria-label="Stop generating">
-            <Square size={12} fill="currentColor" />
-          </ComposerPrimitive.Cancel>
-        </ThreadPrimitive.If>
+        <div className="chat-composer-controls">
+          <ComposerModelBar />
+          <ThreadPrimitive.If running={false}>
+            <ComposerPrimitive.Send className="chat-composer-send" aria-label="Send message">
+              <ArrowUp size={16} />
+            </ComposerPrimitive.Send>
+          </ThreadPrimitive.If>
+          <ThreadPrimitive.If running>
+            <ComposerPrimitive.Cancel className="chat-composer-send chat-composer-stop" aria-label="Stop generating">
+              <Square size={12} fill="currentColor" />
+            </ComposerPrimitive.Cancel>
+          </ThreadPrimitive.If>
+        </div>
       </ComposerPrimitive.Root>
     </ThreadPrimitive.Root>
   )
