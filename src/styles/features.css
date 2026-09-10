@@ -2306,3 +2306,17 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   border-radius: 9px; background: var(--control); color: var(--ink); font-size: var(--text-meta); cursor: pointer;
 }
 .inspector-section > .set-editor { margin-top: 10px; padding-top: 0; border-top: 0; }
+
+/* iOS Safari zooms the page when a form control's rendered text is smaller
+   than 16px. Keep the existing compact desktop typography, but make text
+   entry controls touch-sized on narrow iOS viewports. Non-text controls do
+   not trigger this behavior and retain their native sizing. */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 760px) {
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']):not([type='hidden']):not([type='button']):not([type='submit']):not([type='reset']):not([type='image']),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+}

@@ -276,6 +276,39 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
     }
     root.addEventListener('click', openWikiLink, true)
 
+    // Milkdown's list-item node view focuses the editor before toggling a
+    // checkbox. That is useful on desktop, but on touch devices the focus
+    // opens the software keyboard even when the user only wants to mark the
+    // task complete. Handle semantic task checkboxes in capture phase so the
+    // node-view handler never runs, then dispatch the same attribute change
+    // without moving focus.
+    const toggleTaskCheckboxWithoutFocus = (event: PointerEvent) => {
+      if (!mobileQuery.matches || event.pointerType !== 'touch') return
+      const target = event.target instanceof Element ? event.target : null
+      const labelWrapper = target?.closest<HTMLElement>('li.task-block > .label-wrapper')
+      const item = labelWrapper?.closest<HTMLLIElement>('li.task-block')
+      if (!labelWrapper || !item || !labelWrapper.querySelector(':scope > .label.checked, :scope > .label.unchecked')) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      markUserMutation()
+      crepe.editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx)
+        let match: { pos: number; checked: boolean } | null = null
+        view.state.doc.descendants((node, pos) => {
+          if (match || node.type.name !== 'list_item') return true
+          const wrapper = view.nodeDOM(pos)
+          const dom = wrapper instanceof HTMLElement ? wrapper.querySelector<HTMLElement>(':scope > li') ?? wrapper : null
+          if (dom === item && typeof node.attrs.checked === 'boolean') match = { pos, checked: node.attrs.checked }
+          return true
+        })
+        if (!match) return
+        const found: { pos: number; checked: boolean } = match
+        view.dispatch(view.state.tr.setNodeAttribute(found.pos, 'checked', !found.checked))
+      })
+    }
+    root.addEventListener('pointerdown', toggleTaskCheckboxWithoutFocus, true)
+
     // Crepe's own label-wrapper pointerdown handler stops propagation
     // unconditionally (even for non-task bullets), so this has to run in the
     // capture phase on `root` to see the event first.
@@ -463,6 +496,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       window.visualViewport?.removeEventListener('scroll', syncToolbar)
       mobileQuery.removeEventListener('change', syncToolbar)
       root.removeEventListener('click', openWikiLink, true)
+      root.removeEventListener('pointerdown', toggleTaskCheckboxWithoutFocus, true)
       root.removeEventListener('pointerdown', toggleChecklistItem, true)
       window.removeEventListener('thread:day-external-update', applyExternalUpdate)
       window.removeEventListener('thread:block-metadata-update', refreshBlockMetadata)
