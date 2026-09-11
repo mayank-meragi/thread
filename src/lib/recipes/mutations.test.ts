@@ -31,13 +31,14 @@ describe('recipe authoring mutations', () => {
 
   it('adds, updates, reorders, and removes Cooklang-annotated steps', async () => {
     const threadId = await createRecipeThread({ title: 'Pancakes', servings: 2 })
-    await addStep(threadId, 'Whisk @eggs{2} and @milk{300%ml} together.')
-    await addStep(threadId, 'Add @flour{200%g} and mix until smooth.')
+    await addStep(threadId, 'Whisk @eggs{2} and @milk{300%ml} in the #mixing bowl{}.')
+    await addStep(threadId, 'Add @flour{200%g} and mix with the #mixing bowl{} and #whisk.')
     await addStep(threadId, 'Cook for ~{2%minutes} per side.')
 
     let recipe = await getRecipe(threadId)
     expect(recipe?.steps).toHaveLength(3)
     expect(recipe?.ingredients.map((ingredient) => ingredient.name)).toEqual(['eggs', 'milk', 'flour'])
+    expect(recipe?.cookware).toEqual(['mixing bowl', 'whisk'])
     expect(recipe?.steps[2].durationSeconds).toBe(120)
 
     await updateStep(threadId, 1, 'Add @flour{250%g} and mix until smooth.')

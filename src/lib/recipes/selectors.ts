@@ -28,6 +28,16 @@ function buildStepViews(steps: string[]): RecipeStepView[] {
   })
 }
 
+function mergeCookware(cookware: readonly string[]): string[] {
+  const seen = new Set<string>()
+  return cookware.filter((item) => {
+    const key = item.toLocaleLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 async function propertyMap(threadId: string): Promise<Map<string, PropertyValue>> {
   const rows = await db.threadProperties.where('threadId').equals(threadId).toArray()
   return new Map(rows.map((row) => [row.propertyId, row.value]))
@@ -44,6 +54,7 @@ export async function getRecipe(threadId: string): Promise<RecipeView | undefine
     properties: await propertyMap(threadId),
     steps,
     ingredients: mergeIngredients(steps.flatMap((step) => step.ingredients)),
+    cookware: mergeCookware(steps.flatMap((step) => step.cookware)),
   }
 }
 

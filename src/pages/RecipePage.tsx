@@ -11,11 +11,13 @@ import { getRecipe } from '../lib/recipes/selectors'
 import type { RecipeIngredient } from '../lib/recipes/cooklangTokens'
 import { Button } from '../components/ui'
 
+type RecipePanel = 'ingredients' | 'cookware' | 'steps'
+
 function IngredientRow({ ingredient }: { ingredient: RecipeIngredient }) {
   return (
     <li className="recipe-ingredient-row">
-      {ingredient.quantity !== undefined && <span className="recipe-ingredient-quantity">{formatQuantity(ingredient.quantity)}{ingredient.unit ? ` ${ingredient.unit}` : ''}</span>}
       <span className="recipe-ingredient-name">{ingredient.name}</span>
+      {ingredient.quantity !== undefined && <span className="recipe-ingredient-quantity">{formatQuantity(ingredient.quantity)}{ingredient.unit ? ` ${ingredient.unit}` : ''}</span>}
     </li>
   )
 }
@@ -66,6 +68,7 @@ export function RecipePage() {
   const [cookError, setCookError] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [activePanel, setActivePanel] = useState<RecipePanel>('ingredients')
 
   if (recipe === undefined) return <div className="page-loading">Loading recipe…</div>
   if (recipe === null) {
@@ -82,6 +85,9 @@ export function RecipePage() {
   const scaleFactor = baseServings > 0 ? servings / baseServings : 1
   const prepMinutes = recipe.properties.get('recipe-prep-minutes')
   const cookMinutes = recipe.properties.get('recipe-cook-minutes')
+  const recipeId = threadId.replace(/[^a-zA-Z0-9_-]/g, '-')
+  const tabId = (panel: RecipePanel) => `recipe-${recipeId}-${panel}-tab`
+  const panelId = (panel: RecipePanel) => `recipe-${recipeId}-${panel}-panel`
 
   const submitNewStep = async () => {
     if (!newStep.trim()) return
@@ -157,7 +163,40 @@ export function RecipePage() {
       </header>
       {cookError && <p className="add-exercise-error" role="alert">{cookError}</p>}
 
-      <section className="recipe-ingredients-panel">
+      <div className="recipe-content-tabs" role="tablist" aria-label="Recipe details">
+        <button
+          type="button"
+          role="tab"
+          id={tabId('ingredients')}
+          aria-controls={panelId('ingredients')}
+          aria-selected={activePanel === 'ingredients'}
+          onClick={() => setActivePanel('ingredients')}
+        >
+          Ingredients
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id={tabId('cookware')}
+          aria-controls={panelId('cookware')}
+          aria-selected={activePanel === 'cookware'}
+          onClick={() => setActivePanel('cookware')}
+        >
+          Cookware
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id={tabId('steps')}
+          aria-controls={panelId('steps')}
+          aria-selected={activePanel === 'steps'}
+          onClick={() => setActivePanel('steps')}
+        >
+          Steps
+        </button>
+      </div>
+
+      <section id={panelId('ingredients')} className={`recipe-ingredients-panel recipe-tab-panel${activePanel === 'ingredients' ? ' is-active' : ''}`} role="tabpanel" aria-labelledby={tabId('ingredients')}>
         <header className="recipe-panel-head">
           <h2>Ingredients</h2>
           <div className="recipe-servings-scaler" aria-label="Servings">
@@ -175,7 +214,18 @@ export function RecipePage() {
         )}
       </section>
 
-      <section className="recipe-steps-panel">
+      <section id={panelId('cookware')} className={`recipe-cookware-panel recipe-tab-panel${activePanel === 'cookware' ? ' is-active' : ''}`} role="tabpanel" aria-labelledby={tabId('cookware')}>
+        <h2>Cookware</h2>
+        {recipe.cookware.length ? (
+          <ul className="recipe-cookware-list">
+            {recipe.cookware.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        ) : (
+          <p className="section-empty">Add cookware with <code>#pan{'{}'}</code> tokens in recipe steps and it will show up here automatically.</p>
+        )}
+      </section>
+
+      <section id={panelId('steps')} className={`recipe-steps-panel recipe-tab-panel${activePanel === 'steps' ? ' is-active' : ''}`} role="tabpanel" aria-labelledby={tabId('steps')}>
         <h2>Steps</h2>
         {recipe.steps.length ? (
           <ol className="recipe-step-list">

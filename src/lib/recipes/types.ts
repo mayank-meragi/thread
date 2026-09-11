@@ -15,6 +15,8 @@ export interface RecipeView {
   steps: RecipeStepView[]
   /** Deduplicated union of every step's ingredients, in first-seen order. */
   ingredients: RecipeIngredient[]
+  /** Deduplicated union of every step's cookware, in first-seen order. */
+  cookware: string[]
 }
 
 export interface CookIngredientView {
