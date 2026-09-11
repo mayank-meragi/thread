@@ -116,6 +116,36 @@ export async function addStepToSection(recipeThreadId: string, sectionId: string
   return document.nodes.filter((node) => node.role === RECIPE_CONTENT_TAGS.step).length
 }
 
+/** Move all root-level steps into a new root section, preserving each step's notes and order. */
+export async function convertUnsectionedStepsToSection(recipeThreadId: string, title: string): Promise<void> {
+  await requireRecipe(recipeThreadId)
+  const sectionTitle = title.trim()
+  if (!sectionTitle) throw new Error('A section needs a title.')
+  const document = await currentDocument(recipeThreadId)
+  const steps = document.nodes.filter((node) => node.role === RECIPE_CONTENT_TAGS.step && node.parentId === null)
+  if (!steps.length) throw new Error('There are no unsectioned steps to convert.')
+
+  const ranges = steps.map((step) => ({
+    start: step.sourceLine,
+    end: subtreeEndLine(document, step),
+    step,
+  }))
+  const moved = ranges.flatMap(({ start, end, step }) => {
+    const lines = document.lines.slice(start, end + 1)
+    lines[0] = formatRecipeNodeLine(step, RECIPE_CONTENT_TAGS.step, step.text)
+    return lines.map((line) => line.trim() ? `${' '.repeat(2)}${line}` : line)
+  })
+  const lines = [...document.lines]
+  for (const range of [...ranges].reverse()) {
+    lines.splice(range.start, range.end - range.start + 1)
+  }
+  const insertionAt = steps[0].sourceLine - ranges
+    .filter((range) => range.end < steps[0].sourceLine)
+    .reduce((count, range) => count + range.end - range.start + 1, 0)
+  lines.splice(insertionAt, 0, formatNewRecipeLine(RECIPE_CONTENT_TAGS.section, sectionTitle), ...moved)
+  await writeBody(recipeThreadId, lines.join('\n'))
+}
+
 export async function addNote(recipeThreadId: string, text: string, parentId?: string): Promise<void> {
   await requireRecipe(recipeThreadId)
   const note = text.trim()

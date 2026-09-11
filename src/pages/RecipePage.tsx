@@ -6,7 +6,7 @@ import { CooklangText } from '../components/recipes/CooklangText'
 import { formatQuantity, mergeIngredients, scaleIngredient } from '../lib/recipes/cooklangTokens'
 import { isoToday } from '../lib/dates'
 import { ActiveCookConflictError, startCook } from '../lib/recipes/lifecycle'
-import { addNote, addSection, addStep, addStepToSection, deleteRecipeThread, removeNote, removeSection, removeStep, updateNote, updateStep } from '../lib/recipes/mutations'
+import { addNote, addSection, addStep, addStepToSection, convertUnsectionedStepsToSection, deleteRecipeThread, removeNote, removeSection, removeStep, updateNote, updateStep } from '../lib/recipes/mutations'
 import { getRecipe } from '../lib/recipes/selectors'
 import type { RecipeIngredient } from '../lib/recipes/cooklangTokens'
 import type { RecipeSectionView, RecipeStepView } from '../lib/recipes/types'
@@ -207,11 +207,11 @@ function IngredientTotals({ ingredients, sections, unsectionedSteps, scaleFactor
   )
 }
 
-function SectionForm({ title, onChange, onSubmit, onCancel, saving }: { title: string; onChange: (value: string) => void; onSubmit: () => void; onCancel: () => void; saving: boolean }) {
+function SectionForm({ title, onChange, onSubmit, onCancel, saving, submitLabel = 'Add section', savingLabel = 'Adding…' }: { title: string; onChange: (value: string) => void; onSubmit: () => void; onCancel: () => void; saving: boolean; submitLabel?: string; savingLabel?: string }) {
   return (
     <form className="recipe-section-form" onSubmit={(event) => { event.preventDefault(); onSubmit() }}>
       <input autoFocus value={title} onChange={(event) => onChange(event.target.value)} placeholder="New section name" aria-label="New section name" disabled={saving} />
-      <Button type="submit" size="sm" disabled={saving || !title.trim()}>{saving ? 'Adding…' : 'Add section'}</Button>
+      <Button type="submit" size="sm" disabled={saving || !title.trim()}>{saving ? savingLabel : submitLabel}</Button>
       <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={saving}>Cancel</Button>
     </form>
   )
@@ -273,6 +273,7 @@ export function RecipePage() {
   const [newSectionParentId, setNewSectionParentId] = useState<string | null>(null)
   const [newSectionTitle, setNewSectionTitle] = useState('')
   const [addingSection, setAddingSection] = useState(false)
+  const [convertingOtherSteps, setConvertingOtherSteps] = useState(false)
 
   if (recipe === undefined) return <div className="page-loading">Loading recipe…</div>
   if (recipe === null) {
@@ -321,8 +322,30 @@ export function RecipePage() {
   }
 
   const openSectionForm = (parentId: string) => {
+    setConvertingOtherSteps(false)
     setNewSectionParentId(parentId)
     setNewSectionTitle('')
+  }
+
+  const openConvertOtherSteps = () => {
+    setNewSectionParentId(null)
+    setNewSectionTitle('')
+    setConvertingOtherSteps(true)
+  }
+
+  const submitConvertOtherSteps = async () => {
+    if (!newSectionTitle.trim()) return
+    setAddingSection(true)
+    setCookError(null)
+    try {
+      await convertUnsectionedStepsToSection(threadId, newSectionTitle)
+      setNewSectionTitle('')
+      setConvertingOtherSteps(false)
+    } catch (caught) {
+      setCookError(caught instanceof Error ? caught.message : String(caught))
+    } finally {
+      setAddingSection(false)
+    }
   }
 
   const addNoteToStep = async (step: RecipeStepView, text: string) => {
@@ -499,7 +522,7 @@ export function RecipePage() {
         {recipe.steps.length || recipe.sections.length || recipe.unsectionedNotes.length ? (
           <>
             {recipe.sections.map((section) => <SectionStepList key={section.id} section={section} onSave={(step, text) => updateStep(threadId, step.index, text)} onRemove={(step) => void removeStep(threadId, step.index)} onAddNote={addNoteToStep} onSaveNote={saveRecipeNote} onRemoveNote={deleteRecipeNote} onRequestAddSection={openSectionForm} onRemoveSection={deleteRecipeSection} activeSectionFormId={newSectionParentId} sectionTitle={newSectionTitle} onSectionTitleChange={setNewSectionTitle} onSubmitSection={() => void submitNewSection()} onCancelSection={() => { setNewSectionParentId(null); setNewSectionTitle('') }} addingSection={addingSection} />)}
-            {recipe.unsectionedSteps.length > 0 && <div className="recipe-section-block recipe-section-ungrouped"><div className="recipe-section-heading"><h3 className="recipe-section-title">Other steps</h3></div><ol className="recipe-step-list">{recipe.unsectionedSteps.map((step, index) => <StepEditor key={step.id} step={step} displayIndex={index + 1} onSave={(text) => updateStep(threadId, step.index, text)} onRemove={() => void removeStep(threadId, step.index)} onAddNote={(text) => addNoteToStep(step, text)} onSaveNote={saveRecipeNote} onRemoveNote={deleteRecipeNote} />)}</ol></div>}
+            {recipe.unsectionedSteps.length > 0 && <div className="recipe-section-block recipe-section-ungrouped"><div className="recipe-section-heading"><h3 className="recipe-section-title">General steps</h3><Button type="button" variant="outline" size="sm" className="recipe-section-convert" onClick={openConvertOtherSteps}>Convert to section</Button></div>{convertingOtherSteps && <SectionForm title={newSectionTitle} onChange={setNewSectionTitle} onSubmit={() => void submitConvertOtherSteps()} onCancel={() => { setConvertingOtherSteps(false); setNewSectionTitle('') }} saving={addingSection} submitLabel="Convert to section" savingLabel="Converting…" />}<ol className="recipe-step-list">{recipe.unsectionedSteps.map((step, index) => <StepEditor key={step.id} step={step} displayIndex={index + 1} onSave={(text) => updateStep(threadId, step.index, text)} onRemove={() => void removeStep(threadId, step.index)} onAddNote={(text) => addNoteToStep(step, text)} onSaveNote={saveRecipeNote} onRemoveNote={deleteRecipeNote} />)}</ol></div>}
             {recipe.unsectionedNotes.length > 0 && <div className="recipe-section-notes">{recipe.unsectionedNotes.map((note) => <NoteEditor key={note.id} note={note} onSave={(text) => saveRecipeNote(note, text)} onRemove={() => deleteRecipeNote(note)} />)}</div>}
           </>
         ) : (

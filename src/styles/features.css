@@ -2452,6 +2452,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .recipe-section-block .recipe-section-block { margin-top: 12px; margin-left: 14px; padding-left: 14px; border-left: 2px solid var(--line-soft); }
 .recipe-section-heading { display: flex; align-items: center; gap: 5px; padding-bottom: 7px; border-bottom: 1px solid var(--line); }
 .recipe-section-title { flex: 1; margin-bottom: 0; font-size: 13px; }
+.recipe-section-convert { flex: none; white-space: nowrap; }
 .recipe-section-add { flex: none; width: 28px; height: 28px; padding: 0; }
 .recipe-section-remove { flex: none; width: 28px; height: 28px; padding: 0; color: var(--muted); }
 .recipe-section-remove:hover { color: var(--danger, #c0392b); }

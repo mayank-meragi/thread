@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { db, initializeDatabase } from '../../db'
-import { addNote, addSection, addStep, addStepToSection, createRecipeThread, removeNote, removeSection, removeStep, reorderStep, replaceRecipeMarkdown, replaceSteps, updateNote, updateRecipeProperties, updateStep } from './mutations'
+import { addNote, addSection, addStep, addStepToSection, convertUnsectionedStepsToSection, createRecipeThread, removeNote, removeSection, removeStep, reorderStep, replaceRecipeMarkdown, replaceSteps, updateNote, updateRecipeProperties, updateStep } from './mutations'
 import { getRecipe, isRecipeThread, listRecipes } from './selectors'
 
 const DATE = '2026-09-01'
@@ -115,6 +115,22 @@ describe('recipe authoring mutations', () => {
     expect(recipe?.unsectionedSteps[0].ingredients.map((ingredient) => ingredient.name)).toEqual(['tomato'])
     expect(recipe?.sections[0].cookware).toEqual(['pot'])
     expect(recipe?.unsectionedSteps[0].cookware).toEqual(['pot'])
+  })
+
+  it('converts root steps into a tagged section while preserving step notes', async () => {
+    const threadId = await createRecipeThread({ title: 'Layered soup' })
+    await addStep(threadId, 'Cook @tomato{200%g} in the ^pot{}.')
+    const stepId = (await getRecipe(threadId))!.steps[0].id
+    await addNote(threadId, 'Keep the lid nearby.', stepId)
+
+    await convertUnsectionedStepsToSection(threadId, 'Make broth')
+
+    const recipe = await getRecipe(threadId)
+    expect(recipe?.unsectionedSteps).toHaveLength(0)
+    expect(recipe?.sections[0].title).toBe('Make broth')
+    expect(recipe?.sections[0].steps[0].text).toContain('@tomato{200%g}')
+    expect(recipe?.sections[0].steps[0].notes[0].text).toBe('Keep the lid nearby.')
+    expect((await db.threadNotes.get(threadId))!.markdown).toContain('- #[cook-section] Make broth\n  - #[cook-step] Cook @tomato{200%g} in the ^pot{}.')
   })
 
   it('preserves tagged nested outlines when replacing steps', async () => {
