@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { db, initializeDatabase } from '../../db'
-import { addNote, addSection, addStep, addStepToSection, createRecipeThread, removeStep, reorderStep, replaceRecipeMarkdown, replaceSteps, updateRecipeProperties, updateStep } from './mutations'
+import { addNote, addSection, addStep, addStepToSection, createRecipeThread, removeNote, removeSection, removeStep, reorderStep, replaceRecipeMarkdown, replaceSteps, updateNote, updateRecipeProperties, updateStep } from './mutations'
 import { getRecipe, isRecipeThread, listRecipes } from './selectors'
 
 const DATE = '2026-09-01'
@@ -80,6 +80,41 @@ describe('recipe authoring mutations', () => {
     expect(recipe?.sections[0].steps).toHaveLength(2)
     expect(recipe?.sections[0].steps[0].ingredients[0].preparation).toBe('cracked')
     expect((await db.threadNotes.get(threadId))!.markdown).toContain('#[cook-section] Make the sauce')
+  })
+
+  it('updates and removes notes, and removes a section subtree', async () => {
+    const threadId = await createRecipeThread({ title: 'Layered soup' })
+    await addSection(threadId, 'Sauce')
+    let recipe = await getRecipe(threadId)
+    const sectionId = recipe!.sections[0].id
+    await addStepToSection(threadId, sectionId, 'Cook @tomato{200%g}.')
+    await addNote(threadId, 'Keep it moving.', sectionId)
+
+    recipe = await getRecipe(threadId)
+    const noteId = recipe!.sections[0].notes[0].id
+    await updateNote(threadId, noteId, 'Do not let it dry out.')
+    expect((await getRecipe(threadId))!.sections[0].notes[0].text).toBe('Do not let it dry out.')
+
+    await removeNote(threadId, noteId)
+    expect((await getRecipe(threadId))!.sections[0].notes).toHaveLength(0)
+    await removeSection(threadId, sectionId)
+    recipe = await getRecipe(threadId)
+    expect(recipe?.sections).toHaveLength(0)
+    expect(recipe?.steps).toHaveLength(0)
+  })
+
+  it('keeps section and unsectioned usages separate for recipe totals', async () => {
+    const threadId = await createRecipeThread({ title: 'Layered soup' })
+    await addSection(threadId, 'Make broth')
+    const sectionId = (await getRecipe(threadId))!.sections[0].id
+    await addStepToSection(threadId, sectionId, 'Cook @tomato{200%g} in the ^pot{}.')
+    await addStep(threadId, 'Finish with @tomato{150%g} using the ^pot{}.')
+
+    const recipe = await getRecipe(threadId)
+    expect(recipe?.sections[0].ingredients.map((ingredient) => ingredient.name)).toEqual(['tomato'])
+    expect(recipe?.unsectionedSteps[0].ingredients.map((ingredient) => ingredient.name)).toEqual(['tomato'])
+    expect(recipe?.sections[0].cookware).toEqual(['pot'])
+    expect(recipe?.unsectionedSteps[0].cookware).toEqual(['pot'])
   })
 
   it('preserves tagged nested outlines when replacing steps', async () => {

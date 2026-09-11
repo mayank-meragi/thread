@@ -126,6 +126,38 @@ export async function addNote(recipeThreadId: string, text: string, parentId?: s
   await writeBody(recipeThreadId, insertRecipeLine(document, parent, RECIPE_CONTENT_TAGS.note, note))
 }
 
+export async function updateNote(recipeThreadId: string, noteId: string, text: string): Promise<void> {
+  await requireRecipe(recipeThreadId)
+  const note = text.trim()
+  if (!note) throw new Error('A note needs some text.')
+  const document = await currentDocument(recipeThreadId)
+  const target = document.nodes.find((node) => node.id === noteId && node.role === RECIPE_CONTENT_TAGS.note)
+  if (!target) throw new Error('This note no longer exists.')
+  const lines = [...document.lines]
+  lines[target.sourceLine] = formatRecipeNodeLine(target, RECIPE_CONTENT_TAGS.note, note)
+  await writeBody(recipeThreadId, lines.join('\n'))
+}
+
+export async function removeNote(recipeThreadId: string, noteId: string): Promise<void> {
+  await requireRecipe(recipeThreadId)
+  const document = await currentDocument(recipeThreadId)
+  const target = document.nodes.find((node) => node.id === noteId && node.role === RECIPE_CONTENT_TAGS.note)
+  if (!target) return
+  const lines = [...document.lines]
+  lines.splice(target.sourceLine, subtreeEndLine(document, target) - target.sourceLine + 1)
+  await writeBody(recipeThreadId, lines.join('\n'))
+}
+
+export async function removeSection(recipeThreadId: string, sectionId: string): Promise<void> {
+  await requireRecipe(recipeThreadId)
+  const document = await currentDocument(recipeThreadId)
+  const target = document.nodes.find((node) => node.id === sectionId && node.role === RECIPE_CONTENT_TAGS.section)
+  if (!target) return
+  const lines = [...document.lines]
+  lines.splice(target.sourceLine, subtreeEndLine(document, target) - target.sourceLine + 1)
+  await writeBody(recipeThreadId, lines.join('\n'))
+}
+
 export async function updateStep(recipeThreadId: string, index: number, text: string): Promise<void> {
   await requireRecipe(recipeThreadId)
   const step = text.trim()
