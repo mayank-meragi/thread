@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Check } from 'lucide-react'
 import type { PropertyValue } from '../../db'
 import { updateSet, type SetPropertyInput } from '../../lib/workouts/mutations'
+import { Button } from '../ui'
 
 const LOAD_UNITS = ['kg', 'lb'] as const
 const DISTANCE_UNITS = ['m', 'km', 'mi'] as const
@@ -115,9 +116,9 @@ export function SetEditor({
       </div>
       {error && <p className="set-editor-error" role="alert">{error}</p>}
       <div className="set-editor-actions">
-        <button type="submit" className="primary-button" disabled={saving}>
+        <Button type="submit" disabled={saving}>
           <Check size={14} aria-hidden="true" /> {saving ? 'Saving…' : 'Save set'}
-        </button>
+        </Button>
       </div>
     </form>
   )

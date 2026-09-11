@@ -4,6 +4,7 @@ import type { BlockTagRecord, MentionRecord, TagDefinitionRecord, TaskRecord } f
 import { formatDay, isoToday, shiftDay } from '../lib/dates'
 import { deleteTask, setTaskDueDate, setTaskStatus } from '../lib/tasks'
 import { TaskStatusControl } from './TaskStatusControl'
+import { Button } from './ui'
 
 export type TaskDisplayMode = 'list' | 'compact'
 
@@ -78,15 +79,15 @@ export function TaskRow({
     <div className="task-row-swipe-wrap">
       {revealed && (
         <div className="task-row-swipe-actions">
-          <button type="button" onClick={() => { void setTaskDueDate(task.id, shiftDay(isoToday(), 1)); setRevealed(false) }}>
+          <Button variant="outline" size="sm" onClick={() => { void setTaskDueDate(task.id, shiftDay(isoToday(), 1)); setRevealed(false) }}>
             <Clock3 size={13} /> Tomorrow
-          </button>
-          <button type="button" className="danger" onClick={() => {
+          </Button>
+          <Button variant="danger" size="sm" onClick={() => {
             if (window.confirm('Delete this task and all of its nested blocks?')) void deleteTask(task.id)
             setRevealed(false)
           }}>
             <Trash2 size={13} /> Delete
-          </button>
+          </Button>
         </div>
       )}
       <div

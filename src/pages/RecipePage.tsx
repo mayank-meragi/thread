@@ -9,6 +9,7 @@ import { ActiveCookConflictError, startCook } from '../lib/recipes/lifecycle'
 import { addStep, deleteRecipeThread, removeStep, updateStep } from '../lib/recipes/mutations'
 import { getRecipe } from '../lib/recipes/selectors'
 import type { RecipeIngredient } from '../lib/recipes/cooklangTokens'
+import { Button } from '../components/ui'
 
 function IngredientRow({ ingredient }: { ingredient: RecipeIngredient }) {
   return (
@@ -50,7 +51,7 @@ function StepEditor({ step, onSave, onRemove }: { step: { index: number; text: s
       ) : (
         <p className="recipe-step-text" onClick={() => setEditing(true)}><CooklangText text={step.text} /></p>
       )}
-      <button type="button" className="recipe-step-remove" aria-label="Remove step" onClick={onRemove}><Trash2 size={14} aria-hidden="true" /></button>
+      <Button variant="danger" size="sm" iconOnly className="recipe-step-remove" aria-label="Remove step" onClick={onRemove}><Trash2 size={14} aria-hidden="true" /></Button>
     </li>
   )
 }
@@ -146,12 +147,12 @@ export function RecipePage() {
           </p>
         </div>
         <div className="recipe-page-hero-actions">
-          <button type="button" className="primary-button" disabled={starting || !recipe.steps.length} onClick={() => void startCooking()}>
+          <Button disabled={starting || !recipe.steps.length} onClick={() => void startCooking()}>
             <ChefHat size={16} aria-hidden="true" /> Start cooking
-          </button>
-          <button type="button" className="icon-button recipe-delete" aria-label="Delete recipe" disabled={deleting} onClick={() => void deleteRecipe()}>
+          </Button>
+          <Button variant="danger" iconOnly className="recipe-delete" aria-label="Delete recipe" disabled={deleting} onClick={() => void deleteRecipe()}>
             <Trash2 size={16} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </header>
       {cookError && <p className="add-exercise-error" role="alert">{cookError}</p>}
@@ -160,9 +161,9 @@ export function RecipePage() {
         <header className="recipe-panel-head">
           <h2>Ingredients</h2>
           <div className="recipe-servings-scaler" aria-label="Servings">
-            <button type="button" onClick={() => changeServings(servings - 1)} aria-label="Fewer servings"><Minus size={14} aria-hidden="true" /></button>
+            <Button variant="ghost" size="sm" iconOnly onClick={() => changeServings(servings - 1)} aria-label="Fewer servings"><Minus size={14} aria-hidden="true" /></Button>
             <span>{servings} serving{servings === 1 ? '' : 's'}</span>
-            <button type="button" onClick={() => changeServings(servings + 1)} aria-label="More servings"><Plus size={14} aria-hidden="true" /></button>
+            <Button variant="ghost" size="sm" iconOnly onClick={() => changeServings(servings + 1)} aria-label="More servings"><Plus size={14} aria-hidden="true" /></Button>
           </div>
         </header>
         {recipe.ingredients.length ? (
@@ -203,7 +204,7 @@ export function RecipePage() {
             placeholder="Whisk @eggs{2} and @milk{300%ml} together."
             aria-label="New step"
           />
-          <button type="submit" className="primary-button" disabled={addingStep || !newStep.trim()}><Plus size={14} aria-hidden="true" /> Add step</button>
+          <Button type="submit" disabled={addingStep || !newStep.trim()}><Plus size={14} aria-hidden="true" /> Add step</Button>
         </form>
       </section>
     </article>

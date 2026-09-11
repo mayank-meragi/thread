@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { shiftDay } from '../../lib/dates'
 import { workoutLensState } from '../../lib/workouts/presentation'
 import type { WorkoutView } from '../../lib/workouts/types'
+import { Button } from '../ui'
 
 function monthStart(month: string): string {
   return `${month}-01`
@@ -46,9 +47,9 @@ export function WorkoutCalendar({
   return (
     <section className="workout-calendar" aria-label="Workout calendar">
       <header>
-        <button type="button" className="icon-button tap-target-sm" aria-label="Previous month" onClick={() => onMonthChange(shiftMonth(month, -1))}><ChevronLeft size={18} /></button>
+        <Button variant="ghost" size="sm" iconOnly aria-label="Previous month" onClick={() => onMonthChange(shiftMonth(month, -1))}><ChevronLeft size={18} /></Button>
         <h2>{monthLabel(month)}</h2>
-        <button type="button" className="icon-button tap-target-sm" aria-label="Next month" onClick={() => onMonthChange(shiftMonth(month, 1))}><ChevronRight size={18} /></button>
+        <Button variant="ghost" size="sm" iconOnly aria-label="Next month" onClick={() => onMonthChange(shiftMonth(month, 1))}><ChevronRight size={18} /></Button>
       </header>
       <div className="workout-calendar-weekdays" aria-hidden="true">
         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => <span key={day}>{day}</span>)}

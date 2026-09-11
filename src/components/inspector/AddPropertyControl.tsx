@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { createPropertyDefinition, type PropertyDefinitionRecord, type PropertyType } from '../../db'
 import { PROPERTY_TYPES } from './propertyTypes'
+import { Button } from '../ui'
 
 const MAX_ROWS = 8
 
@@ -117,9 +118,10 @@ export function AddPropertyControl({
       {open && (matches.length > 0 || showCreate || exactAssigned) && (
         <div className="menu-panel add-property-menu" role="listbox">
           {matches.map((definition, index) => (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               key={definition.id}
-              type="button"
               role="option"
               aria-selected={index === highlighted}
               className={index === highlighted ? 'menu-item active' : 'menu-item'}
@@ -129,21 +131,22 @@ export function AddPropertyControl({
             >
               <span>{definition.name}</span>
               <small className="add-property-type">{definition.type.replace('_', ' ')}</small>
-            </button>
+            </Button>
           ))}
           {showCreate && (
             <div
               className={`menu-item add-property-create${highlighted === matches.length ? ' active' : ''}`}
               onMouseEnter={() => setHighlighted(matches.length)}
             >
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 className="add-property-create-main"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={create}
               >
                 <Plus size={14} /> Create “{trimmed}”
-              </button>
+              </Button>
               <select
                 aria-label="New property type"
                 value={type}

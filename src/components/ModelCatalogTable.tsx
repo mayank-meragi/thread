@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, RotateCcw, Trash2 } from 'lucide-react'
 import type { AIProvider } from '../lib/ai'
+import { Button } from './ui'
 import {
   DEFAULT_MODELS,
   PROVIDER_IDS,
@@ -192,9 +193,9 @@ export function ModelCatalogTable() {
                     />
                   </td>
                   <td>
-                    <button type="button" className="text-button models-remove" aria-label="Remove model" onClick={() => removeRow(row.uid)}>
+                    <Button variant="ghost" size="sm" iconOnly className="models-remove" aria-label="Remove model" onClick={() => removeRow(row.uid)}>
                       <Trash2 size={14} />
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               )
@@ -204,8 +205,8 @@ export function ModelCatalogTable() {
       </div>
 
       <div className="settings-actions">
-        <button type="button" className="secondary-button" onClick={addRow}><Plus size={15} /> Add model</button>
-        <button type="button" className="text-button" onClick={restoreDefaults}><RotateCcw size={14} /> Reset to defaults</button>
+        <Button variant="outline" onClick={addRow}><Plus size={15} /> Add model</Button>
+        <Button variant="ghost" onClick={restoreDefaults}><RotateCcw size={14} /> Reset to defaults</Button>
       </div>
       <p className="settings-hint">Blank prices fall back to any built-in rate (shown as a hint); with no rate the model's usage is left out of cost totals.</p>
     </section>

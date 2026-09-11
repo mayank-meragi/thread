@@ -8,6 +8,7 @@ import { MarkdownEditor } from '../components/MarkdownEditor'
 import { TodayCooking } from '../components/TodayCooking'
 import { TodayTasks } from '../components/TodayTasks'
 import { DatePicker } from '../components/DatePicker'
+import { Button } from '../components/ui'
 
 const INITIAL_DAYS = 14
 const LOAD_BATCH = 14
@@ -205,7 +206,7 @@ export function TodayPage() {
         <div className="day-actions" aria-label="Change day">
           <DatePicker selected={activeDate} onSelect={(date) => jumpTo(date, 'smooth')} />
           {!isViewingToday && (
-            <button className="today-button" type="button" onClick={() => jumpTo(today, 'smooth')}>Today</button>
+            <Button variant="outline" size="sm" className="today-button" onClick={() => jumpTo(today, 'smooth')}>Today</Button>
           )}
         </div>
       </header>

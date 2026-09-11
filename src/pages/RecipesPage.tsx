@@ -6,6 +6,7 @@ import { ImportDialog } from '../components/recipes/ImportDialog'
 import { createRecipeThread } from '../lib/recipes/mutations'
 import { listRecipes } from '../lib/recipes/selectors'
 import type { RecipeView } from '../lib/recipes/types'
+import { Button, ButtonLink } from '../components/ui'
 
 function RecipeCard({ recipe }: { recipe: RecipeView }) {
   const servings = recipe.properties.get('recipe-servings')
@@ -68,15 +69,15 @@ export function RecipesPage() {
       <header className="recipes-hero">
         <div><h1>Recipes</h1><p>Your personal recipe box.</p></div>
         <div className="recipes-hero-actions">
-          <Link to="/docs/recipe-syntax" className="secondary-button recipes-import-open">
+          <ButtonLink to="/docs/recipe-syntax" variant="outline" className="recipes-import-open">
             <BookOpen size={15} aria-hidden="true" /> Syntax guide
-          </Link>
-          <Link to="/meal-plan" className="secondary-button recipes-import-open">
+          </ButtonLink>
+          <ButtonLink to="/meal-plan" variant="outline" className="recipes-import-open">
             <CalendarDays size={15} aria-hidden="true" /> Meal plan
-          </Link>
-          <button type="button" className="secondary-button recipes-import-open" onClick={() => setImportOpen(true)}>
+          </ButtonLink>
+          <Button variant="outline" className="recipes-import-open" onClick={() => setImportOpen(true)}>
             <Download size={15} aria-hidden="true" /> Import from URL
-          </button>
+          </Button>
           <form
             className="recipes-new-form"
             onSubmit={(event) => {
@@ -85,7 +86,7 @@ export function RecipesPage() {
             }}
           >
             <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="New recipe name" aria-label="New recipe name" />
-            <button type="submit" className="primary-button" disabled={busy || !title.trim()}><Plus size={16} aria-hidden="true" /> New recipe</button>
+            <Button type="submit" disabled={busy || !title.trim()}><Plus size={16} aria-hidden="true" /> New recipe</Button>
           </form>
         </div>
       </header>

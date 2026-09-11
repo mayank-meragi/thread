@@ -22,6 +22,7 @@ import {
 import { kindLabel } from '../lib/blockMetadata'
 import { formatDay } from '../lib/dates'
 import { closeInspector, getInspectorTarget, INSPECTOR_TARGET_EVENT, type InspectorTarget } from '../lib/inspectorTarget'
+import { Button } from './ui'
 import { NewPropertyForm, PropertyField } from './inspector/PropertyField'
 import { TaskDraft } from './inspector/TaskDraft'
 import { WorkoutInspectorSections } from './inspector/WorkoutInspectorSections'
@@ -188,7 +189,7 @@ export function ContextualInspector() {
               {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : saveState === 'error' ? 'Save failed' : ''}
             </span>
           </div>
-          <button type="button" className="inspector-icon-button" aria-label="Close details" onClick={() => closeInspector()}><X size={17} /></button>
+          <Button variant="ghost" size="sm" iconOnly className="inspector-icon-button" aria-label="Close details" onClick={() => closeInspector()}><X size={17} /></Button>
         </header>
 
         {!loaded && <div className="inspector-loading">Finding this {target.kind}…</div>}
@@ -229,7 +230,7 @@ export function ContextualInspector() {
                 if (!subtaskText.trim()) return
                 void run(async () => { await createSubtask(task.id, subtaskText); setSubtaskText('') })
               }}>
-                <ListPlus size={15} /><input value={subtaskText} onChange={(event) => setSubtaskText(event.target.value)} placeholder="Add a subtask" /><button type="submit">Add</button>
+                <ListPlus size={15} /><input value={subtaskText} onChange={(event) => setSubtaskText(event.target.value)} placeholder="Add a subtask" /><Button type="submit" size="sm">Add</Button>
               </form>
             </section>
 
@@ -285,7 +286,7 @@ export function ContextualInspector() {
               }}>
                 <Hash size={13} />
                 <input value={newTag} onChange={(event) => setNewTag(event.target.value)} placeholder="New tag" aria-label="New tag name" />
-                <button type="submit" aria-label="Create and add tag" disabled={!newTag.trim()}><Plus size={13} /></button>
+                <Button type="submit" variant="ghost" size="sm" iconOnly aria-label="Create and add tag" disabled={!newTag.trim()}><Plus size={13} /></Button>
               </form>
             </div>
           </section>}
@@ -306,27 +307,27 @@ export function ContextualInspector() {
             </div>
             {newPropertyOpen
               ? <NewPropertyForm onDone={() => setNewPropertyOpen(false)} onError={setError} />
-              : <button type="button" className="inspector-add-property" onClick={() => setNewPropertyOpen(true)}><Plus size={14} /> New property</button>}
+              : <Button variant="outline" size="sm" className="inspector-add-property" onClick={() => setNewPropertyOpen(true)}><Plus size={14} /> New property</Button>}
           </section>}
 
           <section className="inspector-advanced">
             <div className="inspector-advanced-title">Advanced</div>
             {task && <div className="inspector-advanced-row">
-              <button type="button" onClick={() => void run(() => moveTask(task.id, 'up'))}><ArrowUp size={14} /> Up</button>
-              <button type="button" onClick={() => void run(() => moveTask(task.id, 'down'))}><ArrowDown size={14} /> Down</button>
-              <button type="button" onClick={() => void run(() => changeTaskIndent(task.id, 'indent'))}><ArrowRight size={14} /> Indent</button>
-              <button type="button" onClick={() => void run(() => changeTaskIndent(task.id, 'outdent'))}><ArrowLeft size={14} /> Outdent</button>
-              <button type="button" onClick={() => void run(() => duplicateTask(task.id))}><Copy size={14} /> Duplicate</button>
-              <button type="button" className="danger" onClick={() => {
+              <Button variant="ghost" size="sm" onClick={() => void run(() => moveTask(task.id, 'up'))}><ArrowUp size={14} /> Up</Button>
+              <Button variant="ghost" size="sm" onClick={() => void run(() => moveTask(task.id, 'down'))}><ArrowDown size={14} /> Down</Button>
+              <Button variant="ghost" size="sm" onClick={() => void run(() => changeTaskIndent(task.id, 'indent'))}><ArrowRight size={14} /> Indent</Button>
+              <Button variant="ghost" size="sm" onClick={() => void run(() => changeTaskIndent(task.id, 'outdent'))}><ArrowLeft size={14} /> Outdent</Button>
+              <Button variant="ghost" size="sm" onClick={() => void run(() => duplicateTask(task.id))}><Copy size={14} /> Duplicate</Button>
+              <Button variant="danger" size="sm" onClick={() => {
                 if (!window.confirm('Delete this task and all of its nested blocks?')) return
                 void run(async () => { await deleteTask(task.id); closeInspector() })
-              }}><Trash2 size={13} /> Delete task</button>
+              }}><Trash2 size={13} /> Delete task</Button>
             </div>}
             {!task && blockId && <div className="inspector-advanced-row">
-              <button type="button" className="danger" onClick={() => {
+              <Button variant="danger" size="sm" onClick={() => {
                 if (!window.confirm('Delete this block and all of its nested blocks?')) return
                 void run(async () => { await deleteBlock(blockId); closeInspector() })
-              }}><Trash2 size={13} /> Delete block</button>
+              }}><Trash2 size={13} /> Delete block</Button>
             </div>}
           </section>
 

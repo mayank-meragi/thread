@@ -8,6 +8,7 @@ import { stripStructuralTag } from '../lib/workouts/presentation'
 import { WorkoutDiagnostics } from '../components/workouts/WorkoutDiagnostics'
 import { ActiveExercise } from '../components/workouts/ActiveExercise'
 import { ExerciseTopBar } from '../components/workouts/ExerciseTopBar'
+import { Button } from '../components/ui'
 
 const SWIPE_THRESHOLD_PX = 50
 
@@ -99,22 +100,22 @@ export function WorkoutPage() {
           placeholder="Add an exercise (e.g. Bench Press)"
           aria-label="Exercise name"
         />
-        <button type="submit" className="primary-button" disabled={addingExercise || !exerciseTitle.trim()}>
+        <Button type="submit" disabled={addingExercise || !exerciseTitle.trim()}>
           <Plus size={14} aria-hidden="true" /> Add
-        </button>
+        </Button>
       </form>
       {addError && <p className="add-exercise-error" role="alert">{addError}</p>}
 
       {exercises.length > 1 && (
         <div className="exercise-pager">
-          <button type="button" disabled={clampedIndex === 0} onClick={() => goTo(clampedIndex - 1)}>Previous</button>
-          <button type="button" disabled={clampedIndex === exercises.length - 1} onClick={() => goTo(clampedIndex + 1)}>Next exercise</button>
+        <Button variant="outline" size="sm" disabled={clampedIndex === 0} onClick={() => goTo(clampedIndex - 1)}>Previous</Button>
+        <Button variant="outline" size="sm" disabled={clampedIndex === exercises.length - 1} onClick={() => goTo(clampedIndex + 1)}>Next exercise</Button>
         </div>
       )}
 
-      <button type="button" className="text-button workout-page-finish" onClick={() => navigate(overviewHref)}>
+      <Button variant="ghost" className="workout-page-finish" onClick={() => navigate(overviewHref)}>
         Back to overview
-      </button>
+      </Button>
     </article>
   )
 }

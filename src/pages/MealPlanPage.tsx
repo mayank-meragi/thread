@@ -6,6 +6,7 @@ import { daysBetween, formatDay, isoToday, shiftDay } from '../lib/dates'
 import { planMeal, removeMealPlan } from '../lib/recipes/mutations'
 import { getMealPlanRange, listRecipes } from '../lib/recipes/selectors'
 import type { MealPlanView, MealType } from '../lib/recipes/types'
+import { Button, ButtonLink } from '../components/ui'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 const MEAL_LABEL: Record<MealType, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' }
@@ -17,7 +18,7 @@ function AddMealForm({ day, recipes }: { day: string; recipes: Array<{ id: strin
   const [busy, setBusy] = useState(false)
 
   if (!recipes.length) return null
-  if (!open) return <button type="button" className="meal-plan-add" onClick={() => setOpen(true)}><Plus size={13} aria-hidden="true" /> Add meal</button>
+  if (!open) return <Button variant="outline" size="sm" className="meal-plan-add" onClick={() => setOpen(true)}><Plus size={13} aria-hidden="true" /> Add meal</Button>
 
   const submit = async () => {
     if (!recipeId) return
@@ -38,8 +39,8 @@ function AddMealForm({ day, recipes }: { day: string; recipes: Array<{ id: strin
       <select value={mealType} onChange={(event) => setMealType(event.target.value as MealType)} disabled={busy}>
         {MEAL_TYPES.map((type) => <option key={type} value={type}>{MEAL_LABEL[type]}</option>)}
       </select>
-      <button type="submit" className="text-button" disabled={busy}>Add</button>
-      <button type="button" className="text-button" onClick={() => setOpen(false)} disabled={busy}>Cancel</button>
+      <Button type="submit" variant="ghost" size="sm" disabled={busy}>Add</Button>
+      <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
     </form>
   )
 }
@@ -58,7 +59,7 @@ function DayColumn({ day, plans, recipes }: { day: string; plans: MealPlanView[]
           <li key={plan.task.id} className={`meal-plan-item meal-${plan.mealType ?? 'snack'}`}>
             <span className="meal-plan-type-label">{MEAL_LABEL[plan.mealType ?? 'snack']}</span>
             {plan.recipeThreadId ? <Link to={`/recipe/${plan.recipeThreadId}`}>{plan.recipeTitle}</Link> : <span>{plan.recipeTitle ?? 'Recipe'}</span>}
-            <button type="button" aria-label="Remove planned meal" onClick={() => void removeMealPlan(plan.task.id)}><X size={12} aria-hidden="true" /></button>
+            <Button variant="ghost" size="sm" iconOnly aria-label="Remove planned meal" onClick={() => void removeMealPlan(plan.task.id)}><X size={12} aria-hidden="true" /></Button>
           </li>
         ))}
       </ul>
@@ -101,10 +102,10 @@ export function MealPlanPage() {
         <div><h1>Meal plan</h1><p>{formatDay(startDay).short} – {formatDay(endDay).short}</p></div>
         <div className="meal-plan-hero-actions">
           <nav className="meal-plan-nav" aria-label="Week">
-            <button type="button" onClick={() => shiftWeek(-1)} aria-label="Previous week"><ChevronLeft size={16} aria-hidden="true" /></button>
-            <button type="button" onClick={() => shiftWeek(1)} aria-label="Next week"><ChevronRight size={16} aria-hidden="true" /></button>
+            <Button variant="ghost" size="sm" iconOnly onClick={() => shiftWeek(-1)} aria-label="Previous week"><ChevronLeft size={16} aria-hidden="true" /></Button>
+            <Button variant="ghost" size="sm" iconOnly onClick={() => shiftWeek(1)} aria-label="Next week"><ChevronRight size={16} aria-hidden="true" /></Button>
           </nav>
-          <Link className="secondary-button" to={`/shopping-list?start=${startDay}&end=${endDay}`}><ShoppingCart size={15} aria-hidden="true" /> Shopping list</Link>
+          <ButtonLink variant="outline" to={`/shopping-list?start=${startDay}&end=${endDay}`}><ShoppingCart size={15} aria-hidden="true" /> Shopping list</ButtonLink>
         </div>
       </header>
 

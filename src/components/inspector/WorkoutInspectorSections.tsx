@@ -7,6 +7,7 @@ import { elapsedMs, formatDuration, tallySets } from '../../lib/workouts/present
 import type { WorkoutRole } from '../../lib/workouts/systemTags'
 import type { WorkoutView } from '../../lib/workouts/types'
 import { SetEditor } from '../workouts/SetEditor'
+import { Button } from '../ui'
 
 function toLocalInput(value: PropertyValue | undefined): string {
   if (typeof value !== 'string') return ''
@@ -116,7 +117,7 @@ function ExerciseSection({
         </p>
       )}
       <div className="inspector-workout-actions">
-        <button type="button" onClick={() => void run(() => addSet(task.id))}><Plus size={13} aria-hidden="true" /> Add set</button>
+        <Button variant="outline" size="sm" onClick={() => void run(() => addSet(task.id))}><Plus size={13} aria-hidden="true" /> Add set</Button>
       </div>
       <OpenWorkoutLink workout={workout} onNavigate={onNavigate} />
     </section>

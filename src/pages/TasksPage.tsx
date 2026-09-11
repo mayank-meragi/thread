@@ -10,6 +10,7 @@ import { TaskRow, type TaskDisplayMode } from '../components/TaskRow'
 import { TaskBoard } from '../components/TaskBoard'
 import { TaskFilterPopover, type TaskFilterKey } from '../components/TaskFilterPopover'
 import { Chip } from '../components/ui/Chip'
+import { Button } from '../components/ui'
 import { isWorkoutRole, workoutRolesByBlockId } from '../lib/workouts/integration'
 import { cookRolesByBlockId, isCookRole } from '../lib/recipes/integration'
 
@@ -323,7 +324,7 @@ function QuickAdd({ autoFocus = false, onCreated }: { autoFocus?: boolean; onCre
     <input autoFocus={autoFocus} className="task-quick-title" value={text} onChange={(event) => setText(event.target.value)} placeholder="Add a task to today’s journal" aria-label="New task title" />
     <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} aria-label="New task due date" />
     <select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority | '')} aria-label="New task priority"><option value="">Priority</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
-    <button type="submit" disabled={!text.trim() || busy}>{busy ? 'Adding…' : 'Add task'}</button>
+    <Button type="submit" disabled={!text.trim() || busy}>{busy ? 'Adding…' : 'Add task'}</Button>
   </form>
 }
 
@@ -355,7 +356,7 @@ export function TaskBranch(props: {
 
 function BulkBar({ ids, onClear }: { ids: string[]; onClear: () => void }) {
   const [date, setDate] = useState('')
-  return <div className="task-bulk-bar"><strong>{ids.length} selected</strong><button type="button" onClick={() => void bulkSetTaskStatus(ids, 'done').then(onClear)}>Complete</button><button type="button" onClick={() => void bulkSetTaskStatus(ids, 'in_progress').then(onClear)}>Start</button><select aria-label="Set selected priority" defaultValue="" onChange={(event) => { if (event.target.value) void bulkSetTaskPriority(ids, event.target.value as TaskPriority).then(onClear) }}><option value="">Set priority</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><input type="date" aria-label="Set selected due date" value={date} onChange={(event) => { setDate(event.target.value); if (event.target.value) void bulkSetTaskDueDate(ids, event.target.value).then(onClear) }} /><button type="button" className="text-button" onClick={onClear}>Clear</button></div>
+  return <div className="task-bulk-bar"><strong>{ids.length} selected</strong><Button size="sm" onClick={() => void bulkSetTaskStatus(ids, 'done').then(onClear)}>Complete</Button><Button variant="outline" size="sm" onClick={() => void bulkSetTaskStatus(ids, 'in_progress').then(onClear)}>Start</Button><select aria-label="Set selected priority" defaultValue="" onChange={(event) => { if (event.target.value) void bulkSetTaskPriority(ids, event.target.value as TaskPriority).then(onClear) }}><option value="">Set priority</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><input type="date" aria-label="Set selected due date" value={date} onChange={(event) => { setDate(event.target.value); if (event.target.value) void bulkSetTaskDueDate(ids, event.target.value).then(onClear) }} /><Button variant="ghost" size="sm" onClick={onClear}>Clear</Button></div>
 }
 
 function scheduleGroups(roots: TaskRecord[], today: string) {

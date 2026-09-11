@@ -7,6 +7,7 @@ import { addSet, deleteWorkoutItem, skipExercise } from '../../lib/workouts/muta
 import { exerciseSummary, sourceHref, stripStructuralTag } from '../../lib/workouts/presentation'
 import type { WorkoutExerciseView } from '../../lib/workouts/types'
 import { SetRow } from './SetRow'
+import { Button } from '../ui'
 
 function exerciseName(exercise: WorkoutExerciseView): string {
   return exercise.exerciseThread?.title
@@ -161,10 +162,10 @@ export function ActiveExercise({
           </div>
         )}
 
-        <button type="button" className="add-set-button" disabled={busy} onClick={() => void run(() => addSet(exercise.task.id))}>
+        <Button variant="outline" className="add-set-button" disabled={busy} onClick={() => void run(() => addSet(exercise.task.id))}>
           <span className="add-set-icon" aria-hidden="true"><Plus size={14} /></span>
           Add set
-        </button>
+        </Button>
 
         {exercise.notes.map((note) => (
           <p key={note.id} className="exercise-note">{note.plainText}</p>
@@ -172,9 +173,9 @@ export function ActiveExercise({
 
         <div className="active-exercise-actions">
           <div className="active-exercise-menu-anchor">
-            <button type="button" className="active-exercise-action" disabled={busy} onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen}>
+            <Button variant="ghost" className="active-exercise-action" disabled={busy} onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen}>
               <ArrowLeftRight size={16} aria-hidden="true" /> Swap
-            </button>
+            </Button>
             {menuOpen && (
               <>
                 <div className="active-exercise-menu-backdrop" onClick={() => setMenuOpen(false)} />
@@ -182,34 +183,36 @@ export function ActiveExercise({
                   <a className="menu-item" role="menuitem" href={sourceHref(exercise.task)}>
                     <ExternalLink size={15} aria-hidden="true" /> Open source line
                   </a>
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="menu-item"
                     role="menuitem"
                     disabled={exercise.task.status === 'canceled'}
                     onClick={() => void run(() => skipExercise(exercise.task.id))}
                   >
                     <SkipForward size={15} aria-hidden="true" /> Skip exercise
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
                     className="menu-item"
                     role="menuitem"
                     onClick={() => void run(() => deleteWorkoutItem(exercise.task.id))}
                   >
                     <Trash2 size={15} aria-hidden="true" /> Delete exercise
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
           </div>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             className="active-exercise-action"
             onClick={() => window.dispatchEvent(new Event(OPEN_CHAT_EVENT))}
           >
             <MessageCircle size={16} aria-hidden="true" /> Ask coach
-          </button>
+          </Button>
         </div>
 
         <p className="active-exercise-tally">{tally.completed}/{tally.total} sets logged</p>

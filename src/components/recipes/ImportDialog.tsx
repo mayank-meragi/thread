@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { RECIPE_CATEGORY_OPTIONS } from '../../lib/blockMetadata'
 import { importRecipeFromUrl, type RecipeImportDraft } from '../../lib/recipes/import'
 import { addStep, createRecipeThread, updateRecipeProperties } from '../../lib/recipes/mutations'
+import { Button } from '../ui'
 
 interface ImportDialogProps {
   onClose: () => void
@@ -75,7 +76,7 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
       <div className="dialog recipes-import-dialog">
         <div className="recipes-import-head">
           <strong>Import a recipe</strong>
-          <button type="button" className="icon-button" aria-label="Close" onClick={onClose}><X size={16} /></button>
+          <Button variant="ghost" size="sm" iconOnly aria-label="Close" onClick={onClose}><X size={16} /></Button>
         </div>
 
         {stage.kind === 'url' || stage.kind === 'fetching' ? (
@@ -94,10 +95,10 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
             </label>
             {error && <p className="banner banner-error" role="alert">{error}</p>}
             <div className="recipes-import-actions">
-              <button type="button" className="secondary-button" onClick={onClose}>Cancel</button>
-              <button type="button" className="primary-button" disabled={!url.trim() || stage.kind === 'fetching'} onClick={() => void fetchDraft()}>
+              <Button variant="outline" onClick={onClose}>Cancel</Button>
+              <Button disabled={!url.trim() || stage.kind === 'fetching'} onClick={() => void fetchDraft()}>
                 {stage.kind === 'fetching' ? 'Fetching…' : 'Fetch recipe'}
-              </button>
+              </Button>
             </div>
           </>
         ) : (
@@ -124,15 +125,16 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
               <span className="field-label">Category</span>
               <div className="recipes-import-categories">
                 {RECIPE_CATEGORY_OPTIONS.map((option) => (
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
+                    size="sm"
                     key={option.id}
                     className={category.includes(option.id) ? 'active' : ''}
                     onClick={() => toggleCategory(option.id)}
                     disabled={stage.kind === 'saving'}
                   >
                     {option.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -149,10 +151,10 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
             </label>
             {error && <p className="banner banner-error" role="alert">{error}</p>}
             <div className="recipes-import-actions">
-              <button type="button" className="secondary-button" onClick={onClose} disabled={stage.kind === 'saving'}>Cancel</button>
-              <button type="button" className="primary-button" disabled={stage.kind === 'saving'} onClick={() => void save()}>
+              <Button variant="outline" onClick={onClose} disabled={stage.kind === 'saving'}>Cancel</Button>
+              <Button disabled={stage.kind === 'saving'} onClick={() => void save()}>
                 {stage.kind === 'saving' ? 'Saving…' : 'Save recipe'}
-              </button>
+              </Button>
             </div>
           </>
         )}

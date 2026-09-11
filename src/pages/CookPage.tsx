@@ -13,6 +13,7 @@ import {
 } from '../lib/recipes/lifecycle'
 import { getCookSession } from '../lib/recipes/selectors'
 import type { CookStepView } from '../lib/recipes/types'
+import { Button } from '../components/ui'
 
 // A task's stored text uses the cleaned inline-tag form (`#cook-step foo`, no
 // brackets -- see `cleanMarkdownLine`), not the authored `#[cook-step] foo`.
@@ -135,12 +136,12 @@ export function CookPage() {
                   {isActive && state === 'pending' && (
                     <div className="cook-step-actions">
                       {step.durationSeconds !== undefined && <CookTimer key={step.task.id} seconds={step.durationSeconds} />}
-                      <button type="button" className="primary-button" disabled={busy} onClick={() => void markDone(step.task.id)}>
+                      <Button disabled={busy} onClick={() => void markDone(step.task.id)}>
                         <Check size={14} aria-hidden="true" /> Done
-                      </button>
-                      <button type="button" className="text-button" disabled={busy} onClick={() => void skip(step.task.id)}>
+                      </Button>
+                      <Button variant="ghost" disabled={busy} onClick={() => void skip(step.task.id)}>
                         <SkipForward size={14} aria-hidden="true" /> Skip
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -151,14 +152,14 @@ export function CookPage() {
       </section>
 
       {!finished && (
-        <button type="button" className="primary-button cook-finish" disabled={busy} onClick={() => void finish()}>
+        <Button className="cook-finish" disabled={busy} onClick={() => void finish()}>
           Finish cooking
-        </button>
+        </Button>
       )}
       {finished && (
-        <button type="button" className="text-button" onClick={() => navigate(recipeHref ?? '/recipes')}>
+        <Button variant="ghost" onClick={() => navigate(recipeHref ?? '/recipes')}>
           Back to recipe
-        </button>
+        </Button>
       )}
     </article>
   )

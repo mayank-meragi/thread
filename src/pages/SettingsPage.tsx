@@ -25,6 +25,7 @@ import { commandRegistry } from '../lib/commands'
 import { revokeCapability, useTrustedCapabilities } from '../lib/threadscript/trustedCapabilities'
 import { MetadataSchemas } from '../components/MetadataSchemas'
 import { clearRssProxyConfig, generateRssProxyAccessKey, getRssProxyConfig, saveRssProxyConfig, testRssProxyConnection } from '../lib/rssProxy'
+import { Button, ButtonLink } from '../components/ui'
 import { refreshAllFeeds } from '../lib/rss'
 import { getRssSettings, RSS_REFRESH_INTERVALS, saveRssSettings, type RssRefreshInterval } from '../lib/rssSettings'
 import { formatAIUsageCost, groupAIUsage, summarizeAIUsage, type AIUsageFeature, type AIUsagePeriod } from '../lib/aiUsage'
@@ -397,13 +398,13 @@ export function SettingsPage() {
               <label><span>Worker URL</span><input type="url" value={rssProxyUrl} onChange={(event) => setRssProxyUrl(event.target.value)} placeholder="https://thread-rss-proxy.your-name.workers.dev" /></label>
               <label><span>Worker access key</span><input type={showRssProxyKey ? 'text' : 'password'} value={rssProxyKey} onChange={(event) => setRssProxyKey(event.target.value)} placeholder="Generate a key, then add the same secret to Wrangler" autoComplete="off" /></label>
               <div className="settings-actions">
-                <button type="button" className="secondary-button" onClick={() => { setRssProxyKey(generateRssProxyAccessKey()); setShowRssProxyKey(true) }}><Rss size={15} /> Generate key</button>
-                <button type="button" className="text-button" onClick={() => setShowRssProxyKey((current) => !current)}>{showRssProxyKey ? <EyeOff size={15} /> : <Eye size={15} />}{showRssProxyKey ? 'Hide key' : 'Show key'}</button>
-                <button type="button" className="primary-button" onClick={() => void connectRssProxy()} disabled={rssProxyState === 'checking' || !rssProxyUrl.trim() || !rssProxyKey.trim()}>
+                <Button variant="outline" onClick={() => { setRssProxyKey(generateRssProxyAccessKey()); setShowRssProxyKey(true) }}><Rss size={15} /> Generate key</Button>
+                <Button variant="ghost" onClick={() => setShowRssProxyKey((current) => !current)}>{showRssProxyKey ? <EyeOff size={15} /> : <Eye size={15} />}{showRssProxyKey ? 'Hide key' : 'Show key'}</Button>
+                <Button onClick={() => void connectRssProxy()} disabled={rssProxyState === 'checking' || !rssProxyUrl.trim() || !rssProxyKey.trim()}>
                   {rssProxyState === 'checking' ? <LoaderCircle className="spin" size={16} /> : rssProxyState === 'done' ? <Check size={16} /> : <Rss size={16} />}
                   {rssProxyState === 'checking' ? 'Testing…' : rssProxyState === 'done' ? 'Connected' : existingRssProxy ? 'Reconnect' : 'Test and connect'}
-                </button>
-                {existingRssProxy && <button type="button" className="text-button" onClick={() => { clearRssProxyConfig(); setRssProxyUrl(''); setRssProxyKey(''); setRssProxyError('') }}><Unplug size={15} /> Disconnect</button>}
+                </Button>
+                {existingRssProxy && <Button variant="ghost" onClick={() => { clearRssProxyConfig(); setRssProxyUrl(''); setRssProxyKey(''); setRssProxyError('') }}><Unplug size={15} /> Disconnect</Button>}
               </div>
               {rssProxyError && <p className="banner banner-error form-error">{rssProxyError}</p>}
               <div className="security-note"><ShieldCheck size={16} /><span>The key is stored only in this browser and sent only to your Worker. Never paste a Cloudflare API token here; Wrangler uses that token on your machine.</span></div>
@@ -413,10 +414,10 @@ export function SettingsPage() {
               <div className="settings-title"><RefreshCw size={20} /><div><h2>Refresh schedule</h2><p>Choose how often Thread checks subscribed feeds while the Feeds screen is open. Turning this off never deletes cached entries.</p></div></div>
               <label><span>Automatic refresh</span><select value={rssRefreshIntervalMs} onChange={(event) => changeRssRefreshInterval(event.target.value)}>{RSS_REFRESH_INTERVALS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
               <div className="settings-actions">
-                <button type="button" className="secondary-button" onClick={() => void refreshRssFeedsNow()} disabled={rssManualState === 'refreshing' || rssFeeds.length === 0}>
+                <Button variant="outline" onClick={() => void refreshRssFeedsNow()} disabled={rssManualState === 'refreshing' || rssFeeds.length === 0}>
                   {rssManualState === 'refreshing' ? <LoaderCircle className="spin" size={16} /> : <RefreshCw size={16} />}
                   {rssManualState === 'refreshing' ? 'Refreshing…' : 'Refresh all feeds now'}
-                </button>
+                </Button>
               </div>
               {rssManualMessage && <p className="settings-hint rss-refresh-status">{rssManualMessage}</p>}
             </section>
@@ -459,55 +460,49 @@ export function SettingsPage() {
                     <div className="conflict-hunk" key={hunk.index}>
                       <div className="conflict-hunk-label">near “{hunk.blockLabel}”</div>
                       <div className="conflict-hunk-sides">
-                        <button
-                          type="button"
-                          className="secondary-button"
+                        <Button
+                          variant="outline"
                           aria-pressed={choice === 'local'}
                           disabled={resolving === conflict.id}
                           onClick={() => setHunkChoice(conflict.id, hunk.index, 'local')}
                         >
                           <div className="conflict-hunk-side-title">This browser</div>
                           <pre className="conflict-hunk-text">{hunk.local || '(removed)'}</pre>
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary-button"
+                        </Button>
+                        <Button
+                          variant="outline"
                           aria-pressed={choice === 'remote'}
                           disabled={resolving === conflict.id}
                           onClick={() => setHunkChoice(conflict.id, hunk.index, 'remote')}
                         >
                           <div className="conflict-hunk-side-title">Repository</div>
                           <pre className="conflict-hunk-text">{hunk.remote || '(removed)'}</pre>
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )
                 })}
                 <div className="settings-actions conflict-actions">
-                  <button
-                    type="button"
-                    className="secondary-button"
+                  <Button
+                    variant="outline"
                     disabled={resolving === conflict.id}
                     onClick={() => void resolve(conflict.id, 'local')}
                   >
                     Keep this browser's copy
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-button"
+                  </Button>
+                  <Button
+                    variant="outline"
                     disabled={resolving === conflict.id}
                     onClick={() => void resolve(conflict.id, 'remote')}
                   >
                     Keep the repository's copy
-                  </button>
-                  <button
-                    type="button"
-                    className="primary-button"
+                  </Button>
+                  <Button
                     disabled={resolving === conflict.id}
                     onClick={() => void resolve(conflict.id, new Map(conflict.conflicts.map((hunk) => [hunk.index, choices[hunk.index] ?? 'local'])))}
                   >
                     Resolve all
-                  </button>
+                  </Button>
                 </div>
               </div>
             )
@@ -536,17 +531,17 @@ export function SettingsPage() {
         )}
         {error && <p className="banner banner-error form-error">{error}</p>}
         <div className="settings-actions">
-          <button className="primary-button" onClick={() => void connect()} disabled={state !== 'idle' || !repo || !token}>
+          <Button onClick={() => void connect()} disabled={state !== 'idle' || !repo || !token}>
             {state === 'checking' || state === 'syncing' ? <LoaderCircle className="spin" size={16} /> : state === 'done' ? <Check size={16} /> : <GitBranch size={16} />}
             {state === 'checking' ? 'Checking…' : state === 'syncing' ? 'Syncing…' : state === 'done' ? 'Connected' : existing ? 'Reconnect' : 'Connect and sync'}
-          </button>
+          </Button>
           {getGitHubConfig() && <>
-            <button className="secondary-button" onClick={() => void sync()} disabled={state !== 'idle'}>Sync {pending} changes</button>
-            <button className="secondary-button" onClick={() => void pull()} disabled={state !== 'idle'}>
+            <Button variant="outline" onClick={() => void sync()} disabled={state !== 'idle'}>Sync {pending} changes</Button>
+            <Button variant="outline" onClick={() => void pull()} disabled={state !== 'idle'}>
               {state === 'pulling' ? <LoaderCircle className="spin" size={16} /> : null}
               Refresh all data from GitHub
-            </button>
-            <button className="text-button" onClick={() => { clearGitHubConfig(); setToken('') }}><Unplug size={15} /> Disconnect</button>
+            </Button>
+            <Button variant="ghost" onClick={() => { clearGitHubConfig(); setToken('') }}><Unplug size={15} /> Disconnect</Button>
           </>}
         </div>
       </section>
@@ -605,8 +600,8 @@ export function SettingsPage() {
                   />
                 </label>
                 <div className="ai-key-row-actions">
-                  <button type="button" className="secondary-button" onClick={() => saveProviderKey(provider)} disabled={!(keyDrafts[provider]?.trim())}>Save</button>
-                  {saved ? <button type="button" className="text-button" onClick={() => removeProviderKey(provider)}>Clear</button> : null}
+                  <Button variant="outline" size="sm" onClick={() => saveProviderKey(provider)} disabled={!(keyDrafts[provider]?.trim())}>Save</Button>
+                  {saved ? <Button variant="ghost" size="sm" onClick={() => removeProviderKey(provider)}>Clear</Button> : null}
                 </div>
               </div>
             )
@@ -616,11 +611,11 @@ export function SettingsPage() {
         <p className="settings-hint">Manage which models appear here and their token prices in <a href="#/settings?section=models">Models</a>.</p>
         {aiError && <p className="banner banner-error form-error">{aiError}</p>}
         <div className="settings-actions">
-          <button className="primary-button" onClick={() => void connectAI()} disabled={aiState !== 'idle' || !effectiveActiveKey || !aiModel}>
+          <Button onClick={() => void connectAI()} disabled={aiState !== 'idle' || !effectiveActiveKey || !aiModel}>
             {aiState === 'checking' ? <LoaderCircle className="spin" size={16} /> : aiState === 'done' ? <Check size={16} /> : <Bot size={16} />}
             {aiState === 'checking' ? 'Checking…' : aiState === 'done' ? 'Connected' : hasAnyKey ? 'Test connection' : 'Connect'}
-          </button>
-          {hasAnyKey && <button className="text-button" onClick={() => { clearAIConfig(); setKeyDrafts({}) }}><Unplug size={15} /> Disconnect all</button>}
+          </Button>
+          {hasAnyKey && <Button variant="ghost" onClick={() => { clearAIConfig(); setKeyDrafts({}) }}><Unplug size={15} /> Disconnect all</Button>}
         </div>
       </section>
 
@@ -693,10 +688,10 @@ export function SettingsPage() {
               </label>
               {aiBuildError && <p className="banner banner-error form-error">{aiBuildError}</p>}
               <div className="settings-actions">
-                <button className="secondary-button" onClick={() => void buildPersonaWithAI()} disabled={aiBuilding || !aiDescription.trim()}>
+                <Button variant="outline" onClick={() => void buildPersonaWithAI()} disabled={aiBuilding || !aiDescription.trim()}>
                   {aiBuilding ? <LoaderCircle className="spin" size={16} /> : <Wand2 size={16} />}
                   {aiBuilding ? 'Generating…' : 'Generate with AI'}
-                </button>
+                </Button>
               </div>
             </div>
             <div className="field-grid">
@@ -704,14 +699,14 @@ export function SettingsPage() {
               <label><span>Icon</span><IconPicker value={newPersonaIcon} onChange={setNewPersonaIcon} /></label>
               <label className="persona-prompt-field"><span>System prompt</span><textarea value={newPersonaPrompt} onChange={(event) => setNewPersonaPrompt(event.target.value)} rows={3} placeholder="You are a supportive career coach…" /></label>
               <div className="settings-actions">
-                <button className="primary-button" onClick={() => void addPersona()} disabled={!newPersonaName.trim()}><Plus size={16} /> Create persona</button>
-                <button className="text-button" onClick={() => setCreatingPersona(false)}>Cancel</button>
+                <Button onClick={() => void addPersona()} disabled={!newPersonaName.trim()}><Plus size={16} /> Create persona</Button>
+                <Button variant="ghost" onClick={() => setCreatingPersona(false)}>Cancel</Button>
               </div>
             </div>
           </div>
         ) : (
           <div className="settings-actions">
-            <button className="secondary-button" onClick={() => setCreatingPersona(true)}><Plus size={16} /> New persona</button>
+            <Button variant="outline" onClick={() => setCreatingPersona(true)}><Plus size={16} /> New persona</Button>
           </div>
         )}
       </section>
@@ -733,7 +728,7 @@ export function SettingsPage() {
       <section className="settings-card">
         <div className="settings-title"><FileText size={20} /><div><h2>Thread templates</h2><p>Mark any thread <em>Use as template</em> in its header, then copy it onto another from the Omnibox (<kbd>⌘⇧P</kbd> → Apply template).</p></div></div>
         <div className="settings-actions">
-          <a className="secondary-button" href="#/templates">Manage templates</a>
+          <ButtonLink variant="outline" to="/templates">Manage templates</ButtonLink>
         </div>
       </section>
 
@@ -750,9 +745,9 @@ export function SettingsPage() {
       <section className="settings-card">
         <div className="settings-title"><BookOpen size={20} /><div><h2>Documentation</h2><p>Reference guides for Thread’s features.</p></div></div>
         <div className="settings-actions">
-          <a className="secondary-button" href="#/docs/query-language">Query language</a>
-          <a className="secondary-button" href="#/docs/recipe-syntax">Recipe syntax</a>
-          <a className="text-button" href="#/docs">All docs</a>
+          <ButtonLink variant="outline" to="/docs/query-language">Query language</ButtonLink>
+          <ButtonLink variant="outline" to="/docs/recipe-syntax">Recipe syntax</ButtonLink>
+          <ButtonLink variant="ghost" to="/docs">All docs</ButtonLink>
         </div>
       </section>
 
@@ -786,7 +781,7 @@ function TrustedActionsCard() {
                   <code>{name}</code>
                   {summary ? <span>{summary}</span> : null}
                 </div>
-                <button className="text-button" onClick={() => revokeCapability(name)}>Revoke</button>
+                <Button variant="ghost" size="sm" onClick={() => revokeCapability(name)}>Revoke</Button>
               </div>
             )
           })}
@@ -824,9 +819,9 @@ function PersonaRow({
         <DynamicIcon name={persona.icon} size={16} />
         <span className="persona-row-name">{persona.name}</span>
         <div className="settings-actions">
-          <button className="text-button" onClick={onEdit}>Edit</button>
+          <Button variant="ghost" size="sm" onClick={onEdit}>Edit</Button>
           {persona.id !== GENERAL_PERSONA_ID && (
-            <button className="text-button" onClick={() => void archivePersona(persona.id)}><Trash2 size={15} /></button>
+            <Button variant="danger" size="sm" iconOnly aria-label="Delete persona" onClick={() => void archivePersona(persona.id)}><Trash2 size={15} /></Button>
           )}
         </div>
       </div>
@@ -839,8 +834,8 @@ function PersonaRow({
       <label><span>Icon</span><IconPicker value={icon} onChange={setIcon} /></label>
       <label className="persona-prompt-field"><span>System prompt</span><textarea value={systemPrompt} onChange={(event) => setSystemPrompt(event.target.value)} rows={3} /></label>
       <div className="settings-actions">
-        <button className="primary-button" onClick={() => void save()}>Save</button>
-        <button className="text-button" onClick={onCancelEdit}>Cancel</button>
+        <Button onClick={() => void save()}>Save</Button>
+        <Button variant="ghost" onClick={onCancelEdit}>Cancel</Button>
       </div>
     </div>
   )

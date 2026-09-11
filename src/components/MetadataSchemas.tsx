@@ -14,6 +14,7 @@ import {
 } from '../db'
 import { DEFAULT_TAG_COLOR } from '../lib/tagColors'
 import { isWorkoutSystemTag } from '../lib/workouts/systemTags'
+import { Button } from './ui'
 
 const FIELD_TYPES: Array<{ value: PropertyType; label: string }> = [
   { value: 'text', label: 'Text' },
@@ -52,7 +53,7 @@ export function MetadataSchemas() {
       }}>
         <Hash size={15} />
         <input value={newSchema} onChange={(event) => setNewSchema(event.target.value)} placeholder="New schema tag" aria-label="New schema tag" />
-        <button type="submit" className="secondary-button" disabled={!newSchema.trim()}><Plus size={14} /> Create schema</button>
+        <Button type="submit" variant="outline" disabled={!newSchema.trim()}><Plus size={14} /> Create schema</Button>
       </form>
 
       <div className="schema-ledger">
@@ -72,7 +73,7 @@ export function MetadataSchemas() {
           <select value={newFieldType} onChange={(event) => setNewFieldType(event.target.value as PropertyType)} aria-label="New field type">
             {FIELD_TYPES.map((type) => <option value={type.value} key={type.value}>{type.label}</option>)}
           </select>
-          <button type="submit" className="text-button" disabled={!newField.trim()}><Plus size={14} /> Add field</button>
+          <Button type="submit" variant="ghost" disabled={!newField.trim()}><Plus size={14} /> Add field</Button>
         </form>
       </div>
       {error && <p className="banner banner-error form-error" role="alert">{error}</p>}
@@ -142,11 +143,11 @@ function SchemaEditor({ tag, definitions, onError }: { tag: TagDefinitionRecord;
           })}
         </div>
         <div className="schema-editor-actions">
-          <button type="button" className="primary-button" onClick={() => void save()}><Save size={14} /> {saved ? 'Saved' : 'Save schema'}</button>
-          {!isSystem && <button type="button" className="text-button schema-delete" onClick={() => {
+          <Button onClick={() => void save()}><Save size={14} /> {saved ? 'Saved' : 'Save schema'}</Button>
+          {!isSystem && <Button variant="danger" className="schema-delete" onClick={() => {
             if (!window.confirm(`Delete #${tag.name}? The tag will be removed from every block. Explicit property values will stay.`)) return
             void deleteTagDefinition(tag.id).catch((caught) => onError(caught instanceof Error ? caught.message : String(caught)))
-          }}><Trash2 size={14} /> Delete</button>}
+          }}><Trash2 size={14} /> Delete</Button>}
         </div>
       </div>
     </details>

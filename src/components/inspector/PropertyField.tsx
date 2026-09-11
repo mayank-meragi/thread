@@ -11,6 +11,7 @@ import {
   type TagDefinitionRecord,
 } from '../../db'
 import { PROPERTY_TYPES } from './propertyTypes'
+import { Button } from '../ui'
 
 // A property field edits either a block's property or a thread's property; the
 // control and validation are identical, only the mutation differs.
@@ -57,7 +58,7 @@ export function PropertyControl({
   }
 
   if (definition.type === 'boolean') {
-    return <button type="button" className={value === true ? 'property-boolean active' : 'property-boolean'} aria-pressed={value === true} onClick={() => void save(value !== true)}><span>{value === true && <Check size={12} />}</span>{value === true ? 'Yes' : 'No'}</button>
+    return <Button variant="outline" size="sm" className={value === true ? 'property-boolean active' : 'property-boolean'} aria-pressed={value === true} onClick={() => void save(value !== true)}><span>{value === true && <Check size={12} />}</span>{value === true ? 'Yes' : 'No'}</Button>
   }
   if ((definition.type === 'select' || definition.type === 'status') && definition.options?.length) {
     return <select value={typeof value === 'string' ? value : ''} onChange={(event) => void save(event.target.value)}>
@@ -79,15 +80,16 @@ export function PropertyControl({
     return (
       <div className="property-multi-select" role="group" aria-label={definition.name}>
         {definition.options.map((option) => (
-          <button
+          <Button
             key={option.id}
-            type="button"
+            variant="outline"
+            size="sm"
             className={selected.has(option.id) ? 'property-chip active' : 'property-chip'}
             aria-pressed={selected.has(option.id)}
             onClick={() => toggle(option.id)}
           >
             {option.label}
-          </button>
+          </Button>
         ))}
       </div>
     )
@@ -134,7 +136,7 @@ export function PropertyField({
         <span>{definition.name}{schema && <small className="property-schema-source">#{schema.tag.name}{schema.required ? ' · required' : ''}</small>}</span>
         <PropertyControl target={target} definition={definition} value={value} onError={onError} />
       </label>
-      {(onRemove || value !== undefined) && <button type="button" className="tap-target-sm property-remove" aria-label={`Remove ${definition.name}`} onClick={clear}><Trash2 size={13} /></button>}
+      {(onRemove || value !== undefined) && <Button variant="danger" size="sm" iconOnly className="tap-target-sm property-remove" aria-label={`Remove ${definition.name}`} onClick={clear}><Trash2 size={13} /></Button>}
     </div>
   )
 }
@@ -153,8 +155,8 @@ export function NewPropertyForm({ onDone, onError }: { onDone: (created?: Proper
       <select value={type} onChange={(event) => setType(event.target.value as PropertyType)} aria-label="Property type">
         {PROPERTY_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
       </select>
-      <button type="submit" className="primary-button" disabled={!name.trim()}>Create</button>
-      <button type="button" className="text-button" onClick={() => onDone()}>Cancel</button>
+      <Button type="submit" disabled={!name.trim()}>Create</Button>
+      <Button variant="ghost" onClick={() => onDone()}>Cancel</Button>
     </form>
   )
 }

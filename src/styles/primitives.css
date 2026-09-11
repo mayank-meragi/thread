@@ -144,6 +144,9 @@ textarea.field-control { min-height: 80px; padding: 9px 11px; resize: vertical; 
 .btn[aria-disabled='true'] { opacity: var(--disabled-opacity); cursor: default; }
 .btn-sm { min-height: 32px; padding: 0 10px; font-size: var(--text-meta); border-radius: var(--radius-sm); }
 .btn-lg { min-height: 48px; padding: 0 18px; }
+.btn-icon { width: 44px; padding: 0; }
+.btn-icon.btn-sm { width: 32px; padding: 0; }
+.btn-icon.btn-lg { width: 48px; padding: 0; }
 
 .btn-solid { background: var(--ink); border-color: var(--ink); color: var(--on-solid); }
 .btn-solid:hover:not(:disabled) { background: var(--ink-soft); border-color: var(--ink-soft); }
@@ -161,7 +164,10 @@ textarea.field-control { min-height: 80px; padding: 9px 11px; resize: vertical; 
 .btn-danger:hover:not(:disabled) { background: var(--danger-soft); border-color: var(--danger); }
 
 .btn-loading { color: transparent !important; pointer-events: none; position: relative; }
-.btn-loading .btn-spinner { position: absolute; color: inherit; }
+.btn-loading .btn-spinner { position: absolute; color: var(--on-solid); }
+.btn-outline.btn-loading .btn-spinner,
+.btn-ghost.btn-loading .btn-spinner { color: var(--ink); }
+.btn-danger.btn-loading .btn-spinner { color: var(--danger); }
 
 /* ---------------------------------------------------------------------- */
 /* Chip — semantic accents for Chip.tsx; consolidates priority-chip /

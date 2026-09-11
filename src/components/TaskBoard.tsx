@@ -4,6 +4,7 @@ import type { BlockTagRecord, MentionRecord, TagDefinitionRecord, TaskRecord, Ta
 import { formatDay, isoToday } from '../lib/dates'
 import { setTaskStatus } from '../lib/tasks'
 import { TaskStatusIcon } from './TaskStatusControl'
+import { Button } from './ui'
 
 const EMPTY_SELECTION = new Set<string>()
 function NOOP_SELECT(): void {}
@@ -142,7 +143,7 @@ function TaskCard({
         </label>}
         {task.priority && <span className={`priority-dot priority-${task.priority}`} title={`${task.priority} priority`} />}
       </div>
-      <button type="button" className="task-board-card-body" onClick={onOpen}>
+      <Button variant="ghost" className="task-board-card-body" onClick={onOpen}>
         <span className="task-row-title">{task.text}</span>
         {task.description && <span className="task-row-description">{task.description}</span>}
         <span className="task-board-card-foot">
@@ -152,7 +153,7 @@ function TaskCard({
           {appliedTags.slice(0, 2).map((tag) => <span key={tag.id}><Tag size={10} /> {tag.name}</span>)}
           {relatedThreads.slice(0, 2).map((mention) => <span key={mention.threadId}>#{mention.title}</span>)}
         </span>
-      </button>
+      </Button>
     </div>
   )
 }

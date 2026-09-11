@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Pause, Play, RotateCcw } from 'lucide-react'
+import { Button } from '../ui'
 
 function formatClock(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60)
@@ -54,12 +55,12 @@ export function CookTimer({ seconds }: { seconds: number }) {
     <div className="cook-timer" role="timer">
       <span className="cook-timer-clock">{formatClock(remaining)}</span>
       <div className="cook-timer-controls">
-        <button type="button" onClick={() => setRunning((value) => !value)} disabled={remaining === 0} aria-label={running ? 'Pause timer' : 'Start timer'}>
+        <Button variant="ghost" size="sm" iconOnly onClick={() => setRunning((value) => !value)} disabled={remaining === 0} aria-label={running ? 'Pause timer' : 'Start timer'}>
           {running ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
-        </button>
-        <button type="button" onClick={() => { setRunning(false); setRemaining(seconds) }} aria-label="Reset timer">
+        </Button>
+        <Button variant="ghost" size="sm" iconOnly onClick={() => { setRunning(false); setRemaining(seconds) }} aria-label="Reset timer">
           <RotateCcw size={14} aria-hidden="true" />
-        </button>
+        </Button>
       </div>
     </div>
   )

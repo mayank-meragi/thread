@@ -18,6 +18,7 @@ import {
 } from '../lib/workouts/presentation'
 import { formatShortDate } from '../lib/dates'
 import type { WorkoutExerciseView, WorkoutView } from '../lib/workouts/types'
+import { Button, ButtonLink } from '../components/ui'
 
 const STATE_LABEL = { planned: 'Planned', active: 'Active', completed: 'Completed', canceled: 'Canceled' } as const
 
@@ -170,21 +171,21 @@ export function WorkoutOverviewPage() {
 
       <div className="workout-overview-actions">
         {(state === 'planned' || state === 'active') && (
-          <button type="button" className="primary-button workout-overview-cta" disabled={busy} onClick={() => void enter()}>
+          <Button className="workout-overview-cta" disabled={busy} onClick={() => void enter()}>
             <Play size={15} aria-hidden="true" /> {state === 'active' ? 'Resume workout' : 'Start workout'}
-          </button>
+          </Button>
         )}
         {state === 'active' && (
-          <button type="button" className="text-button workout-overview-secondary" disabled={busy} onClick={() => void finish()}>
+          <Button variant="ghost" className="workout-overview-secondary" disabled={busy} onClick={() => void finish()}>
             <CheckCircle2 size={14} aria-hidden="true" /> Finish workout
-          </button>
+          </Button>
         )}
         {(state === 'completed' || state === 'canceled') && (
           <>
-            <Link to={activeHref} className="primary-button workout-overview-cta">Review workout</Link>
-            <button type="button" className="text-button workout-overview-secondary" disabled={busy} onClick={() => void guard(() => reopenWorkout(view.task.id))}>
+            <ButtonLink to={activeHref} className="workout-overview-cta">Review workout</ButtonLink>
+            <Button variant="ghost" className="workout-overview-secondary" disabled={busy} onClick={() => void guard(() => reopenWorkout(view.task.id))}>
               <RotateCcw size={14} aria-hidden="true" /> Reopen
-            </button>
+            </Button>
           </>
         )}
       </div>
