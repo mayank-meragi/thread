@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
-import { BookOpenText, Dumbbell, ListTodo, Plus, Rss } from 'lucide-react'
-import { HashRouter, NavLink, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { BookOpenText, ChefHat, Dumbbell, ListTodo, Menu, Plus, Rss } from 'lucide-react'
+import { HashRouter, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { initializeDatabase } from './db'
 import { isoToday } from './lib/dates'
 import { OPEN_CHAT_EVENT, TOGGLE_RAIL_EVENT } from './lib/dockviewActions'
@@ -15,9 +15,12 @@ import { useGitHubSync } from './hooks/useGitHubSync'
 
 function AppShell() {
   const navigate = useNavigate()
+  const location = useLocation()
   const sync = useGitHubSync()
   const [omnibox, setOmnibox] = useState<{ open: boolean; mode: 'command' | 'search' }>({ open: false, mode: 'command' })
   const [activityBarHidden, setActivityBarHidden] = useState(() => isUserActivityBarHidden())
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
+  const mobileMoreRef = useRef<HTMLDivElement>(null)
   const closeOmnibox = useCallback(() => setOmnibox((state) => ({ ...state, open: false })), [])
   const openCommand = useCallback(() => setOmnibox({ open: true, mode: 'command' }), [])
   const openOmniboxSearch = useCallback(() => setOmnibox({ open: true, mode: 'search' }), [])
@@ -53,6 +56,22 @@ function AppShell() {
     window.addEventListener('keydown', openGlobalActions)
     return () => window.removeEventListener('keydown', openGlobalActions)
   }, [navigate, toggleRail, openCommand, openOmniboxSearch])
+
+  useEffect(() => {
+    if (!mobileMoreOpen) return
+    const closeOnOutside = (event: MouseEvent) => {
+      if (mobileMoreRef.current && !mobileMoreRef.current.contains(event.target as Node)) setMobileMoreOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileMoreOpen(false)
+    }
+    document.addEventListener('mousedown', closeOnOutside)
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutside)
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [mobileMoreOpen])
 
   const syncProps = {
     connected: sync.connected,
@@ -97,7 +116,24 @@ function AppShell() {
           <span className="mobile-create-mark"><Plus size={19} /></span><span>Create</span>
         </button>
         <NavLink to="/workouts" className={({ isActive }) => isActive ? 'active' : ''}><Dumbbell size={19} /><span>Workouts</span></NavLink>
-        <NavLink to="/feeds" className={({ isActive }) => isActive ? 'active' : ''}><Rss size={19} /><span>Feeds</span></NavLink>
+        <div className="mobile-more" ref={mobileMoreRef}>
+          <button
+            type="button"
+            className={`mobile-more-trigger${location.pathname === '/feeds' || location.pathname.startsWith('/recipe') ? ' active' : ''}`}
+            aria-label="More navigation"
+            aria-haspopup="menu"
+            aria-expanded={mobileMoreOpen}
+            onClick={() => setMobileMoreOpen((current) => !current)}
+          >
+            <Menu size={19} aria-hidden="true" /><span>More</span>
+          </button>
+          {mobileMoreOpen && (
+            <div className="mobile-more-menu" role="menu" aria-label="More destinations">
+              <NavLink to="/feeds" role="menuitem" onClick={() => setMobileMoreOpen(false)}><Rss size={17} aria-hidden="true" /><span>Feed</span></NavLink>
+              <NavLink to="/recipes" role="menuitem" onClick={() => setMobileMoreOpen(false)}><ChefHat size={17} aria-hidden="true" /><span>Recipe</span></NavLink>
+            </div>
+          )}
+        </div>
       </nav>
 
       <Omnibox open={omnibox.open} initialMode={omnibox.mode} onClose={closeOmnibox} onTogglePanel={toggleRail} />

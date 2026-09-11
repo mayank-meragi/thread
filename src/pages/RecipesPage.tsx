@@ -75,7 +75,7 @@ export function RecipesPage() {
           <ButtonLink to="/meal-plan" variant="outline" className="recipes-import-open">
             <CalendarDays size={15} aria-hidden="true" /> Meal plan
           </ButtonLink>
-          <Button variant="outline" className="recipes-import-open" onClick={() => setImportOpen(true)}>
+          <Button variant="outline" className="recipes-import-open recipes-import-url" onClick={() => setImportOpen(true)}>
             <Download size={15} aria-hidden="true" /> Import from URL
           </Button>
           <form

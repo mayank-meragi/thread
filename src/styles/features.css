@@ -1363,10 +1363,15 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .dockview-theme-thread .dv-groupview,
   .dockview-theme-thread .dv-content-container { background: transparent; }
   .mobile-nav { position: fixed; z-index: 20; inset: auto 16px calc(10px + env(safe-area-inset-bottom)) 16px; display: grid; grid-template-columns: repeat(5, 1fr); padding: 5px; border: 1px solid var(--glass-border); border-radius: 16px; background: var(--nav-glass); box-shadow: var(--shadow); backdrop-filter: blur(18px); }
-  .mobile-nav a, .mobile-nav button { min-height: 47px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 0; border-radius: 11px; background: transparent; color: var(--muted); font-size: var(--text-meta); cursor: pointer; }
-  .mobile-nav a.active, .mobile-nav button.active { color: var(--ink); background: var(--paper); box-shadow: var(--shadow-soft); }
+  .mobile-nav > a, .mobile-nav > button, .mobile-more-trigger { min-height: 47px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 0; border-radius: 11px; background: transparent; color: var(--muted); font-size: var(--text-meta); cursor: pointer; }
+  .mobile-nav > a.active, .mobile-nav > button.active, .mobile-more-trigger.active { color: var(--ink); background: var(--paper); box-shadow: var(--shadow-soft); }
   .mobile-nav .mobile-create { overflow: visible; color: var(--ink); }
   .mobile-create-mark { width: 31px; height: 27px; display: grid; place-items: center; margin-top: -12px; border: 1px solid var(--thread); border-radius: 10px; background: var(--ink); color: var(--on-solid); box-shadow: 0 7px 16px color-mix(in srgb, var(--thread) 25%, transparent); }
+  .mobile-more { position: relative; min-width: 0; }
+  .mobile-more-trigger { width: 100%; padding: 0; }
+  .mobile-more-menu { position: absolute; right: 0; bottom: calc(100% + 10px); width: 176px; padding: 6px; border: 1px solid var(--glass-border); border-radius: 13px; background: var(--paper-raised); box-shadow: var(--shadow); }
+  .mobile-more-menu a { min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-radius: 9px; color: var(--ink-soft); font-size: 13px; text-decoration: none; }
+  .mobile-more-menu a:hover, .mobile-more-menu a.active { background: var(--control-hover); color: var(--ink); }
   body.mobile-editor-active .mobile-nav { display: none; }
   .layer-backdrop.command-backdrop { place-items: end center; padding: 0; background: var(--scrim-strong); }
   .command-sheet { width: 100%; max-height: min(82dvh, 680px); padding: 0 0 calc(12px + env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0; border-bottom: 0; }
@@ -2389,6 +2394,20 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .recipe-card-body { padding: 12px 14px 14px; }
 .recipe-card-body h3 { margin: 0; font: 500 16px/1.25 var(--font-display); color: var(--ink); }
 .recipe-card-meta { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+
+@container panel (max-width: 760px) {
+  .recipes-page { padding: 28px 22px 110px; }
+  .recipes-hero { display: block; margin-bottom: 20px; }
+  .recipes-hero h1 { font-size: 34px; }
+  .recipes-hero-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 22px; }
+  .recipes-import-open { width: 100%; min-width: 0; justify-content: center; }
+  .recipes-import-url { grid-column: 1 / -1; }
+  .recipes-new-form { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) auto; width: 100%; gap: 8px; }
+  .recipes-new-form input { width: 100%; min-width: 0; }
+  .recipes-new-form .btn { white-space: nowrap; }
+  .recipes-search { width: 100%; max-width: none; margin: 18px 0 22px; }
+  .recipes-grid { grid-template-columns: 1fr; gap: 14px; }
+}
 
 .recipe-page, .cook-page { width: min(760px, 100%); margin: 0 auto; padding: 24px 20px 110px; }
 .recipe-page-hero, .cook-page-hero { margin: 16px 0 26px; }
