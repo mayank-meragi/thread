@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate } from 'react-router-dom'
-import { CalendarDays, ChefHat, Download, Plus, Search } from 'lucide-react'
+import { BookOpen, CalendarDays, ChefHat, Download, Plus, Search } from 'lucide-react'
 import { ImportDialog } from '../components/recipes/ImportDialog'
 import { createRecipeThread } from '../lib/recipes/mutations'
 import { listRecipes } from '../lib/recipes/selectors'
@@ -68,6 +68,9 @@ export function RecipesPage() {
       <header className="recipes-hero">
         <div><h1>Recipes</h1><p>Your personal recipe box.</p></div>
         <div className="recipes-hero-actions">
+          <Link to="/docs/recipe-syntax" className="secondary-button recipes-import-open">
+            <BookOpen size={15} aria-hidden="true" /> Syntax guide
+          </Link>
           <Link to="/meal-plan" className="secondary-button recipes-import-open">
             <CalendarDays size={15} aria-hidden="true" /> Meal plan
           </Link>
@@ -98,7 +101,11 @@ export function RecipesPage() {
         <div className="recipes-empty">
           <ChefHat size={24} aria-hidden="true" />
           <h2>Start your recipe box</h2>
-          <p>Write your first recipe as steps with <code>@ingredient{'{'}qty%unit{'}'}</code> annotations, and the ingredient list builds itself.</p>
+          <p>
+            Write your first recipe as steps with <code>@ingredient{'{'}qty%unit{'}'}</code> annotations, and the
+            ingredient list builds itself. See the <Link to="/docs/recipe-syntax">syntax guide</Link> for
+            cookware (<code>#pan{'{'}{'}'}</code>) and timers (<code>~{'{'}5%minutes{'}'}</code>) too.
+          </p>
         </div>
       ) : (
         <>

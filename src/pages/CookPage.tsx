@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check, SkipForward } from 'lucide-react'
 import { CookTimer } from '../components/recipes/CookTimer'
+import { CooklangText } from '../components/recipes/CooklangText'
 import {
   UnresolvedCookStepsError,
   completeCookStep,
@@ -130,7 +131,7 @@ export function CookPage() {
               <li key={step.task.id} className={`cook-step-row state-${state}${isActive ? ' active' : ''}`}>
                 <span className="cook-step-number">{state === 'done' ? <Check size={13} aria-hidden="true" /> : index + 1}</span>
                 <div className="cook-step-body">
-                  <p>{text}</p>
+                  <p><CooklangText text={text} /></p>
                   {isActive && state === 'pending' && (
                     <div className="cook-step-actions">
                       {step.durationSeconds !== undefined && <CookTimer key={step.task.id} seconds={step.durationSeconds} />}

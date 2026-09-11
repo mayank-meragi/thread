@@ -1,4 +1,4 @@
-import { createThread, db, removeThreadProperty, saveThreadNote, setBlockProperty, setThreadProperty, type PropertyValue } from '../../db'
+import { createThread, db, deleteThread, removeThreadProperty, saveThreadNote, setBlockProperty, setThreadProperty, type PropertyValue } from '../../db'
 import { createMealPlanTask, deleteTask } from '../tasks'
 import { parseThreadDocument } from '../threadDocument'
 import { RECIPE_MARKER_PROPERTY, getCookRole, isRecipeThread, parseRecipeSteps } from './selectors'
@@ -102,6 +102,19 @@ export async function updateRecipeProperties(recipeThreadId: string, values: Rec
       await setThreadProperty(recipeThreadId, propertyId, raw as PropertyValue)
     }
   }
+}
+
+/** Wholesale replace all steps at once -- used by AI-proposed edits and imports, where the whole step list is regenerated rather than edited one line at a time. */
+export async function replaceSteps(recipeThreadId: string, steps: string[]): Promise<void> {
+  await requireRecipe(recipeThreadId)
+  const cleaned = steps.map((step) => step.trim()).filter(Boolean)
+  if (!cleaned.length) throw new Error('A recipe needs at least one step.')
+  await writeSteps(recipeThreadId, cleaned)
+}
+
+export async function deleteRecipeThread(recipeThreadId: string): Promise<void> {
+  await requireRecipe(recipeThreadId)
+  await deleteThread(recipeThreadId)
 }
 
 // --- Meal planning ---------------------------------------------------------

@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChefHat, Minus, Plus, Trash2 } from 'lucide-react'
+import { CooklangText } from '../components/recipes/CooklangText'
 import { formatQuantity, scaleIngredient } from '../lib/recipes/cooklangTokens'
 import { isoToday } from '../lib/dates'
 import { ActiveCookConflictError, startCook } from '../lib/recipes/lifecycle'
-import { addStep, removeStep, updateStep } from '../lib/recipes/mutations'
+import { addStep, deleteRecipeThread, removeStep, updateStep } from '../lib/recipes/mutations'
 import { getRecipe } from '../lib/recipes/selectors'
 import type { RecipeIngredient } from '../lib/recipes/cooklangTokens'
 
@@ -47,7 +48,7 @@ function StepEditor({ step, onSave, onRemove }: { step: { index: number; text: s
           disabled={saving}
         />
       ) : (
-        <p className="recipe-step-text" onClick={() => setEditing(true)}>{step.text}</p>
+        <p className="recipe-step-text" onClick={() => setEditing(true)}><CooklangText text={step.text} /></p>
       )}
       <button type="button" className="recipe-step-remove" aria-label="Remove step" onClick={onRemove}><Trash2 size={14} aria-hidden="true" /></button>
     </li>
@@ -63,6 +64,7 @@ export function RecipePage() {
   const [servingsOverride, setServingsOverride] = useState<number | null>(null)
   const [cookError, setCookError] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   if (recipe === undefined) return <div className="page-loading">Loading recipe…</div>
   if (recipe === null) {
@@ -118,6 +120,19 @@ export function RecipePage() {
     }
   }
 
+  const deleteRecipe = async () => {
+    if (!window.confirm(`Delete "${recipe.thread.title}"? This cannot be undone.`)) return
+    setDeleting(true)
+    setCookError(null)
+    try {
+      await deleteRecipeThread(threadId)
+      navigate('/recipes')
+    } catch (caught) {
+      setCookError(caught instanceof Error ? caught.message : String(caught))
+      setDeleting(false)
+    }
+  }
+
   return (
     <article className="recipe-page">
       <Link to="/recipes" className="back-link">Back to recipes</Link>
@@ -130,9 +145,14 @@ export function RecipePage() {
             {typeof cookMinutes === 'number' ? `${cookMinutes} min cook` : null}
           </p>
         </div>
-        <button type="button" className="primary-button" disabled={starting || !recipe.steps.length} onClick={() => void startCooking()}>
-          <ChefHat size={16} aria-hidden="true" /> Start cooking
-        </button>
+        <div className="recipe-page-hero-actions">
+          <button type="button" className="primary-button" disabled={starting || !recipe.steps.length} onClick={() => void startCooking()}>
+            <ChefHat size={16} aria-hidden="true" /> Start cooking
+          </button>
+          <button type="button" className="icon-button recipe-delete" aria-label="Delete recipe" disabled={deleting} onClick={() => void deleteRecipe()}>
+            <Trash2 size={16} aria-hidden="true" />
+          </button>
+        </div>
       </header>
       {cookError && <p className="add-exercise-error" role="alert">{cookError}</p>}
 

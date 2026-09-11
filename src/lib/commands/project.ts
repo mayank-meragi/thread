@@ -67,6 +67,18 @@ export function projectCommandOutput(prepared: PreparedCommand): unknown | undef
     case 'workout.logSet':
     case 'workout.finish':
       return { workout: undefined, status: undefined }
+    case 'recipe.create':
+      return existing
+        ? { thread: existing.id, created: false }
+        : { thread: slugifyThread(String(input.title)), created: true }
+    case 'recipe.addSteps':
+    case 'recipe.setSteps':
+    case 'recipe.removeStep':
+      return { thread: thread?.id, stepCount: undefined }
+    case 'recipe.updateStep':
+    case 'recipe.updateProperties':
+    case 'recipe.delete':
+      return { thread: thread?.id, changed: hasChanges }
     default:
       return undefined
   }

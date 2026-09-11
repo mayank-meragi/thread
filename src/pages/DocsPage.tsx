@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, BookOpen } from 'lucide-react'
 import { QueryLanguageDoc } from '../components/docs/QueryLanguageDoc'
+import { RecipeSyntaxDoc } from '../components/docs/RecipeSyntaxDoc'
 
 interface DocEntry {
   slug: string
@@ -16,6 +17,12 @@ const DOCS: DocEntry[] = [
     title: 'Query language',
     blurb: 'Write ```tql blocks to list and tabulate threads and tags.',
     body: () => <QueryLanguageDoc />,
+  },
+  {
+    slug: 'recipe-syntax',
+    title: 'Recipe syntax',
+    blurb: 'Write @ingredients, #cookware and ~timers inline in recipe steps.',
+    body: () => <RecipeSyntaxDoc />,
   },
 ]
 

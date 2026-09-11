@@ -63,3 +63,8 @@ export const workoutGuideResultSchema = z.object({
   changed: z.boolean(),
   fields: z.array(z.string()),
 }).strict()
+
+export const recipeStepsResultSchema = z.object({
+  thread: z.string(),
+  stepCount: z.number().int().nonnegative(),
+}).strict()

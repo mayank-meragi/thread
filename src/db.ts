@@ -1015,6 +1015,23 @@ export async function renameThread(threadId: string, nextTitle: string): Promise
   await queueWorkspaceSync()
 }
 
+// Permanently deletes a thread the user chose to remove (as opposed to
+// `pruneThreadIfOrphan`, which only sweeps threads nobody references any
+// more). Removes the thread, its note body, and its derived property index,
+// then records a tombstone so the deletion propagates through GitHub sync.
+// Any `[[wiki-link]]` mentions left pointing at this id are NOT rewritten --
+// same self-healing behavior as any other dangling wikilink -- so a stub
+// thread can reappear if something still links to it, which is expected.
+export async function deleteThread(threadId: string): Promise<void> {
+  await db.transaction('rw', [db.threads, db.threadNotes, db.threadProperties, db.outbox], async () => {
+    await db.threads.delete(threadId)
+    await db.threadNotes.delete(threadId)
+    await db.threadProperties.where('threadId').equals(threadId).delete()
+    await db.outbox.delete(`thread-note:${threadId}`)
+  })
+  await recordWorkspaceTombstone('threads', threadId)
+}
+
 const threadNoteSaveQueues = new Map<string, Promise<void>>()
 
 // Rebuilds the `threadProperties` index for one thread from its decoded

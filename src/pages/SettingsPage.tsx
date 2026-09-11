@@ -751,6 +751,7 @@ export function SettingsPage() {
         <div className="settings-title"><BookOpen size={20} /><div><h2>Documentation</h2><p>Reference guides for Thread’s features.</p></div></div>
         <div className="settings-actions">
           <a className="secondary-button" href="#/docs/query-language">Query language</a>
+          <a className="secondary-button" href="#/docs/recipe-syntax">Recipe syntax</a>
           <a className="text-button" href="#/docs">All docs</a>
         </div>
       </section>

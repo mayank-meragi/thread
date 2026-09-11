@@ -81,3 +81,44 @@ export function editorLinksToCooklang(markdown: string): string {
     (whole: string, href: string) => decodeToken(href) ?? whole,
   )
 }
+
+export type CooklangSegmentKind = 'text' | 'ingredient' | 'cookware' | 'timer'
+export interface CooklangSegment { kind: CooklangSegmentKind; text: string }
+
+// Read-only counterpart to `cooklangLinksToEditor`, for rendering canonical
+// Cooklang text (e.g. a recipe step) outside the Milkdown editor -- same
+// single-pass token matching, but producing plain segments for a React
+// component to render as chips instead of a Markdown chip-link string.
+export function splitCooklangSegments(markdown: string): CooklangSegment[] {
+  const segments: CooklangSegment[] = []
+  let lastIndex = 0
+  const pushText = (text: string) => {
+    if (text) segments.push({ kind: 'text', text })
+  }
+  for (const match of markdown.matchAll(TOKEN_PATTERN)) {
+    const index = match.index ?? 0
+    const raw = match[0]
+    const groups = match.groups as Record<string, string | undefined>
+    pushText(markdown.slice(lastIndex, index))
+    lastIndex = index + raw.length
+    if (groups.ingName !== undefined) {
+      const name = groups.ingName.trim()
+      if (!name) { pushText(raw); continue }
+      segments.push({ kind: 'ingredient', text: ingredientLabel(name, groups.ingContent ?? '') })
+    } else if (groups.ingBare !== undefined) {
+      segments.push({ kind: 'ingredient', text: groups.ingBare })
+    } else if (groups.timerLabel !== undefined) {
+      segments.push({ kind: 'timer', text: timerLabel(groups.timerLabel.trim(), groups.timerContent ?? '') })
+    } else if (groups.cookName !== undefined) {
+      const name = groups.cookName.trim()
+      if (!name) { pushText(raw); continue }
+      segments.push({ kind: 'cookware', text: name })
+    } else if (groups.cookBare !== undefined) {
+      segments.push({ kind: 'cookware', text: groups.cookBare })
+    } else {
+      pushText(raw)
+    }
+  }
+  pushText(markdown.slice(lastIndex))
+  return segments
+}

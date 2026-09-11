@@ -2394,6 +2394,10 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .recipe-page-hero, .cook-page-hero { margin: 16px 0 26px; }
 .recipe-page-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .recipe-page-hero .primary-button { min-height: 42px; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.recipe-page-hero-actions { display: flex; align-items: center; gap: 8px; }
+.recipe-page-hero-actions .icon-button { width: 38px; height: 38px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--muted); cursor: pointer; }
+.recipe-page-hero-actions .icon-button:hover { color: var(--danger, #c0392b); border-color: color-mix(in srgb, var(--danger, #c0392b) 40%, var(--line)); background: var(--control); }
+.recipe-page-hero-actions .icon-button:disabled { opacity: .5; cursor: default; }
 .recipe-page-hero h1, .cook-page-hero h1 { margin: 0; font: 500 34px/1.1 'Newsreader', serif; letter-spacing: -.025em; }
 .recipe-page-meta, .cook-page-meta { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
 .recipe-ingredients-panel, .recipe-steps-panel { margin-bottom: 28px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--paper); }
@@ -2416,6 +2420,14 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .recipe-step-input { width: 100%; min-height: 60px; padding: 6px 8px; border: 1px solid var(--thread); border-radius: 8px; background: var(--paper); color: var(--ink); font: 14px/1.5 var(--font-ui); resize: vertical; }
 .recipe-step-remove { width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
 .recipe-step-remove:hover { color: var(--danger, #c0392b); background: var(--control); }
+
+.cooklang-chip {
+  display: inline-flex; align-items: center; margin: 0 1px; padding: 1px 7px 2px; border: 1px solid transparent;
+  border-radius: 6px; font: 500 .92em/1.4 var(--font-ui);
+}
+.cooklang-chip-ingredient { border-color: color-mix(in srgb, var(--thread) 28%, var(--line)); background: var(--thread-soft); color: var(--thread); }
+.cooklang-chip-cookware { border-color: var(--line); background: var(--control); color: var(--muted); }
+.cooklang-chip-timer { border-color: color-mix(in srgb, var(--task) 30%, var(--line)); background: var(--task-soft); color: var(--task); }
 
 /* Cook mode */
 .cook-ingredients-panel, .cook-steps-panel { margin-bottom: 28px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--paper); }
