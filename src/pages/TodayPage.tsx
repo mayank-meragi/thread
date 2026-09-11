@@ -5,6 +5,7 @@ import { db, ensureDay, saveDay } from '../db'
 import { daysBetween, formatDay, isoToday, shiftDay } from '../lib/dates'
 import { getGitHubConfig, runGitHubSyncCycle } from '../lib/github'
 import { MarkdownEditor } from '../components/MarkdownEditor'
+import { TodayCooking } from '../components/TodayCooking'
 import { TodayTasks } from '../components/TodayTasks'
 import { DatePicker } from '../components/DatePicker'
 
@@ -336,6 +337,7 @@ function DaySection({ date, isToday, registerSection, onActive, onChange, paramB
         <MarkdownEditor key={date} day={date} initialValue={day.markdown} onChange={handleChange} onReady={jumpToBlock} autoFocus={isToday && captureRequested} />
       </div>
 
+      {isToday && <TodayCooking today={date} />}
       {isToday && <TodayTasks today={date} />}
     </section>
   )

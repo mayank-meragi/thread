@@ -1,4 +1,4 @@
-import { Bot, BookOpenText, Dumbbell, ListTodo, Plus, Rss, Search, Settings } from 'lucide-react'
+import { Bot, BookOpenText, ChefHat, Dumbbell, ListTodo, Plus, Rss, Search, Settings } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { RailSyncIndicator, type RailSyncIndicatorProps } from './RailSyncIndicator'
 
@@ -6,6 +6,7 @@ const nav = [
   { to: '/', label: 'Today', icon: BookOpenText, end: true },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/workouts', label: 'Workouts', icon: Dumbbell },
+  { to: '/recipes', label: 'Recipes', icon: ChefHat },
   { to: '/search', label: 'Search', icon: Search },
   { to: '/feeds', label: 'Feeds', icon: Rss },
   { to: '/settings', label: 'Settings', icon: Settings },

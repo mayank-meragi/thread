@@ -46,6 +46,7 @@ const AI_USAGE_FEATURE_LABELS: Record<AIUsageFeature, string> = {
   chat: 'Chat',
   'persona-builder': 'Persona builder',
   'connection-test': 'Connection test',
+  'recipe-import': 'Recipe import',
 }
 
 const integerFormat = new Intl.NumberFormat('en-US')

@@ -1,6 +1,7 @@
 import type { BlockKind, OutlineBlock } from './outline'
 import { emptyDayMetadata, type DayMetadata, type PropertyValue } from './dayDocument'
 import { WORKOUT_SYSTEM_TAGS } from './workouts/systemTags'
+import { RECIPE_SYSTEM_TAGS } from './recipes/systemTags'
 
 export type PropertyType = 'text' | 'rich_text' | 'number' | 'boolean' | 'date' | 'datetime' | 'status' | 'select' | 'multi_select' | 'relation' | 'url'
 export type PropertySource = 'explicit' | 'default' | 'derived' | 'automation'
@@ -104,6 +105,30 @@ export const EXERCISE_EQUIPMENT_OPTIONS: PropertyOption[] = [
   { id: 'foam-roller', label: 'Foam roller' },
 ]
 
+export const RECIPE_CATEGORY_OPTIONS: PropertyOption[] = [
+  { id: 'breakfast', label: 'Breakfast' },
+  { id: 'lunch', label: 'Lunch' },
+  { id: 'dinner', label: 'Dinner' },
+  { id: 'dessert', label: 'Dessert' },
+  { id: 'snack', label: 'Snack' },
+  { id: 'drink', label: 'Drink' },
+  { id: 'side', label: 'Side' },
+  { id: 'sauce', label: 'Sauce / condiment' },
+]
+
+export const RECIPE_CUISINE_OPTIONS: PropertyOption[] = [
+  { id: 'american', label: 'American' },
+  { id: 'italian', label: 'Italian' },
+  { id: 'mexican', label: 'Mexican' },
+  { id: 'indian', label: 'Indian' },
+  { id: 'chinese', label: 'Chinese' },
+  { id: 'japanese', label: 'Japanese' },
+  { id: 'thai', label: 'Thai' },
+  { id: 'french', label: 'French' },
+  { id: 'mediterranean', label: 'Mediterranean' },
+  { id: 'middle-eastern', label: 'Middle Eastern' },
+]
+
 export const BUILT_IN_PROPERTIES: Array<Omit<PropertyDefinitionRecord, 'createdAt' | 'updatedAt'>> = [
   { id: 'description', name: 'Description', type: 'rich_text', system: true },
   {
@@ -160,6 +185,28 @@ export const BUILT_IN_PROPERTIES: Array<Omit<PropertyDefinitionRecord, 'createdA
   { id: 'exercise-common-mistakes', name: 'Common mistakes', type: 'rich_text', system: true },
   { id: 'exercise-safety-notes', name: 'Safety notes', type: 'rich_text', system: true },
   { id: 'exercise-image-urls', name: 'Reference images', type: 'relation', system: true },
+  { id: 'recipe-servings', name: 'Servings', type: 'number', system: true },
+  { id: 'recipe-prep-minutes', name: 'Prep time', type: 'number', system: true },
+  { id: 'recipe-cook-minutes', name: 'Cook time', type: 'number', system: true },
+  { id: 'recipe-source-url', name: 'Source URL', type: 'url', system: true },
+  { id: 'recipe-image-url', name: 'Image URL', type: 'url', system: true },
+  { id: 'recipe-category', name: 'Category', type: 'multi_select', system: true, options: RECIPE_CATEGORY_OPTIONS },
+  { id: 'recipe-cuisine', name: 'Cuisine', type: 'select', system: true, options: RECIPE_CUISINE_OPTIONS },
+  { id: 'cook-started-at', name: 'Cook started at', type: 'datetime', system: true },
+  { id: 'cook-finished-at', name: 'Cook finished at', type: 'datetime', system: true },
+  { id: 'cook-servings', name: 'Servings cooked', type: 'number', system: true },
+  { id: 'cook-ingredient-quantity', name: 'Quantity', type: 'number', system: true },
+  { id: 'cook-ingredient-unit', name: 'Unit', type: 'text', system: true },
+  { id: 'cook-step-duration-seconds', name: 'Duration', type: 'number', system: true },
+  {
+    id: 'meal-plan-type', name: 'Meal', type: 'select', system: true,
+    options: [
+      { id: 'breakfast', label: 'Breakfast' },
+      { id: 'lunch', label: 'Lunch' },
+      { id: 'dinner', label: 'Dinner' },
+      { id: 'snack', label: 'Snack' },
+    ],
+  },
 ]
 
 export const BUILT_IN_TAGS: Array<Omit<TagDefinitionRecord, 'createdAt' | 'updatedAt'>> = [
@@ -185,6 +232,26 @@ export const BUILT_IN_TAGS: Array<Omit<TagDefinitionRecord, 'createdAt' | 'updat
       'set-distance',
       'set-distance-unit',
     ],
+  },
+  {
+    id: RECIPE_SYSTEM_TAGS.cook,
+    name: 'cook',
+    propertyIds: ['cook-started-at', 'cook-finished-at', 'cook-servings'],
+  },
+  {
+    id: RECIPE_SYSTEM_TAGS.cookIngredient,
+    name: 'cook-ingredient',
+    propertyIds: ['cook-ingredient-quantity', 'cook-ingredient-unit'],
+  },
+  {
+    id: RECIPE_SYSTEM_TAGS.cookStep,
+    name: 'cook-step',
+    propertyIds: ['cook-step-duration-seconds'],
+  },
+  {
+    id: RECIPE_SYSTEM_TAGS.mealPlan,
+    name: 'meal-plan',
+    propertyIds: ['meal-plan-type'],
   },
 ]
 

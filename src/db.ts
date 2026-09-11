@@ -21,6 +21,16 @@ import { isoToday } from './lib/dates'
 import type { CommandRisk } from './lib/commands/types'
 import type { CompiledThreadScript, PlanPreview, PlanTargetCapture } from './lib/threadscript/types'
 import { isWorkoutSystemTag, WORKOUT_SYSTEM_TAGS } from './lib/workouts/systemTags'
+import { isRecipeSystemTag, RECIPE_SYSTEM_TAGS } from './lib/recipes/systemTags'
+
+// A block may carry at most one "structural" tag -- one that changes what the
+// application treats the block as (`#[workout]`/`#[exercise]`/`#[set]`,
+// `#[cook]`/`#[cook-ingredient]`/`#[cook-step]`) -- and structural tags are
+// protected from rename/delete. Feature registries plug into this single
+// check rather than each reimplementing the exclusivity/protection rules.
+function isStructuralSystemTag(tagId: string): boolean {
+  return isWorkoutSystemTag(tagId) || isRecipeSystemTag(tagId)
+}
 
 export interface DayRecord {
   date: string
@@ -290,7 +300,7 @@ export interface AIUsageAggregateRecord {
   day: string
   provider: 'anthropic' | 'openai' | 'google'
   model: string
-  feature: 'chat' | 'persona-builder' | 'connection-test'
+  feature: 'chat' | 'persona-builder' | 'connection-test' | 'recipe-import'
   runCount: number
   inputTokens: number
   outputTokens: number
@@ -1350,9 +1360,9 @@ async function syncInlineHashtags(blocks: OutlineBlock[], metadata: DayMetadata)
     const slug = slugifyTag(tag.name)
     if (!tagBySlug.has(slug)) tagBySlug.set(slug, tag)
   }
-  // Reserved workout names always resolve to their protected stable IDs,
+  // Reserved structural names always resolve to their protected stable IDs,
   // even when an older user-created tag has the same display name.
-  for (const tagId of Object.values(WORKOUT_SYSTEM_TAGS)) {
+  for (const tagId of [...Object.values(WORKOUT_SYSTEM_TAGS), ...Object.values(RECIPE_SYSTEM_TAGS)]) {
     const tag = definitions.find((candidate) => candidate.id === tagId)
     if (tag) tagBySlug.set(slugifyTag(tag.name), tag)
   }
@@ -1374,14 +1384,14 @@ async function syncInlineHashtags(blocks: OutlineBlock[], metadata: DayMetadata)
     const desiredIds = extractHashtags(block.markdown)
       .map((name) => tagBySlug.get(slugifyTag(name))?.id)
       .filter((id): id is string => Boolean(id))
-    const lastStructuralId = desiredIds.filter((id) => isWorkoutSystemTag(id)).at(-1)
-    const desired = new Set(desiredIds.filter((id) => !isWorkoutSystemTag(id) || id === lastStructuralId))
+    const lastStructuralId = desiredIds.filter((id) => isStructuralSystemTag(id)).at(-1)
+    const desired = new Set(desiredIds.filter((id) => !isStructuralSystemTag(id) || id === lastStructuralId))
     const existing = new Set(item.tags ?? [])
     const inline = new Set(Object.entries(item.tagSources ?? {}).filter(([, source]) => source === 'inline').map(([tagId]) => tagId))
 
     if (lastStructuralId) {
       for (const tagId of Array.from(existing)) {
-        if (tagId === lastStructuralId || !isWorkoutSystemTag(tagId)) continue
+        if (tagId === lastStructuralId || !isStructuralSystemTag(tagId)) continue
         existing.delete(tagId)
         const tag = tagsById.get(tagId)
         if (tag) {
@@ -1838,8 +1848,8 @@ export async function updateTagDefinition(
 ): Promise<void> {
   const previous = await db.tagDefinitions.get(id)
   if (!previous) throw new Error('This tag no longer exists.')
-  if (isWorkoutSystemTag(id) && changes.name !== undefined && changes.name.trim() !== previous.name) {
-    throw new Error('Built-in workout tags cannot be renamed.')
+  if (isStructuralSystemTag(id) && changes.name !== undefined && changes.name.trim() !== previous.name) {
+    throw new Error('Built-in system tags cannot be renamed.')
   }
   const definitions = new Map((await db.propertyDefinitions.toArray()).map((definition) => [definition.id, definition]))
   const propertyIds = Array.from(new Set(changes.propertyIds ?? previous.propertyIds)).filter((propertyId) => definitions.has(propertyId))
@@ -1895,14 +1905,14 @@ async function ensureBlockUsesTaskSyntax(blockId: string): Promise<void> {
 export async function addBlockTag(blockId: string, tagId: string): Promise<void> {
   const tag = await db.tagDefinitions.get(tagId)
   if (!tag) throw new Error('This tag no longer exists.')
-  if (isWorkoutSystemTag(tagId)) await ensureBlockUsesTaskSyntax(blockId)
+  if (isStructuralSystemTag(tagId)) await ensureBlockUsesTaskSyntax(blockId)
   const definitions = new Map((await db.propertyDefinitions.toArray()).map((definition) => [definition.id, definition]))
   const allTags = new Map((await db.tagDefinitions.toArray()).map((definition) => [definition.id, definition]))
   await mutateBlockMetadata(blockId, (item) => {
     let tags = item.tags ?? []
-    if (isWorkoutSystemTag(tagId)) {
+    if (isStructuralSystemTag(tagId)) {
       for (const existingTagId of tags) {
-        if (existingTagId === tagId || !isWorkoutSystemTag(existingTagId)) continue
+        if (existingTagId === tagId || !isStructuralSystemTag(existingTagId)) continue
         const existingTag = allTags.get(existingTagId)
         if (existingTag) {
           const remaining = tags
@@ -1913,7 +1923,7 @@ export async function addBlockTag(blockId: string, tagId: string): Promise<void>
         }
         if (item.tagSources) delete item.tagSources[existingTagId]
       }
-      tags = tags.filter((candidate) => !isWorkoutSystemTag(candidate) || candidate === tagId)
+      tags = tags.filter((candidate) => !isStructuralSystemTag(candidate) || candidate === tagId)
     }
     item.tags = Array.from(new Set([...tags, tagId]))
     item.tagSources = { ...(item.tagSources ?? {}), [tagId]: 'explicit' }
@@ -1943,7 +1953,7 @@ export async function removeBlockTag(blockId: string, tagId: string): Promise<vo
 }
 
 export async function deleteTagDefinition(id: string): Promise<void> {
-  if (isWorkoutSystemTag(id)) throw new Error('Built-in workout tags cannot be deleted.')
+  if (isStructuralSystemTag(id)) throw new Error('Built-in system tags cannot be deleted.')
   const applications = await db.blockTags.where('tagId').equals(id).toArray()
   for (const application of applications) await removeBlockTag(application.blockId, id)
   await db.tagDefinitions.delete(id)

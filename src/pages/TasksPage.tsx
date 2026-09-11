@@ -11,6 +11,7 @@ import { TaskBoard } from '../components/TaskBoard'
 import { TaskFilterPopover, type TaskFilterKey } from '../components/TaskFilterPopover'
 import { Chip } from '../components/ui/Chip'
 import { isWorkoutRole, workoutRolesByBlockId } from '../lib/workouts/integration'
+import { cookRolesByBlockId, isCookRole } from '../lib/recipes/integration'
 
 type TaskView = 'my-day' | 'in-progress' | 'overdue' | 'upcoming' | 'blocked' | 'unscheduled' | 'completed' | 'all'
 type TaskSort = 'smart' | 'due' | 'priority' | 'updated'
@@ -114,12 +115,13 @@ export function TasksPage() {
 
   const threadOptions = useMemo(() => Array.from(new Map(mentions.map((item) => [item.threadId, item.title])).entries()), [mentions])
 
-  // Structurally tagged workout tasks belong to the workout lens, not general
-  // task views or their counts.
+  // Structurally tagged workout and cook-session tasks belong to their own
+  // lenses, not general task views or their counts.
   const workoutRoles = useMemo(() => workoutRolesByBlockId(tags), [tags])
+  const cookRoles = useMemo(() => cookRolesByBlockId(tags), [tags])
   const visibleTasks = useMemo(
-    () => tasks.filter((task) => !isWorkoutRole(workoutRoles.get(task.id))),
-    [tasks, workoutRoles],
+    () => tasks.filter((task) => !isWorkoutRole(workoutRoles.get(task.id)) && !isCookRole(cookRoles.get(task.id))),
+    [tasks, workoutRoles, cookRoles],
   )
 
   const filtered = useMemo(() => {

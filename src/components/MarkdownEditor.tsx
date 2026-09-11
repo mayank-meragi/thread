@@ -36,6 +36,7 @@ import { queryLanguageDescription } from '../lib/queryBlockLanguage'
 import type { BlockConversionKind } from '../lib/suggestions'
 import { editorLinksToWiki, wikiLinkInputRule, wikiLinkInteractionPlugin, wikiLinksToEditor } from '../lib/wikilinks'
 import { editorLinksToTags, TAG_HREF_PREFIX, TAG_TITLE, tagLinkInputRule, tagLinksToEditor } from '../lib/taglinks'
+import { cooklangLinksToEditor, editorLinksToCooklang } from '../lib/recipes/cooklangLinks'
 import { replaceAll } from '@milkdown/utils'
 import { MobileEditorToolbar, type ToolbarAction, type ToolbarBlockKind } from './MobileEditorToolbar'
 import { openBlockInspector } from '../lib/inspectorTarget'
@@ -49,9 +50,11 @@ interface MarkdownEditorProps {
   ariaLabel?: string
   loadingLabel?: string
   autoFocus?: boolean
+  /** Renders Cooklang tokens (`@ingredient{}`, `#cookware{}`, `~{timer}`) as chips. Only ever passed for a recipe thread's own note -- see ThreadComposer. */
+  cooklang?: boolean
 }
 
-export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel = 'Daily journal editor', loadingLabel = 'Opening today’s page…', autoFocus = false }: MarkdownEditorProps) {
+export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel = 'Daily journal editor', loadingLabel = 'Opening today’s page…', autoFocus = false, cooklang = false }: MarkdownEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
   const onReadyRef = useRef(onReady)
@@ -94,10 +97,12 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
     const markUserMutation = () => {
       if (active && !disposed) userMutationPending = true
     }
+    const applyCooklang = (markdown: string) => (cooklang ? cooklangLinksToEditor(markdown) : markdown)
+    const stripCooklang = (markdown: string) => (cooklang ? editorLinksToCooklang(markdown) : markdown)
 
     const crepe = new Crepe({
       root,
-      defaultValue: tagLinksToEditor(wikiLinksToEditor(initialValue.trim() ? initialValue : '- ')),
+      defaultValue: tagLinksToEditor(wikiLinksToEditor(applyCooklang(initialValue.trim() ? initialValue : '- '))),
       features: {
         [Crepe.Feature.AI]: false,
         [Crepe.Feature.Latex]: false,
@@ -361,7 +366,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
       latest = detail.markdown
       dirty = false
       userMutationPending = false
-      crepe.editor.action(replaceAll(tagLinksToEditor(wikiLinksToEditor(detail.markdown.trim() ? detail.markdown : '- '))))
+      crepe.editor.action(replaceAll(tagLinksToEditor(wikiLinksToEditor(applyCooklang(detail.markdown.trim() ? detail.markdown : '- ')))))
       if (metadataTimer) window.clearTimeout(metadataTimer)
       metadataTimer = window.setTimeout(() => {
         if (disposed) return
@@ -414,7 +419,7 @@ export function MarkdownEditor({ day, initialValue, onChange, onReady, ariaLabel
         // Only an active editor is allowed to write to the journal.
         if (!active || disposed || markdown === previous || !userMutationPending) return
         userMutationPending = false
-        const canonical = editorLinksToTags(editorLinksToWiki(markdown))
+        const canonical = stripCooklang(editorLinksToTags(editorLinksToWiki(markdown)))
         if (canonical === latest) return
         latest = canonical
         dirty = true

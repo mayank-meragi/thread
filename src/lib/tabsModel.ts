@@ -9,13 +9,15 @@ export const CONTEXT_RAIL_POSITION: EdgePosition = 'right'
 
 export const CHAT_PANEL_ID = 'chat-panel'
 
-const STATIC_TAB_PATHS = ['/workouts', '/tasks', '/search', '/feeds', '/settings', '/templates', '/docs']
+const STATIC_TAB_PATHS = ['/workouts', '/recipes', '/meal-plan', '/shopping-list', '/tasks', '/search', '/feeds', '/settings', '/templates', '/docs']
 
 export function isWorkingPath(path: string): boolean {
   const pathname = path.split('?')[0] || '/'
   return pathname === '/'
     || pathname.startsWith('/thread/')
     || pathname.startsWith('/workout/')
+    || pathname.startsWith('/recipe/')
+    || pathname.startsWith('/cook/')
     || pathname.startsWith('/docs/')
     || STATIC_TAB_PATHS.includes(pathname)
 }

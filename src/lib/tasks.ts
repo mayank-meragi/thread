@@ -10,6 +10,7 @@ import {
 } from '../db'
 import { isoToday } from './dates'
 import { systemTagIdForWorkoutRole, type WorkoutRole } from './workouts/systemTags'
+import { systemTagIdForCookRole, type CookRole } from './recipes/systemTags'
 
 async function persistTaskMarkdown(day: string, markdown: string): Promise<void> {
   await saveDay(day, markdown)
@@ -160,6 +161,38 @@ export async function createWorkoutTask(input: { role: WorkoutRole; text: string
 export async function createWorkoutSubtask(parentTaskId: string, role: WorkoutRole, text = ''): Promise<string> {
   await requireWorkoutSystemTag(role)
   return createSubtask(parentTaskId, workoutTaggedText(role, text))
+}
+
+const COOK_ROLE_TAG_NAME: Record<CookRole, string> = {
+  cook: 'cook',
+  cookIngredient: 'cook-ingredient',
+  cookStep: 'cook-step',
+  mealPlan: 'meal-plan',
+}
+
+function cookTaggedText(role: CookRole, text: string): string {
+  const label = text.trim()
+  return `#[${COOK_ROLE_TAG_NAME[role]}]${label ? ` ${label}` : ''}`
+}
+
+async function requireRecipeSystemTag(role: CookRole): Promise<void> {
+  const tagId = systemTagIdForCookRole(role)
+  if (!await db.tagDefinitions.get(tagId)) throw new Error('Recipe system tags are not initialized.')
+}
+
+export async function createCookTask(input: { text: string; day?: string }): Promise<string> {
+  await requireRecipeSystemTag('cook')
+  return createTask({ text: cookTaggedText('cook', input.text), day: input.day })
+}
+
+export async function createCookSubtask(parentTaskId: string, role: 'cookIngredient' | 'cookStep', text = ''): Promise<string> {
+  await requireRecipeSystemTag(role)
+  return createSubtask(parentTaskId, cookTaggedText(role, text))
+}
+
+export async function createMealPlanTask(input: { text: string; day?: string }): Promise<string> {
+  await requireRecipeSystemTag('mealPlan')
+  return createTask({ text: cookTaggedText('mealPlan', input.text), day: input.day })
 }
 
 export async function updateTaskTitle(taskId: string, text: string): Promise<void> {

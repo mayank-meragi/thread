@@ -9,6 +9,11 @@ import { TemplatesPage } from '../../pages/TemplatesPage'
 import { WorkoutPage } from '../../pages/WorkoutPage'
 import { WorkoutOverviewPage } from '../../pages/WorkoutOverviewPage'
 import { WorkoutsPage } from '../../pages/WorkoutsPage'
+import { RecipesPage } from '../../pages/RecipesPage'
+import { RecipePage } from '../../pages/RecipePage'
+import { CookPage } from '../../pages/CookPage'
+import { MealPlanPage } from '../../pages/MealPlanPage'
+import { ShoppingListPage } from '../../pages/ShoppingListPage'
 import { DocsPage } from '../../pages/DocsPage'
 import { FeedsPage } from '../../pages/FeedsPage'
 
@@ -25,6 +30,11 @@ export function RoutePanel({ params }: IDockviewPanelProps<RoutePanelParams>) {
         <Route path="/workout/:day/:blockId" element={<WorkoutPage />} />
         <Route path="/workout/:day/:blockId/overview" element={<WorkoutOverviewPage />} />
         <Route path="/workouts" element={<WorkoutsPage />} />
+        <Route path="/recipes" element={<RecipesPage />} />
+        <Route path="/recipe/:threadId" element={<RecipePage />} />
+        <Route path="/cook/:day/:blockId" element={<CookPage />} />
+        <Route path="/meal-plan" element={<MealPlanPage />} />
+        <Route path="/shopping-list" element={<ShoppingListPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/feeds" element={<FeedsPage />} />

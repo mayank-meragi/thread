@@ -3,11 +3,13 @@ import { ChevronRight } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, ensureThreadNote, saveThreadNote } from '../db'
 import { getGitHubConfig, runGitHubSyncCycle } from '../lib/github'
+import { isRecipeThread } from '../lib/recipes/selectors'
 import { parseThreadDocument } from '../lib/threadDocument'
 import { MarkdownEditor } from './MarkdownEditor'
 
 export function ThreadComposer({ threadId, title }: { threadId: string; title: string }) {
   const note = useLiveQuery(() => db.threadNotes.get(threadId), [threadId])
+  const cooklang = useLiveQuery(() => isRecipeThread(threadId), [threadId], false)
   // Hold the editor back until the first remote pull for this note has settled,
   // so it opens on already-reconciled content instead of racing the pull and
   // producing a sync conflict if the user types against stale local content.
@@ -64,6 +66,7 @@ export function ThreadComposer({ threadId, title }: { threadId: string; title: s
           onChange={handleChange}
           ariaLabel={`${title} thread notes editor`}
           loadingLabel="Opening thread notes…"
+          cooklang={cooklang}
         />
       </div>
     </details>

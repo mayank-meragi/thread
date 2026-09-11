@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { db, type TaskRecord } from '../db'
 import { setTaskStatus } from '../lib/tasks'
 import { isWorkoutRole, workoutRolesByBlockId } from '../lib/workouts/integration'
+import { cookRolesByBlockId, isCookRole } from '../lib/recipes/integration'
 
 interface TodayTasksProps {
   today: string
@@ -13,9 +14,10 @@ interface TodayTasksProps {
 export function TodayTasks({ today }: TodayTasksProps) {
   const rawTasks = useLiveQuery(() => db.tasks.toArray(), [], [])
   const tagRows = useLiveQuery(() => db.blockTags.toArray(), [], [])
-  // Workout blocks belong to the workout lens, not the general journal list.
+  // Workout and cook-session blocks belong to their own lenses, not the general journal list.
   const workoutRoles = workoutRolesByBlockId(tagRows)
-  const allTasks = rawTasks.filter((task) => !isWorkoutRole(workoutRoles.get(task.id)))
+  const cookRoles = cookRolesByBlockId(tagRows)
+  const allTasks = rawTasks.filter((task) => !isWorkoutRole(workoutRoles.get(task.id)) && !isCookRole(cookRoles.get(task.id)))
   const tasks = allTasks.filter((task) => task.status !== 'done' && task.status !== 'canceled' && task.dueDate)
   const doneToday = sortTasks(allTasks.filter((task) => task.status === 'done' && task.completedAt?.slice(0, 10) === today))
 

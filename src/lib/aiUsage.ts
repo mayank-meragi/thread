@@ -3,7 +3,7 @@ import { db, type AIUsageAggregateRecord } from '../db'
 import type { AIProvider } from './ai'
 import { isoToday, shiftDay } from './dates'
 
-export type AIUsageFeature = 'chat' | 'persona-builder' | 'connection-test'
+export type AIUsageFeature = 'chat' | 'persona-builder' | 'connection-test' | 'recipe-import'
 export type AIUsagePeriod = 'today' | '30-days' | 'all-time'
 
 export interface AIUsageContext {
