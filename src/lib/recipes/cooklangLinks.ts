@@ -1,4 +1,4 @@
-// Round-trips Cooklang tokens (`@ingredient{qty%unit}`, `#cookware{}`,
+// Round-trips Cooklang tokens (`@ingredient{qty%unit}(preparation)`, `^cookware{}`,
 // `~{qty%unit}`) between their canonical Markdown form and a special Markdown
 // link Milkdown renders and styles as a chip -- the exact technique
 // `lib/wikilinks.ts` and `lib/taglinks.ts` already use for `[[wikilinks]]`
@@ -13,7 +13,11 @@ export const TIMER_TITLE = 'thread-cook-timer'
 const HREF_PREFIX = '#cooklang/'
 
 function encodeToken(kind: 'ingredient' | 'cookware' | 'timer', raw: string): string {
-  return `${HREF_PREFIX}${kind}/${encodeURIComponent(raw)}`
+  // encodeURIComponent intentionally leaves parentheses readable, but an
+  // ingredient preparation uses parentheses and would otherwise confuse the
+  // surrounding Markdown link syntax.
+  const encoded = encodeURIComponent(raw).replace(/\(/g, '%28').replace(/\)/g, '%29')
+  return `${HREF_PREFIX}${kind}/${encoded}`
 }
 
 function decodeToken(href: string): string | null {
@@ -26,10 +30,11 @@ function decodeToken(href: string): string | null {
   }
 }
 
-function ingredientLabel(name: string, content: string): string {
+function ingredientLabel(name: string, content: string, preparation?: string): string {
   const [quantity, unit] = parseQuantityUnit(content)
   const amount = [quantity !== undefined ? formatQuantity(quantity) : undefined, unit].filter(Boolean).join(' ')
-  return amount ? `${amount} ${name}` : name
+  const label = amount ? `${amount} ${name}` : name
+  return preparation ? `${label} (${preparation})` : label
 }
 
 function timerLabel(label: string, content: string): string {
@@ -40,24 +45,24 @@ function timerLabel(label: string, content: string): string {
 
 // A single alternated pattern matched in one pass, so a replacement's own
 // output (which contains a literal `#cooklang/...` href) is never re-scanned
-// by a later `.replace()` call -- chaining separate @/#/~ passes would let the
-// `#`-triggered cookware pass re-match the href a prior @ or ~ pass produced.
+// by a later `.replace()` call. Thread tags still use #, while recipe cookware
+// uses ^, so the two syntaxes remain unambiguous.
 // Braced forms are listed before their bare-word counterpart in each group so
 // the greedy braced form wins at a shared starting position.
 const TOKEN_PATTERN =
-  /@(?<ingName>[^{}\n@#~]+)\{(?<ingContent>[^}]*)\}|@(?<ingBare>[\p{L}\p{N}][\p{L}\p{N}'-]*)|~(?<timerLabel>[^{}\n@#~]*)\{(?<timerContent>[^}]*)\}|#(?!\[)(?<cookName>[^{}\n@#~]+)\{(?<cookContent>[^}]*)\}|#(?!\[)(?<cookBare>[\p{L}\p{N}][\p{L}\p{N}'-]*)/gu
+  /@(?<ingName>[^{}\n@^~]+)\{(?<ingContent>[^}]*)\}(?:\((?<ingPrep>[^)\n]*)\))?|@(?<ingBare>[\p{L}\p{N}][\p{L}\p{N}'-]*)(?:\((?<ingBarePrep>[^)\n]*)\))?|~(?<timerLabel>[^{}\n@^~]*)\{(?<timerContent>[^}]*)\}|\^(?<cookName>[^{}\n@^~]+)\{(?<cookContent>[^}]*)\}|\^(?<cookBare>[\p{L}\p{N}][\p{L}\p{N}'-]*)/gu
 
-/** Canonical Markdown (with raw `@`/`#`/`~` tokens) -> editor Markdown (tokens as chip links). */
+/** Canonical Markdown (with raw `@`/`^`/`~` tokens) -> editor Markdown (tokens as chip links). */
 export function cooklangLinksToEditor(markdown: string): string {
   return markdown.replace(TOKEN_PATTERN, (raw: string, ...rest: unknown[]) => {
     const groups = rest[rest.length - 1] as Record<string, string | undefined>
     if (groups.ingName !== undefined) {
       const name = groups.ingName.trim()
       if (!name) return raw
-      return `[${ingredientLabel(name, groups.ingContent ?? '')}](${encodeToken('ingredient', raw)} "${INGREDIENT_TITLE}")`
+      return `[${ingredientLabel(name, groups.ingContent ?? '', groups.ingPrep?.trim() || undefined)}](${encodeToken('ingredient', raw)} "${INGREDIENT_TITLE}")`
     }
     if (groups.ingBare !== undefined) {
-      return `[${groups.ingBare}](${encodeToken('ingredient', raw)} "${INGREDIENT_TITLE}")`
+      return `[${ingredientLabel(groups.ingBare, '', groups.ingBarePrep?.trim() || undefined)}](${encodeToken('ingredient', raw)} "${INGREDIENT_TITLE}")`
     }
     if (groups.timerLabel !== undefined) {
       return `[${timerLabel(groups.timerLabel.trim(), groups.timerContent ?? '')}](${encodeToken('timer', raw)} "${TIMER_TITLE}")`
@@ -74,7 +79,7 @@ export function cooklangLinksToEditor(markdown: string): string {
   })
 }
 
-/** Editor Markdown (chip links) -> canonical Markdown (raw `@`/`#`/`~` tokens), byte-exact. */
+/** Editor Markdown (chip links) -> canonical Markdown (raw `@`/`^`/`~` tokens), byte-exact. */
 export function editorLinksToCooklang(markdown: string): string {
   return markdown.replace(
     /\[[^\]]*\]\((#cooklang\/(?:ingredient|cookware|timer)\/[^\s)]+)(?:\s+["'](?:thread-cook-ingredient|thread-cook-cookware|thread-cook-timer)["'])?\)/g,
@@ -104,9 +109,9 @@ export function splitCooklangSegments(markdown: string): CooklangSegment[] {
     if (groups.ingName !== undefined) {
       const name = groups.ingName.trim()
       if (!name) { pushText(raw); continue }
-      segments.push({ kind: 'ingredient', text: ingredientLabel(name, groups.ingContent ?? '') })
+      segments.push({ kind: 'ingredient', text: ingredientLabel(name, groups.ingContent ?? '', groups.ingPrep?.trim() || undefined) })
     } else if (groups.ingBare !== undefined) {
-      segments.push({ kind: 'ingredient', text: groups.ingBare })
+      segments.push({ kind: 'ingredient', text: ingredientLabel(groups.ingBare, '', groups.ingBarePrep?.trim() || undefined) })
     } else if (groups.timerLabel !== undefined) {
       segments.push({ kind: 'timer', text: timerLabel(groups.timerLabel.trim(), groups.timerContent ?? '') })
     } else if (groups.cookName !== undefined) {

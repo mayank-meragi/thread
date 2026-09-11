@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergeIngredients, parseCooklangTokens, scaleIngredient } from './cooklangTokens'
+import { mergeIngredients, mergeShoppingIngredients, parseCooklangTokens, scaleIngredient } from './cooklangTokens'
 
 describe('parseCooklangTokens', () => {
   it('parses a braced ingredient with quantity and unit', () => {
@@ -35,11 +35,19 @@ describe('parseCooklangTokens', () => {
     expect(result.ingredients.map((ingredient) => ingredient.name)).toEqual(['eggs', 'milk'])
   })
 
+  it('parses ingredient preparation after the token', () => {
+    const result = parseCooklangTokens('Add @mushrooms{5}(sliced) and @garlic{2}(minced).')
+    expect(result.ingredients).toEqual([
+      { name: 'mushrooms', quantity: 5, preparation: 'sliced', raw: '@mushrooms{5}(sliced)' },
+      { name: 'garlic', quantity: 2, preparation: 'minced', raw: '@garlic{2}(minced)' },
+    ])
+  })
+
   it('parses a bare and braced cookware token', () => {
-    const result = parseCooklangTokens('Heat a #frying pan{} then use the #whisk.')
+    const result = parseCooklangTokens('Heat a ^frying pan{} then use the ^whisk.')
     expect(result.cookware).toEqual([
-      { name: 'frying pan', raw: '#frying pan{}' },
-      { name: 'whisk', raw: '#whisk' },
+      { name: 'frying pan', raw: '^frying pan{}' },
+      { name: 'whisk', raw: '^whisk' },
     ])
   })
 
@@ -94,6 +102,21 @@ describe('mergeIngredients', () => {
       { name: 'flour', quantity: 200, unit: 'g', raw: '@flour{200%g}' },
     ])
     expect(merged.map((ingredient) => ingredient.name)).toEqual(['milk', 'flour'])
+  })
+
+  it('keeps preparation variants separate in the recipe view', () => {
+    const merged = mergeIngredients([
+      { name: 'onion', quantity: 1, preparation: 'sliced', raw: '' },
+      { name: 'onion', quantity: 2, preparation: 'minced', raw: '' },
+    ])
+    expect(merged.map((ingredient) => ingredient.preparation)).toEqual(['sliced', 'minced'])
+  })
+
+  it('merges preparation variants for shopping', () => {
+    expect(mergeShoppingIngredients([
+      { name: 'onion', quantity: 1, unit: 'piece', preparation: 'sliced', raw: '' },
+      { name: 'onion', quantity: 2, unit: 'piece', preparation: 'minced', raw: '' },
+    ])).toEqual([{ name: 'onion', quantity: 3, unit: 'piece', raw: '' }])
   })
 })
 

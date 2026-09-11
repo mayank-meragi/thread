@@ -105,7 +105,7 @@ export function RecipesPage() {
           <p>
             Write your first recipe as steps with <code>@ingredient{'{'}qty%unit{'}'}</code> annotations, and the
             ingredient list builds itself. See the <Link to="/docs/recipe-syntax">syntax guide</Link> for
-            cookware (<code>#pan{'{'}{'}'}</code>) and timers (<code>~{'{'}5%minutes{'}'}</code>) too.
+            cookware (<code>^pan{'{'}{'}'}</code>) and timers (<code>~{'{'}5%minutes{'}'}</code>) too.
           </p>
         </div>
       ) : (

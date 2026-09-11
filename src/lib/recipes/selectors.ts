@@ -1,8 +1,9 @@
 import { db, type BlockPropertyRecord, type BlockTagRecord, type PropertyValue, type ThreadOccurrenceRecord } from '../../db'
 import { parseThreadDocument } from '../threadDocument'
-import { mergeIngredients, parseCooklangTokens, type RecipeIngredient } from './cooklangTokens'
+import { mergeIngredients, mergeShoppingIngredients, parseCooklangTokens, type RecipeIngredient } from './cooklangTokens'
+import { parseRecipeDocument, RECIPE_CONTENT_TAGS, type RecipeSourceNode } from './recipeDocument'
 import { cookRoleFromTagIds, type CookRole } from './systemTags'
-import type { CookSessionView, MealPlanView, MealType, RecipeStepView, RecipeView } from './types'
+import type { CookSessionView, MealPlanView, MealType, RecipeNoteView, RecipeSectionView, RecipeStepView, RecipeView } from './types'
 
 /** The property every recipe thread carries, used to tell a recipe thread apart from any other thread. */
 export const RECIPE_MARKER_PROPERTY = 'recipe-servings'
@@ -15,19 +16,6 @@ export function parseRecipeSteps(body: string): string[] {
     .filter((line) => line.length > 0)
 }
 
-function buildStepViews(steps: string[]): RecipeStepView[] {
-  return steps.map((text, index) => {
-    const parsed = parseCooklangTokens(text)
-    return {
-      index,
-      text,
-      ingredients: parsed.ingredients,
-      cookware: parsed.cookware.map((item) => item.name),
-      durationSeconds: parsed.durationSeconds,
-    }
-  })
-}
-
 function mergeCookware(cookware: readonly string[]): string[] {
   const seen = new Set<string>()
   return cookware.filter((item) => {
@@ -36,6 +24,104 @@ function mergeCookware(cookware: readonly string[]): string[] {
     seen.add(key)
     return true
   })
+}
+
+function nearestAncestor(node: RecipeSourceNode, nodesById: ReadonlyMap<string, RecipeSourceNode>, role: RecipeSourceNode['role']): RecipeSourceNode | undefined {
+  let parentId = node.parentId
+  while (parentId) {
+    const parent = nodesById.get(parentId)
+    if (!parent) return undefined
+    if (parent.role === role) return parent
+    parentId = parent.parentId
+  }
+  return undefined
+}
+
+interface RecipeContentViews {
+  sections: RecipeSectionView[]
+  unsectionedSteps: RecipeStepView[]
+  unsectionedNotes: RecipeNoteView[]
+  steps: RecipeStepView[]
+  ingredients: RecipeIngredient[]
+  cookware: string[]
+}
+
+function buildRecipeContentViews(markdown: string): RecipeContentViews {
+  const document = parseRecipeDocument(markdown)
+  const nodesById = new Map(document.nodes.map((node) => [node.id, node]))
+  const sectionViews = new Map<string, RecipeSectionView>()
+
+  for (const node of document.nodes.filter((candidate) => candidate.role === RECIPE_CONTENT_TAGS.section)) {
+    const parent = nearestAncestor(node, nodesById, RECIPE_CONTENT_TAGS.section)
+    sectionViews.set(node.id, {
+      id: node.id,
+      title: node.text || 'Untitled section',
+      depth: node.indent,
+      parentSectionId: parent?.id,
+      children: [],
+      steps: [],
+      notes: [],
+      ingredients: [],
+      cookware: [],
+    })
+  }
+
+  const steps: RecipeStepView[] = []
+  const stepViews = new Map<string, RecipeStepView>()
+  for (const node of document.nodes.filter((candidate) => candidate.role === RECIPE_CONTENT_TAGS.step)) {
+    const parsed = parseCooklangTokens(node.text)
+    const section = nearestAncestor(node, nodesById, RECIPE_CONTENT_TAGS.section)
+    const step: RecipeStepView = {
+      id: node.id,
+      index: steps.length,
+      text: node.text,
+      sectionId: section?.id,
+      sectionTitle: section?.text,
+      sourceLine: node.sourceLine,
+      depth: node.indent,
+      ingredients: parsed.ingredients,
+      cookware: parsed.cookware.map((item) => item.name),
+      durationSeconds: parsed.durationSeconds,
+      notes: [],
+    }
+    steps.push(step)
+    stepViews.set(node.id, step)
+    if (section) sectionViews.get(section.id)?.steps.push(step)
+  }
+
+  const unsectionedNotes: RecipeNoteView[] = []
+  for (const node of document.nodes.filter((candidate) => candidate.role === RECIPE_CONTENT_TAGS.note)) {
+    const section = nearestAncestor(node, nodesById, RECIPE_CONTENT_TAGS.section)
+    const step = nearestAncestor(node, nodesById, RECIPE_CONTENT_TAGS.step)
+    const note: RecipeNoteView = {
+      id: node.id,
+      text: node.text,
+      sourceLine: node.sourceLine,
+      depth: node.indent,
+      sectionId: section?.id,
+      parentStepId: step?.id,
+    }
+    if (step) stepViews.get(step.id)?.notes.push(note)
+    else if (section) sectionViews.get(section.id)?.notes.push(note)
+    else unsectionedNotes.push(note)
+  }
+
+  for (const section of sectionViews.values()) {
+    section.ingredients = mergeIngredients(section.steps.flatMap((step) => step.ingredients))
+    section.cookware = mergeCookware(section.steps.flatMap((step) => step.cookware))
+    if (section.parentSectionId) sectionViews.get(section.parentSectionId)?.children.push(section)
+  }
+
+  const rootSections = [...sectionViews.values()].filter((section) => !section.parentSectionId)
+  const unsectionedSteps = steps.filter((step) => !step.sectionId)
+  return {
+    sections: rootSections,
+    unsectionedSteps,
+    unsectionedNotes,
+    steps,
+    ingredients: mergeIngredients(steps.flatMap((step) => step.ingredients)),
+    cookware: mergeCookware(steps.flatMap((step) => step.cookware)),
+  }
 }
 
 async function propertyMap(threadId: string): Promise<Map<string, PropertyValue>> {
@@ -48,13 +134,11 @@ export async function getRecipe(threadId: string): Promise<RecipeView | undefine
   if (!thread) return undefined
   const note = await db.threadNotes.get(threadId)
   const body = note ? parseThreadDocument(note.markdown).markdown : ''
-  const steps = buildStepViews(parseRecipeSteps(body))
+  const content = buildRecipeContentViews(body)
   return {
     thread: { id: thread.id, title: thread.title },
     properties: await propertyMap(threadId),
-    steps,
-    ingredients: mergeIngredients(steps.flatMap((step) => step.ingredients)),
-    cookware: mergeCookware(steps.flatMap((step) => step.cookware)),
+    ...content,
   }
 }
 
@@ -131,8 +215,14 @@ function buildCookSession(snapshot: DayCookSnapshot, cookTaskId: string): CookSe
   const steps = children
     .filter((task) => roleOf(task.id) === 'cookStep')
     .map((task) => {
-      const duration = blockPropertyMap(propertiesByBlock.get(task.id) ?? []).get('cook-step-duration-seconds')
-      return { task, durationSeconds: typeof duration === 'number' ? duration : undefined }
+      const properties = blockPropertyMap(propertiesByBlock.get(task.id) ?? [])
+      const duration = properties.get('cook-step-duration-seconds')
+      const sectionTitle = properties.get('cook-step-section')
+      return {
+        task,
+        durationSeconds: typeof duration === 'number' ? duration : undefined,
+        sectionTitle: typeof sectionTitle === 'string' ? sectionTitle : undefined,
+      }
     })
 
   const occurrence = occurrencesByBlock.get(cook.id)?.[0]
@@ -242,7 +332,7 @@ export async function getShoppingList(startDay: string, endDay: string): Promise
     for (const ingredient of recipe.ingredients) {
       const key = ingredient.name.toLocaleLowerCase()
       const existing = counted.get(key)
-      const merged = existing ? mergeIngredients([existing, ingredient])[0] : { ...ingredient }
+      const merged = existing ? mergeShoppingIngredients([existing, ingredient])[0] : { ...ingredient }
       counted.set(key, { ...merged, plannedCount: (existing?.plannedCount ?? 0) + 1 })
     }
   }

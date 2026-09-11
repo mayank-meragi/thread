@@ -2,16 +2,46 @@ import type { PropertyValue, TaskRecord } from '../../db'
 import type { RecipeIngredient } from './cooklangTokens'
 
 export interface RecipeStepView {
+  id: string
   index: number
   text: string
+  sectionId?: string
+  sectionTitle?: string
+  sourceLine: number
+  depth: number
   ingredients: RecipeIngredient[]
   cookware: string[]
   durationSeconds?: number
+  notes: RecipeNoteView[]
+}
+
+export interface RecipeNoteView {
+  id: string
+  text: string
+  sourceLine: number
+  depth: number
+  sectionId?: string
+  parentStepId?: string
+}
+
+export interface RecipeSectionView {
+  id: string
+  title: string
+  depth: number
+  parentSectionId?: string
+  children: RecipeSectionView[]
+  steps: RecipeStepView[]
+  notes: RecipeNoteView[]
+  ingredients: RecipeIngredient[]
+  cookware: string[]
 }
 
 export interface RecipeView {
   thread: { id: string; title: string }
   properties: Map<string, PropertyValue>
+  sections: RecipeSectionView[]
+  unsectionedSteps: RecipeStepView[]
+  unsectionedNotes: RecipeNoteView[]
   steps: RecipeStepView[]
   /** Deduplicated union of every step's ingredients, in first-seen order. */
   ingredients: RecipeIngredient[]
@@ -28,6 +58,7 @@ export interface CookIngredientView {
 export interface CookStepView {
   task: TaskRecord
   durationSeconds?: number
+  sectionTitle?: string
 }
 
 /** A daily `#[cook]` task tree instantiated from a recipe thread -- the checkable session you cook from. */

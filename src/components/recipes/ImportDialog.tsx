@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { RECIPE_CATEGORY_OPTIONS } from '../../lib/blockMetadata'
 import { importRecipeFromUrl, type RecipeImportDraft } from '../../lib/recipes/import'
-import { addStep, createRecipeThread, updateRecipeProperties } from '../../lib/recipes/mutations'
+import { createRecipeThread, replaceRecipeMarkdown, updateRecipeProperties } from '../../lib/recipes/mutations'
 import { Button } from '../ui'
 
 interface ImportDialogProps {
@@ -50,7 +50,7 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
   const save = async () => {
     if (stage.kind !== 'review') return
     if (!title.trim()) { setError('Give the recipe a title.'); return }
-    const steps = stepsText.split('\n').map((line) => line.trim()).filter(Boolean)
+    const steps = stepsText.split('\n').map((line) => line.replace(/\s+$/, '')).filter((line) => line.trim().length > 0)
     if (!steps.length) { setError('The recipe needs at least one step.'); return }
 
     setStage({ kind: 'saving' })
@@ -63,7 +63,7 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
         category: category.length ? category : null,
         sourceUrl: stage.draft.sourceUrl,
       })
-      for (const step of steps) await addStep(threadId, step)
+      await replaceRecipeMarkdown(threadId, stepsText)
       onImported(threadId)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
@@ -139,7 +139,7 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
               </div>
             </div>
             <label className="field">
-              <span className="field-label">Steps (one per line, edit freely)</span>
+                <span className="field-label">Recipe outline (edit freely)</span>
               <textarea
                 className="field-control recipes-import-steps"
                 value={stepsText}
@@ -147,7 +147,7 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
                 disabled={stage.kind === 'saving'}
                 rows={8}
               />
-              <span className="field-hint">Review the ingredient/timer annotations the AI added before saving.</span>
+              <span className="field-hint">Review the tags, indentation, ingredient preparations, cookware and timer annotations before saving.</span>
             </label>
             {error && <p className="banner banner-error" role="alert">{error}</p>}
             <div className="recipes-import-actions">

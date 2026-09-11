@@ -23,14 +23,16 @@ const CATEGORY_IDS = RECIPE_CATEGORY_OPTIONS.map((option) => option.id)
 const CUISINE_IDS = RECIPE_CUISINE_OPTIONS.map((option) => option.id)
 
 const STEP_SYNTAX_NOTE =
-  'Each step is a plain instruction in Cooklang-style annotated Markdown: mark every ingredient mention as @name{quantity%unit} '
+  'Each step is a plain instruction in Cooklang-style annotated Markdown: mark every ingredient mention as @name{quantity%unit}(preparation) '
   + '(a multi-word name needs braces even with no quantity, e.g. @brown sugar{}; a single word can omit them, e.g. @salt). '
-  + 'Mark cookware as #name{} (or bare #name for a single word). Mark a timed duration as ~{quantity%unit} (e.g. ~{5%minutes}), '
+  + 'Add a preparation in parentheses after the ingredient, e.g. @onion{1}(sliced) or @garlic{2}(minced). '
+  + 'Mark cookware as ^name{} (or bare ^name for a single word). Mark a timed duration as ~{quantity%unit} (e.g. ~{5%minutes}), '
   + 'or ~label{quantity%unit} to name it. Do not annotate anything that is not actually an ingredient, cookware, or a timed duration. '
-  + 'Example: "Whisk @eggs{2} and @milk{300%ml} together, then cook in a #frying pan{} for ~{2%minutes}."'
+  + 'Recipe Markdown may organize content with - #[cook-section] titles, nested - #[cook-step] instructions, and - #[cook-note] context. '
+  + 'Example: "Whisk @eggs{2} and @milk{300%ml} together, then cook in a ^frying pan{} for ~{2%minutes}."'
 
-const stepsInputSchema = z.array(z.string().trim().min(1)).min(1).max(40)
-  .describe(`Ordered cooking steps. ${STEP_SYNTAX_NOTE}`)
+const stepsInputSchema = z.array(z.string().refine((value) => value.trim().length > 0, 'Step cannot be empty.')).min(1).max(40)
+  .describe(`Ordered cooking steps or tagged, indented recipe outline lines. Preserve leading indentation for nested sections. ${STEP_SYNTAX_NOTE}`)
 
 const propertiesInputSchema = z.object({
   servings: z.number().positive().optional().describe('Base servings the ingredient quantities assume.'),
@@ -85,7 +87,7 @@ function pickProperties(input: PropertiesInput): PropertiesInput {
 
 const create = defineCommand({
   name: 'recipe.create',
-  summary: 'Create a new recipe: a thread whose steps use Cooklang-style @ingredient/#cookware/~timer annotations.',
+  summary: 'Create a new recipe: a thread whose steps use Cooklang-style @ingredient/^cookware/~timer annotations.',
   category: 'recipes',
   keywords: ['recipe', 'cook', 'cooking', 'ingredient', 'cookware', 'step', 'dish', 'meal', 'kitchen'],
   example:
@@ -97,7 +99,7 @@ const create = defineCommand({
     '  category: ["dinner"]\n' +
     '  steps:\n' +
     '    - "Rinse @rice{1%cup} and @split moong dal{1/2%cup} together."\n' +
-    '    - "In a #pressure cooker{}, heat @ghee{1%tbsp} and add @cumin."\n' +
+    '    - "In a ^pressure cooker{}, heat @ghee{1%tbsp} and add @cumin."\n' +
     '    - "Add the rice and dal, @water{4%cups}, and @turmeric, then cook for ~{3%whistles}."',
   risk: 'write',
   idempotency: 'receipt-required',
@@ -200,7 +202,7 @@ const updateStepCommand = defineCommand({
   summary: 'Edit the text of one existing step, by its 1-based position.',
   category: 'recipes',
   keywords: ['recipe', 'step', 'edit', 'update', 'fix'],
-  example: 'action recipe.updateStep\n  recipe: "Khichdi"\n  step: 2\n  text: "In a #pressure cooker{}, heat @ghee{2%tbsp} and add @cumin and @{bay leaf}."',
+  example: 'action recipe.updateStep\n  recipe: "Khichdi"\n  step: 2\n  text: "In a ^pressure cooker{}, heat @ghee{2%tbsp} and add @cumin and @bay leaf{}."',
   risk: 'write',
   idempotency: 'natural',
   inputSchema: z.object({

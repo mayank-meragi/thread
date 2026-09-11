@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { db, initializeDatabase } from '../../db'
-import { addStep, createRecipeThread, removeStep, reorderStep, updateRecipeProperties, updateStep } from './mutations'
+import { addNote, addSection, addStep, addStepToSection, createRecipeThread, removeStep, reorderStep, replaceRecipeMarkdown, replaceSteps, updateRecipeProperties, updateStep } from './mutations'
 import { getRecipe, isRecipeThread, listRecipes } from './selectors'
 
 const DATE = '2026-09-01'
@@ -31,8 +31,8 @@ describe('recipe authoring mutations', () => {
 
   it('adds, updates, reorders, and removes Cooklang-annotated steps', async () => {
     const threadId = await createRecipeThread({ title: 'Pancakes', servings: 2 })
-    await addStep(threadId, 'Whisk @eggs{2} and @milk{300%ml} in the #mixing bowl{}.')
-    await addStep(threadId, 'Add @flour{200%g} and mix with the #mixing bowl{} and #whisk.')
+    await addStep(threadId, 'Whisk @eggs{2} and @milk{300%ml} in the ^mixing bowl{}.')
+    await addStep(threadId, 'Add @flour{200%g} and mix with the ^mixing bowl{} and ^whisk.')
     await addStep(threadId, 'Cook for ~{2%minutes} per side.')
 
     let recipe = await getRecipe(threadId)
@@ -53,6 +53,47 @@ describe('recipe authoring mutations', () => {
     await removeStep(threadId, 0)
     recipe = await getRecipe(threadId)
     expect(recipe?.steps).toHaveLength(2)
+  })
+
+  it('stores sections, nested steps, and notes as tagged Markdown', async () => {
+    const threadId = await createRecipeThread({ title: 'Broth' })
+    await addSection(threadId, 'Make the broth')
+    let recipe = await getRecipe(threadId)
+    const sectionId = recipe!.sections[0].id
+    await addStepToSection(threadId, sectionId, 'Add @water{2%cups} to the ^pot{}.')
+    await addNote(threadId, 'Keep it partially covered.', sectionId)
+
+    const body = (await db.threadNotes.get(threadId))!.markdown
+    expect(body).toContain('- #[cook-section] Make the broth')
+    expect(body).toContain('  - #[cook-step] Add @water{2%cups} to the ^pot{}.')
+    expect(body).toContain('  - #[cook-note] Keep it partially covered.')
+    recipe = await getRecipe(threadId)
+    expect(recipe?.sections[0].steps[0].sectionTitle).toBe('Make the broth')
+    expect(recipe?.sections[0].notes[0].text).toBe('Keep it partially covered.')
+  })
+
+  it('normalizes imported outlines into explicit recipe roles', async () => {
+    const threadId = await createRecipeThread({ title: 'Eggs' })
+    await replaceRecipeMarkdown(threadId, '- Make the sauce\n  - Whisk @eggs{2}(cracked)\n  - Note: keep it warm')
+    const recipe = await getRecipe(threadId)
+    expect(recipe?.sections[0].title).toBe('Make the sauce')
+    expect(recipe?.sections[0].steps).toHaveLength(2)
+    expect(recipe?.sections[0].steps[0].ingredients[0].preparation).toBe('cracked')
+    expect((await db.threadNotes.get(threadId))!.markdown).toContain('#[cook-section] Make the sauce')
+  })
+
+  it('preserves tagged nested outlines when replacing steps', async () => {
+    const threadId = await createRecipeThread({ title: 'Soup' })
+    await replaceSteps(threadId, [
+      '- #[cook-section] Prep',
+      '  - #[cook-step] Slice @onion{1}(thinly)',
+      '  - #[cook-note] Keep the slices even.',
+    ])
+
+    const recipe = await getRecipe(threadId)
+    expect(recipe?.sections[0].title).toBe('Prep')
+    expect(recipe?.sections[0].steps[0].ingredients[0].preparation).toBe('thinly')
+    expect(recipe?.sections[0].notes[0].text).toBe('Keep the slices even.')
   })
 
   it('updates recipe-level properties and clears them when set to an empty value', async () => {

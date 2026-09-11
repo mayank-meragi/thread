@@ -21,7 +21,7 @@ const DOCS: DocEntry[] = [
   {
     slug: 'recipe-syntax',
     title: 'Recipe syntax',
-    blurb: 'Write @ingredients, #cookware and ~timers inline in recipe steps.',
+    blurb: 'Use tagged sections, notes, @ingredients, ^cookware and ~timers.',
     body: () => <RecipeSyntaxDoc />,
   },
 ]

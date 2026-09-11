@@ -198,6 +198,7 @@ export const BUILT_IN_PROPERTIES: Array<Omit<PropertyDefinitionRecord, 'createdA
   { id: 'cook-ingredient-quantity', name: 'Quantity', type: 'number', system: true },
   { id: 'cook-ingredient-unit', name: 'Unit', type: 'text', system: true },
   { id: 'cook-step-duration-seconds', name: 'Duration', type: 'number', system: true },
+  { id: 'cook-step-section', name: 'Section', type: 'text', system: true },
   {
     id: 'meal-plan-type', name: 'Meal', type: 'select', system: true,
     options: [
@@ -246,7 +247,7 @@ export const BUILT_IN_TAGS: Array<Omit<TagDefinitionRecord, 'createdAt' | 'updat
   {
     id: RECIPE_SYSTEM_TAGS.cookStep,
     name: 'cook-step',
-    propertyIds: ['cook-step-duration-seconds'],
+    propertyIds: ['cook-step-duration-seconds', 'cook-step-section'],
   },
   {
     id: RECIPE_SYSTEM_TAGS.mealPlan,

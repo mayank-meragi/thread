@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check, SkipForward } from 'lucide-react'
@@ -15,8 +15,8 @@ import { getCookSession } from '../lib/recipes/selectors'
 import type { CookStepView } from '../lib/recipes/types'
 import { Button } from '../components/ui'
 
-// A task's stored text uses the cleaned inline-tag form (`#cook-step foo`, no
-// brackets -- see `cleanMarkdownLine`), not the authored `#[cook-step] foo`.
+// A task's stored text keeps the structural tag (`#[cook-step] foo`); accept
+// the legacy unbracketed form too because older task records may contain it.
 function stripStructuralPrefix(text: string, role: 'cook-ingredient' | 'cook-step'): string {
   return text.replace(new RegExp(`^#\\[?${role}\\]?\\s*`), '').trim()
 }
@@ -128,24 +128,28 @@ export function CookPage() {
             const state = stepState(step)
             const isActive = step.task.id === activeId
             const text = stripStructuralPrefix(step.task.text, 'cook-step')
+            const previousSection = session.steps[index - 1]?.sectionTitle
             return (
-              <li key={step.task.id} className={`cook-step-row state-${state}${isActive ? ' active' : ''}`}>
-                <span className="cook-step-number">{state === 'done' ? <Check size={13} aria-hidden="true" /> : index + 1}</span>
-                <div className="cook-step-body">
-                  <p><CooklangText text={text} /></p>
-                  {isActive && state === 'pending' && (
-                    <div className="cook-step-actions">
-                      {step.durationSeconds !== undefined && <CookTimer key={step.task.id} seconds={step.durationSeconds} />}
-                      <Button disabled={busy} onClick={() => void markDone(step.task.id)}>
-                        <Check size={14} aria-hidden="true" /> Done
-                      </Button>
-                      <Button variant="ghost" disabled={busy} onClick={() => void skip(step.task.id)}>
-                        <SkipForward size={14} aria-hidden="true" /> Skip
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </li>
+              <Fragment key={step.task.id}>
+                {step.sectionTitle && step.sectionTitle !== previousSection && <li className="cook-section-title">{step.sectionTitle}</li>}
+                <li className={`cook-step-row state-${state}${isActive ? ' active' : ''}`}>
+                  <span className="cook-step-number">{state === 'done' ? <Check size={13} aria-hidden="true" /> : index + 1}</span>
+                  <div className="cook-step-body">
+                    <p><CooklangText text={text} /></p>
+                    {isActive && state === 'pending' && (
+                      <div className="cook-step-actions">
+                        {step.durationSeconds !== undefined && <CookTimer key={step.task.id} seconds={step.durationSeconds} />}
+                        <Button disabled={busy} onClick={() => void markDone(step.task.id)}>
+                          <Check size={14} aria-hidden="true" /> Done
+                        </Button>
+                        <Button variant="ghost" disabled={busy} onClick={() => void skip(step.task.id)}>
+                          <SkipForward size={14} aria-hidden="true" /> Skip
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </li>
+              </Fragment>
             )
           })}
         </ol>

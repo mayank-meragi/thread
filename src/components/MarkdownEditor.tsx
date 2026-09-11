@@ -50,7 +50,7 @@ interface MarkdownEditorProps {
   ariaLabel?: string
   loadingLabel?: string
   autoFocus?: boolean
-  /** Renders Cooklang tokens (`@ingredient{}`, `#cookware{}`, `~{timer}`) as chips. Only ever passed for a recipe thread's own note -- see ThreadComposer. */
+  /** Renders Cooklang tokens (`@ingredient{}`, `^cookware{}`, `~{timer}`) as chips. Only ever passed for a recipe thread's own note -- see ThreadComposer. */
   cooklang?: boolean
 }
 

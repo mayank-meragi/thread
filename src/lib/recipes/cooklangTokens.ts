@@ -1,6 +1,6 @@
 // A pure, self-contained subset of the Cooklang grammar (https://cooklang.org):
 // `@ingredient{quantity%unit}` and its bare single-word form `@ingredient`,
-// `#cookware{}` / `#cookware` the same way, and `~{quantity%unit}` /
+// `^cookware{}` / `^cookware` the same way, and `~{quantity%unit}` /
 // `~label{quantity%unit}` timers. No dependency on Dexie or any other thread
 // module -- callers (selectors, the editor decoration layer) decide what to do
 // with the parsed result.
@@ -9,6 +9,7 @@ export interface RecipeIngredient {
   name: string
   quantity?: number
   unit?: string
+  preparation?: string
   raw: string
 }
 
@@ -66,28 +67,51 @@ function secondsFor(quantity: number | undefined, unit: string | undefined): num
 
 interface Span { start: number; end: number }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function overlaps(span: Span, spans: Span[]): boolean {
   return spans.some((existing) => span.start < existing.end && span.end > existing.start)
 }
 
 /** Braced form: `SYMBOL name{content}`, name may be empty (timers) or contain spaces (multi-word ingredients/cookware). */
-function bracedMatches(text: string, symbol: '@' | '#' | '~'): Array<{ name: string; content: string; raw: string; span: Span }> {
-  const pattern = new RegExp(`${symbol}([^{}\\n@#~]*?)\\{([^}]*)\\}`, 'g')
-  return Array.from(text.matchAll(pattern), (match) => ({
-    name: match[1].trim(),
-    content: match[2],
-    raw: match[0],
-    span: { start: match.index ?? 0, end: (match.index ?? 0) + match[0].length },
-  }))
+function bracedMatches(text: string, symbol: '@' | '^' | '~'): Array<{ name: string; content: string; preparation?: string; raw: string; span: Span }> {
+  const pattern = new RegExp(`${escapeRegExp(symbol)}([^{}\\n@^~]*?)\\{([^}]*)\\}`, 'g')
+  return Array.from(text.matchAll(pattern), (match) => {
+    const start = match.index ?? 0
+    let end = start + match[0].length
+    let raw = match[0]
+    let preparation: string | undefined
+    if (symbol === '@') {
+      const preparationMatch = text.slice(end).match(/^\(([^)\n]*)\)/)
+      if (preparationMatch) {
+        preparation = preparationMatch[1].trim() || undefined
+        raw += preparationMatch[0]
+        end += preparationMatch[0].length
+      }
+    }
+    return { name: match[1].trim(), content: match[2], preparation, raw, span: { start, end } }
+  })
 }
 
 /** Bare single-word form: `SYMBOL word`, not immediately followed by `{` (that belongs to the braced form). */
-function bareMatches(text: string, symbol: '@' | '#'): Array<{ name: string; raw: string; span: Span }> {
-  const pattern = new RegExp(`${symbol}([\\p{L}\\p{N}][\\p{L}\\p{N}'-]*)`, 'gu')
+function bareMatches(text: string, symbol: '@' | '^'): Array<{ name: string; preparation?: string; raw: string; span: Span }> {
+  const pattern = new RegExp(`${escapeRegExp(symbol)}([\\p{L}\\p{N}][\\p{L}\\p{N}'-]*)`, 'gu')
   return Array.from(text.matchAll(pattern), (match) => {
     const start = match.index ?? 0
-    const end = start + match[0].length
-    return { name: match[1], raw: match[0], span: { start, end } }
+    let end = start + match[0].length
+    let raw = match[0]
+    let preparation: string | undefined
+    if (symbol === '@') {
+      const preparationMatch = text.slice(end).match(/^\(([^)\n]*)\)/)
+      if (preparationMatch) {
+        preparation = preparationMatch[1].trim() || undefined
+        raw += preparationMatch[0]
+        end += preparationMatch[0].length
+      }
+    }
+    return { name: match[1], preparation, raw, span: { start, end } }
   }).filter((entry) => text[entry.span.end] !== '{')
 }
 
@@ -99,9 +123,9 @@ export function parseCooklangTokens(text: string): CooklangParseResult {
   const ingredientBare = bareMatches(text, '@').filter((entry) => !overlaps(entry.span, consumed))
   ingredientBare.forEach((entry) => consumed.push(entry.span))
 
-  const cookwareBraced = bracedMatches(text, '#').filter((entry) => entry.name.length > 0 && !overlaps(entry.span, consumed))
+  const cookwareBraced = bracedMatches(text, '^').filter((entry) => entry.name.length > 0 && !overlaps(entry.span, consumed))
   cookwareBraced.forEach((entry) => consumed.push(entry.span))
-  const cookwareBare = bareMatches(text, '#').filter((entry) => !overlaps(entry.span, consumed))
+  const cookwareBare = bareMatches(text, '^').filter((entry) => !overlaps(entry.span, consumed))
   cookwareBare.forEach((entry) => consumed.push(entry.span))
 
   const timerBraced = bracedMatches(text, '~').filter((entry) => !overlaps(entry.span, consumed))
@@ -109,9 +133,15 @@ export function parseCooklangTokens(text: string): CooklangParseResult {
   const ingredients: RecipeIngredient[] = [
     ...ingredientBraced.map((entry) => {
       const [quantity, unit] = parseQuantityUnit(entry.content)
-      return { name: entry.name, quantity, unit, raw: entry.raw }
+      const ingredient: RecipeIngredient = { name: entry.name, quantity, unit, raw: entry.raw }
+      if (entry.preparation !== undefined) ingredient.preparation = entry.preparation
+      return ingredient
     }),
-    ...ingredientBare.map((entry) => ({ name: entry.name, raw: entry.raw })),
+    ...ingredientBare.map((entry) => {
+      const ingredient: RecipeIngredient = { name: entry.name, raw: entry.raw }
+      if (entry.preparation !== undefined) ingredient.preparation = entry.preparation
+      return ingredient
+    }),
   ]
 
   const cookware: RecipeCookware[] = [
@@ -132,14 +162,36 @@ export function parseCooklangTokens(text: string): CooklangParseResult {
   }
 }
 
-/** Deduplicates ingredients by name (case-insensitive), summing quantities that share a unit. Order follows first appearance. */
+/** Deduplicates ingredients by name and preparation, summing quantities that share a unit. Order follows first appearance. */
 export function mergeIngredients(ingredients: readonly RecipeIngredient[]): RecipeIngredient[] {
+  const byKey = new Map<string, RecipeIngredient>()
+  for (const ingredient of ingredients) {
+    const key = `${ingredient.name.toLocaleLowerCase()}\u0000${ingredient.preparation?.toLocaleLowerCase() ?? ''}`
+    const existing = byKey.get(key)
+    if (!existing) {
+      byKey.set(key, { ...ingredient })
+      continue
+    }
+    if (existing.quantity !== undefined && ingredient.quantity !== undefined && existing.unit === ingredient.unit) {
+      existing.quantity += ingredient.quantity
+    } else if (existing.quantity === undefined && ingredient.quantity !== undefined) {
+      existing.quantity = ingredient.quantity
+      existing.unit = ingredient.unit
+    }
+  }
+  return Array.from(byKey.values())
+}
+
+/** Shopping lists merge different preparations of the same ingredient. */
+export function mergeShoppingIngredients(ingredients: readonly RecipeIngredient[]): RecipeIngredient[] {
   const byKey = new Map<string, RecipeIngredient>()
   for (const ingredient of ingredients) {
     const key = ingredient.name.toLocaleLowerCase()
     const existing = byKey.get(key)
     if (!existing) {
-      byKey.set(key, { ...ingredient })
+      const copy = { ...ingredient }
+      delete copy.preparation
+      byKey.set(key, copy)
       continue
     }
     if (existing.quantity !== undefined && ingredient.quantity !== undefined && existing.unit === ingredient.unit) {

@@ -22,7 +22,7 @@ const CREATE_INPUT = {
   category: ['dinner'],
   steps: [
     'Rinse @rice{1%cup} and @split moong dal{1/2%cup} together.',
-    'In a #pressure cooker{}, heat @ghee{1%tbsp} and add @cumin, then cook for ~{3%whistles}.',
+    'In a ^pressure cooker{}, heat @ghee{1%tbsp} and add @cumin, then cook for ~{3%whistles}.',
   ],
 }
 

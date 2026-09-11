@@ -25,12 +25,14 @@ const recipeExtractionSchema = z.object({
   category: z.array(z.enum(CATEGORY_IDS as [string, ...string[]])).optional()
     .describe('Zero or more categories this recipe fits, from the given list.'),
   steps: z.array(z.string()).min(1).describe(
-    'Ordered cooking steps written as plain instructions in Cooklang-style annotated Markdown. '
+    'Ordered recipe outline lines written in Cooklang-style annotated Markdown. '
+    + 'Use #[cook-section] for a section title, indent its child lines by two spaces, use #[cook-step] for executable instructions, and use #[cook-note] for supporting context. '
     + 'In every step, mark each ingredient mention as @name{quantity%unit} (a multi-word name needs the braces even with no quantity, e.g. @brown sugar{}; a single word can omit them, e.g. @salt). '
-    + 'Mark cookware as #name{} (or bare #name for a single word). '
+    + 'Add preparation in parentheses after an ingredient, e.g. @onion{1}(sliced) or @garlic{2}(minced). '
+    + 'Mark cookware as ^name{} (or bare ^name for a single word). '
     + 'Mark a timed duration as ~{quantity%unit} (e.g. ~{5%minutes}). '
     + 'Do not annotate anything that is not actually an ingredient, cookware, or a timed duration. '
-    + 'Example: "Whisk @eggs{2} and @milk{300%ml} together, then cook in a #frying pan{} for ~{2%minutes}."',
+    + 'Example: "#[cook-section] Make the broth" followed by "  - #[cook-step] Add @water{2.5%cups} to a ^pot{} and simmer for ~{20%minutes}."',
   ),
 })
 
@@ -41,7 +43,7 @@ export interface RecipeImportDraft {
   prepMinutes?: number
   cookMinutes?: number
   category?: string[]
-  /** One Cooklang-annotated line per step, ready to hand to `addStep` after user review. */
+  /** One tagged/indented Markdown outline line per recipe block, ready for review. */
   steps: string[]
 }
 
@@ -51,7 +53,7 @@ export interface RecipeImportDraft {
  * to structure it into a `RecipeImportDraft` with Cooklang-annotated steps.
  * Returns a draft only -- nothing is persisted here; the caller (an import UI)
  * lets the user review/edit it, then saves it through the same
- * `createRecipeThread`/`addStep`/`updateRecipeProperties` mutations manual
+ * `createRecipeThread`/`replaceRecipeMarkdown`/`updateRecipeProperties` mutations manual
  * entry uses.
  */
 export async function importRecipeFromUrl(url: string): Promise<RecipeImportDraft> {
@@ -93,6 +95,8 @@ export async function importRecipeFromUrl(url: string): Promise<RecipeImportDraf
     prepMinutes: object.prepMinutes,
     cookMinutes: object.cookMinutes,
     category: object.category,
-    steps: object.steps.map((step) => step.trim()).filter(Boolean),
+    // Keep leading whitespace: it carries section/note ownership in the
+    // Markdown outline. Only trim trailing whitespace and discard blank lines.
+    steps: object.steps.map((step) => step.replace(/\s+$/, '')).filter((step) => step.trim().length > 0),
   }
 }

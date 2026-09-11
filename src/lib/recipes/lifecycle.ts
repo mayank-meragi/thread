@@ -71,7 +71,8 @@ export async function startCook(recipeThreadId: string, options: { day?: string;
 
   for (const ingredient of recipe.ingredients) {
     const scaled = scaleIngredient(ingredient, scaleFactor)
-    const ingredientTaskId = await createCookSubtask(cookTaskId, 'cookIngredient', scaled.name)
+    const ingredientText = `${scaled.name}${scaled.preparation ? ` (${scaled.preparation})` : ''}`
+    const ingredientTaskId = await createCookSubtask(cookTaskId, 'cookIngredient', ingredientText)
     if (scaled.quantity !== undefined) await setBlockProperty(ingredientTaskId, 'cook-ingredient-quantity', scaled.quantity)
     if (scaled.unit) await setBlockProperty(ingredientTaskId, 'cook-ingredient-unit', scaled.unit)
   }
@@ -79,6 +80,7 @@ export async function startCook(recipeThreadId: string, options: { day?: string;
   for (const step of recipe.steps) {
     const stepTaskId = await createCookSubtask(cookTaskId, 'cookStep', step.text)
     if (step.durationSeconds !== undefined) await setBlockProperty(stepTaskId, 'cook-step-duration-seconds', step.durationSeconds)
+    if (step.sectionTitle) await setBlockProperty(stepTaskId, 'cook-step-section', step.sectionTitle)
   }
 
   return cookTaskId
