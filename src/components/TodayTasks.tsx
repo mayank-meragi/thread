@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { useState } from 'react'
 import { CalendarClock, Check, ChevronRight } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -60,7 +61,7 @@ function TaskGroup({
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   return (
     <div className={`task-group task-group-${tone}${collapsed ? ' is-collapsed' : ''}`}>
-      <button
+      <Button unstyled
         type="button"
         className="task-group-label"
         aria-expanded={!collapsed}
@@ -68,17 +69,17 @@ function TaskGroup({
       >
         <span><ChevronRight className="task-group-caret" size={12} />{title}</span>
         <small>{tasks.length}</small>
-      </button>
+      </Button>
       {collapsed ? null : tasks.length ? tasks.map((task) => (
         <div className="today-task-row" key={task.id}>
-          <button
+          <Button unstyled
             type="button"
             className={isDone ? 'task-check is-checked' : 'task-check'}
             aria-label={isDone ? `Mark ${task.text} not done` : `Complete ${task.text}`}
             onClick={() => void setTaskStatus(task.id, isDone ? 'not_started' : 'done')}
           >
             <Check size={12} />
-          </button>
+          </Button>
           <Link className={isDone ? 'today-task-text is-done' : 'today-task-text'} to={`/?date=${task.day}&block=${task.blockId}`}>{task.text}</Link>
           <span className="today-task-meta">
             {isDone

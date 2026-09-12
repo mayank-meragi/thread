@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { AlertTriangle, Loader2, X } from 'lucide-react'
@@ -167,11 +168,11 @@ export function ThreadScriptProposal({ status, result, approval, respondToApprov
         <p className="chat-approval-auto">Approved automatically — trusted action. Manage in Settings.</p>
       ) : isPending && gateOpen ? (
         <div className="chat-approval-actions">
-          <button type="button" className="btn btn-ghost btn-sm chat-approval-deny" disabled={busy} onClick={cancel}>Deny</button>
+          <Button variant="ghost" size="sm" className="chat-approval-deny" disabled={busy} onClick={cancel}>Deny</Button>
           {risk === 'write' ? (
-            <button type="button" className="btn btn-ghost btn-sm chat-approval-always" disabled={busy} onClick={alwaysAllow}>Always allow</button>
+            <Button variant="ghost" size="sm" className="chat-approval-always" disabled={busy} onClick={alwaysAllow}>Always allow</Button>
           ) : null}
-          <button type="button" className="btn btn-solid btn-sm chat-approval-allow" disabled={busy} onClick={runConfirm}>Allow once</button>
+          <Button size="sm" className="chat-approval-allow" disabled={busy} onClick={runConfirm}>Allow once</Button>
         </div>
       ) : null}
     </div>

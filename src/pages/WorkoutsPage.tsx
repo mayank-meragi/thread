@@ -10,7 +10,7 @@ import { buildWorkoutInsights, type ExerciseProgress, type WorkoutRange } from '
 import { elapsedMs, formatDuration, stripStructuralTag, tallyWorkoutSets, workoutLensState, type WorkoutLensState } from '../lib/workouts/presentation'
 import type { WorkoutView } from '../lib/workouts/types'
 import { formatDay, formatShortDate, isoToday } from '../lib/dates'
-import { Button, ButtonLink } from '../components/ui'
+import { Button, ButtonLink, Input, ToggleButton } from 'fiber'
 
 type WorkoutsView = 'overview' | 'history' | 'exercises'
 const STATE_LABEL: Record<WorkoutLensState, string> = { planned: 'Planned', active: 'Active', completed: 'Completed', canceled: 'Canceled' }
@@ -69,17 +69,17 @@ function NextWorkout({ workouts }: { workouts: readonly WorkoutView[] }) {
 }
 
 function RangeControl({ range, onChange }: { range: WorkoutRange; onChange: (range: WorkoutRange) => void }) {
-  return <div className="workout-range-control" aria-label="Insight range">{([['4w', '4 weeks'], ['12w', '12 weeks'], ['all', 'All time']] as const).map(([id, label]) => <button type="button" key={id} className={range === id ? 'active' : ''} aria-pressed={range === id} onClick={() => onChange(id)}>{label}</button>)}</div>
+  return <div className="workout-range-control" aria-label="Insight range">{([['4w', '4 weeks'], ['12w', '12 weeks'], ['all', 'All time']] as const).map(([id, label]) => <ToggleButton unstyled pressed={range === id} type="button" key={id} className={range === id ? 'active' : ''} onClick={() => onChange(id)}>{label}</ToggleButton>)}</div>
 }
 
 function ExerciseIndexRow({ exercise, selected, onSelect }: { exercise: ExerciseProgress; selected: boolean; onSelect: () => void }) {
   const best = exercise.bestEstimated1rm ?? exercise.bestLoad
   return (
-    <button type="button" className={`exercise-index-row${selected ? ' selected' : ''}`} aria-pressed={selected} onClick={onSelect}>
+    <ToggleButton unstyled pressed={selected} type="button" className={`exercise-index-row${selected ? ' selected' : ''}`} onClick={onSelect}>
       <span className="exercise-index-monogram" aria-hidden="true">{exercise.title.slice(0, 1).toUpperCase()}</span>
       <span className="exercise-index-copy"><strong>{exercise.title}</strong><small>{exercise.sessions} sessions · {exercise.completedSets} sets · Last {formatDay(exercise.latestDay).short}</small></span>
       <span className="exercise-index-best">{best !== undefined ? <><b>{Math.round(best)}</b><small>{exercise.displayUnit}{exercise.bestEstimated1rm !== undefined ? ' est.' : ' best'}</small></> : <small>No load data</small>}</span>
-    </button>
+    </ToggleButton>
   )
 }
 
@@ -134,7 +134,7 @@ export function WorkoutsPage() {
         <div><h1>Workouts</h1><p>Train, review, and see what is moving.</p></div>
         <Button className="workouts-new" disabled={busy} onClick={() => void newWorkout()}><Plus size={16} aria-hidden="true" /> New workout</Button>
       </header>
-      <nav className="workouts-tabs" aria-label="Workout views" role="tablist">{VIEW_OPTIONS.map(({ id, label, icon: Icon }) => <button type="button" role="tab" id={`workouts-tab-${id}`} aria-controls="workouts-view-panel" aria-selected={view === id} key={id} className={view === id ? 'active' : ''} onClick={() => setParam('view', id === 'overview' ? undefined : id)}><Icon size={16} aria-hidden="true" />{label}</button>)}</nav>
+      <nav className="workouts-tabs" aria-label="Workout views" role="tablist">{VIEW_OPTIONS.map(({ id, label, icon: Icon }) => <Button unstyled type="button" role="tab" id={`workouts-tab-${id}`} aria-controls="workouts-view-panel" aria-selected={view === id} key={id} className={view === id ? 'active' : ''} onClick={() => setParam('view', id === 'overview' ? undefined : id)}><Icon size={16} aria-hidden="true" />{label}</Button>)}</nav>
 
       <div role="tabpanel" id="workouts-view-panel" aria-labelledby={`workouts-tab-${view}`}>
       {workouts.length === 0 ? (
@@ -156,7 +156,7 @@ export function WorkoutsPage() {
           <section className="workout-log">
             <header className="workout-log-head"><div><h2>Workout log</h2><p>{history.length} of {workouts.length} sessions</p></div>{(query || status !== 'all' || selectedDay) && <Button variant="ghost" size="sm" onClick={() => setParams({ view: 'history', ...(month !== today.slice(0, 7) ? { month } : {}) })}>Clear filters</Button>}</header>
             <div className="workout-log-filters">
-              <label className="workout-search"><Search size={15} aria-hidden="true" /><span className="sr-only">Search workout titles</span><input value={query} placeholder="Search workouts" onChange={(event) => setParam('q', event.target.value || undefined, true)} /></label>
+              <label className="workout-search"><Search size={15} aria-hidden="true" /><span className="sr-only">Search workout titles</span><Input value={query} placeholder="Search workouts" onChange={(event) => setParam('q', event.target.value || undefined, true)} /></label>
               <label className="workout-status-filter"><ListFilter size={15} aria-hidden="true" /><span className="sr-only">Filter by status</span><select value={status} onChange={(event) => setParam('status', event.target.value === 'all' ? undefined : event.target.value)}><option value="all">All statuses</option><option value="active">Active</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="canceled">Canceled</option></select></label>
             </div>
             {selectedDay && <p className="workout-filter-note">Showing {formatShortDate(selectedDay)} <Button variant="ghost" size="sm" onClick={() => setParam('day')}>Show all dates</Button></p>}
@@ -167,7 +167,7 @@ export function WorkoutsPage() {
         <div className={`workout-exercises-view${selectedExercise ? ' has-selection' : ''}`}>
           <aside className="exercise-index">
             <header><div><h2>Exercises</h2><p>{exerciseResults.length} with completed sets</p></div></header>
-            <label className="workout-search"><Search size={15} aria-hidden="true" /><span className="sr-only">Search exercises</span><input value={query} placeholder="Search exercises" onChange={(event) => setParam('q', event.target.value || undefined, true)} /></label>
+              <label className="workout-search"><Search size={15} aria-hidden="true" /><span className="sr-only">Search exercises</span><Input value={query} placeholder="Search exercises" onChange={(event) => setParam('q', event.target.value || undefined, true)} /></label>
             <div className="exercise-index-list">{exerciseResults.map((exercise) => <ExerciseIndexRow key={exercise.id} exercise={exercise} selected={exercise.id === selectedExerciseId} onSelect={() => setParam('exercise', exercise.id)} />)}{!exerciseResults.length && <p className="workout-panel-empty">No completed, linked exercises match this search.</p>}</div>
           </aside>
           <main className="exercise-detail-shell">{selectedExercise ? <><Button variant="ghost" size="sm" className="exercise-detail-back" onClick={() => setParam('exercise')}>All exercises</Button><ExerciseDetail key={selectedExercise.id} exercise={selectedExercise} /></> : <div className="exercise-detail-empty"><Trophy size={24} /><h2>Choose an exercise</h2><p>Inspect load, reps, volume, estimated strength, and recent sets.</p></div>}</main>

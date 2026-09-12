@@ -4,7 +4,7 @@ import type { BlockTagRecord, MentionRecord, TagDefinitionRecord, TaskRecord } f
 import { formatDay, isoToday, shiftDay } from '../lib/dates'
 import { deleteTask, setTaskDueDate, setTaskStatus } from '../lib/tasks'
 import { TaskStatusControl } from './TaskStatusControl'
-import { Button } from './ui'
+import { Button } from 'fiber'
 
 export type TaskDisplayMode = 'list' | 'compact'
 
@@ -102,11 +102,11 @@ export function TaskRow({
           <input type="checkbox" checked={selected} onChange={(event) => onSelect(event.target.checked)} />
           <span />
         </label>
-        <button type="button" className="task-tree-toggle" disabled={!hasChildren} aria-label={expanded ? 'Collapse subtasks' : 'Expand subtasks'} aria-expanded={hasChildren ? expanded : undefined} onClick={onToggleExpanded}>
+        <Button unstyled type="button" className="task-tree-toggle" disabled={!hasChildren} aria-label={expanded ? 'Collapse subtasks' : 'Expand subtasks'} aria-expanded={hasChildren ? expanded : undefined} onClick={onToggleExpanded}>
           {hasChildren && <ChevronRight size={14} />}
-        </button>
+        </Button>
         <TaskStatusControl task={task} compact />
-        <button type="button" className="task-row-body" onClick={onOpen}>
+        <Button unstyled type="button" className="task-row-body" onClick={onOpen}>
           <span className="task-row-title">{task.text}</span>
           {task.description && !isCompact && <span className="task-row-description">{task.description}</span>}
           <span className="task-row-foot">
@@ -118,7 +118,7 @@ export function TaskRow({
             {!isCompact && appliedTags.slice(0, 2).map((tag) => <span key={tag.id}><Tag size={10} /> {tag.name}</span>)}
             {!isCompact && relatedThreads.slice(0, 2).map((mention) => <span key={mention.threadId}>#{mention.title}</span>)}
           </span>
-        </button>
+        </Button>
         <div className="task-row-progress">
           {task.totalSubtasks > 0 ? <>
             <span><ListTree size={12} /> {task.completedSubtasks}/{task.totalSubtasks}</span>

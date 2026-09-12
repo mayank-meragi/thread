@@ -1,3 +1,4 @@
+import { Button, IconButton } from 'fiber'
 import { useEffect, useRef, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { isoToday } from '../lib/dates'
@@ -64,24 +65,23 @@ export function DatePicker({ selected, onSelect }: DatePickerProps) {
 
   return (
     <div className="date-picker" ref={wrapRef}>
-      <button type="button" aria-label="Pick a date" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+      <IconButton unstyled aria-label="Pick a date" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
         <CalendarDays size={16} />
-      </button>
+      </IconButton>
       {open && (
         <div className="menu-panel date-picker-panel" role="dialog" aria-label="Choose a date">
           <div className="date-picker-nav">
-            <button type="button" aria-label="Previous month" onClick={() => setViewMonth((month) => shiftMonth(month, -1))}>
+            <IconButton unstyled aria-label="Previous month" onClick={() => setViewMonth((month) => shiftMonth(month, -1))}>
               <ChevronLeft size={14} />
-            </button>
+            </IconButton>
             <span>{monthLabel}</span>
-            <button
-              type="button"
+            <IconButton unstyled
               aria-label="Next month"
               disabled={viewMonth >= monthStart(today)}
               onClick={() => setViewMonth((month) => shiftMonth(month, 1))}
             >
               <ChevronRight size={14} />
-            </button>
+            </IconButton>
           </div>
           <div className="date-picker-weekdays">
             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label, index) => <span key={index}>{label}</span>)}
@@ -91,7 +91,7 @@ export function DatePicker({ selected, onSelect }: DatePickerProps) {
               if (!date) return <span key={index} />
               const disabled = date > today
               return (
-                <button
+                <Button unstyled
                   key={date}
                   type="button"
                   disabled={disabled}
@@ -105,7 +105,7 @@ export function DatePicker({ selected, onSelect }: DatePickerProps) {
                   }}
                 >
                   {Number(date.slice(8, 10))}
-                </button>
+                </Button>
               )
             })}
           </div>

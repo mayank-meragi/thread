@@ -10,7 +10,7 @@ import { addNote, addSection, addStep, addStepToSection, convertUnsectionedSteps
 import { getRecipe } from '../lib/recipes/selectors'
 import type { RecipeIngredient } from '../lib/recipes/cooklangTokens'
 import type { RecipeSectionView, RecipeStepView } from '../lib/recipes/types'
-import { Button } from '../components/ui'
+import { Button, Input } from 'fiber'
 
 type RecipePanel = 'ingredients' | 'cookware' | 'steps'
 
@@ -62,7 +62,7 @@ function NoteEditor({ note, onSave, onRemove }: { note: { id: string; text: stri
           </div>
         </div>
       ) : (
-        <button type="button" className="recipe-note-content" onClick={() => setEditing(true)}>{<CooklangText text={note.text} />}</button>
+        <Button unstyled type="button" className="recipe-note-content" onClick={() => setEditing(true)}>{<CooklangText text={note.text} />}</Button>
       )}
     </div>
   )
@@ -142,7 +142,7 @@ function StepEditor({ step, displayIndex, onSave, onRemove, onAddNote, onSaveNot
             </Button>
             {addingNote && (
               <form className="recipe-step-note-form" onSubmit={(event) => { event.preventDefault(); void commitNote() }}>
-                <input
+                <Input
                   autoFocus
                   value={noteText}
                   onChange={(event) => setNoteText(event.target.value)}
@@ -210,7 +210,7 @@ function IngredientTotals({ ingredients, sections, unsectionedSteps, scaleFactor
 function SectionForm({ title, onChange, onSubmit, onCancel, saving, submitLabel = 'Add section', savingLabel = 'Adding…' }: { title: string; onChange: (value: string) => void; onSubmit: () => void; onCancel: () => void; saving: boolean; submitLabel?: string; savingLabel?: string }) {
   return (
     <form className="recipe-section-form" onSubmit={(event) => { event.preventDefault(); onSubmit() }}>
-      <input autoFocus value={title} onChange={(event) => onChange(event.target.value)} placeholder="New section name" aria-label="New section name" disabled={saving} />
+      <Input autoFocus value={title} onChange={(event) => onChange(event.target.value)} placeholder="New section name" aria-label="New section name" disabled={saving} />
       <Button type="submit" size="sm" disabled={saving || !title.trim()}>{saving ? savingLabel : submitLabel}</Button>
       <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={saving}>Cancel</Button>
     </form>
@@ -456,7 +456,7 @@ export function RecipePage() {
       {cookError && <p className="add-exercise-error" role="alert">{cookError}</p>}
 
       <div className="recipe-content-tabs" role="tablist" aria-label="Recipe details">
-        <button
+        <Button unstyled
           type="button"
           role="tab"
           id={tabId('ingredients')}
@@ -465,8 +465,8 @@ export function RecipePage() {
           onClick={() => setActivePanel('ingredients')}
         >
           Ingredients
-        </button>
-        <button
+        </Button>
+        <Button unstyled
           type="button"
           role="tab"
           id={tabId('cookware')}
@@ -475,8 +475,8 @@ export function RecipePage() {
           onClick={() => setActivePanel('cookware')}
         >
           Cookware
-        </button>
-        <button
+        </Button>
+        <Button unstyled
           type="button"
           role="tab"
           id={tabId('steps')}
@@ -485,7 +485,7 @@ export function RecipePage() {
           onClick={() => setActivePanel('steps')}
         >
           Steps
-        </button>
+        </Button>
       </div>
 
       <section id={panelId('ingredients')} className={`recipe-ingredients-panel recipe-tab-panel${activePanel === 'ingredients' ? ' is-active' : ''}`} role="tabpanel" aria-labelledby={tabId('ingredients')}>
@@ -539,7 +539,7 @@ export function RecipePage() {
             <option value="">Recipe root</option>
             {flattenSections(recipe.sections).map((section) => <option key={section.id} value={section.id}>{'— '.repeat(Math.max(0, Math.floor(section.depth / 2)))}{section.title}</option>)}
           </select>}
-          <input
+          <Input
             value={newStep}
             onChange={(event) => setNewStep(event.target.value)}
             placeholder="Whisk @eggs{2} and @milk{300%ml} together."

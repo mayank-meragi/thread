@@ -8,7 +8,7 @@ import { stripStructuralTag } from '../lib/workouts/presentation'
 import { WorkoutDiagnostics } from '../components/workouts/WorkoutDiagnostics'
 import { ActiveExercise } from '../components/workouts/ActiveExercise'
 import { ExerciseTopBar } from '../components/workouts/ExerciseTopBar'
-import { Button } from '../components/ui'
+import { Button, Input } from 'fiber'
 
 const SWIPE_THRESHOLD_PX = 50
 
@@ -94,7 +94,7 @@ export function WorkoutPage() {
           void submitExercise()
         }}
       >
-        <input
+        <Input
           value={exerciseTitle}
           onChange={(event) => setExerciseTitle(event.target.value)}
           placeholder="Add an exercise (e.g. Bench Press)"

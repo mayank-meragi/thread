@@ -13,7 +13,7 @@ import {
 } from '../lib/recipes/lifecycle'
 import { getCookSession } from '../lib/recipes/selectors'
 import type { CookStepView } from '../lib/recipes/types'
-import { Button } from '../components/ui'
+import { Button } from 'fiber'
 
 // A task's stored text keeps the structural tag (`#[cook-step] foo`); accept
 // the legacy unbracketed form too because older task records may contain it.

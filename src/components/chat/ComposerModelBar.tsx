@@ -1,3 +1,4 @@
+import { Button, MenuItem, ToggleButton } from 'fiber'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Check, ChevronDown, Sparkles } from 'lucide-react'
@@ -66,7 +67,7 @@ export function ComposerModelBar() {
 
   return (
     <div className="composer-model-bar" ref={wrapRef}>
-      <button
+      <Button unstyled
         type="button"
         className="composer-model-trigger"
         aria-haspopup="listbox"
@@ -76,7 +77,7 @@ export function ComposerModelBar() {
         <span className="composer-model-name">{modelLabel(config.provider, config.model)}</span>
         {reasoning && <span className="composer-model-effort">{effortLabel(config.effort)}</span>}
         <ChevronDown size={12} />
-      </button>
+      </Button>
       {open && (
         <div className="menu-panel composer-model-panel" role="listbox" aria-label="Model">
           <div className="composer-model-list">
@@ -88,13 +89,13 @@ export function ComposerModelBar() {
                 .map((option) => {
                   const isActive = provider === config.provider && option.id === config.model
                   return (
-                    <button
+                    <MenuItem
                       key={`${provider}:${option.id}`}
                       type="button"
                       role="option"
                       aria-selected={isActive}
                       disabled={!enabled}
-                      className={isActive ? 'menu-item composer-model-option active' : 'menu-item composer-model-option'}
+                      className={isActive ? 'composer-model-option active' : 'composer-model-option'}
                       onClick={() => {
                         setActiveModel(provider, option.id)
                         setOpen(false)
@@ -102,7 +103,7 @@ export function ComposerModelBar() {
                     >
                       <span>{option.label}</span>
                       {isActive ? <Check size={13} /> : !enabled ? <span className="composer-model-lock">Add key in Settings</span> : null}
-                    </button>
+                    </MenuItem>
                   )
                 })
             })}
@@ -112,15 +113,14 @@ export function ComposerModelBar() {
               <span>Thinking</span>
               <div className="composer-thinking-options">
                 {EFFORTS.map((effort) => (
-                  <button
+                  <ToggleButton unstyled
                     key={effort.value}
-                    type="button"
+                    pressed={config.effort === effort.value}
                     className={config.effort === effort.value ? 'is-active' : ''}
-                    aria-pressed={config.effort === effort.value}
                     onClick={() => setEffort(effort.value)}
                   >
                     {effort.label}
-                  </button>
+                  </ToggleButton>
                 ))}
               </div>
             </div>

@@ -14,6 +14,8 @@ npm run dev
 
 Open [http://127.0.0.1:5173/thread/](http://127.0.0.1:5173/thread/).
 
+The standalone Fiber component catalog is at [http://127.0.0.1:5173/thread/fiber.html](http://127.0.0.1:5173/thread/fiber.html).
+
 ## Data model
 
 - IndexedDB/Dexie is the primary working database.

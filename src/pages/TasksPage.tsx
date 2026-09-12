@@ -9,8 +9,8 @@ import { openTaskInspector } from '../lib/inspectorTarget'
 import { TaskRow, type TaskDisplayMode } from '../components/TaskRow'
 import { TaskBoard } from '../components/TaskBoard'
 import { TaskFilterPopover, type TaskFilterKey } from '../components/TaskFilterPopover'
-import { Chip } from '../components/ui/Chip'
-import { Button } from '../components/ui'
+import { Chip } from 'fiber'
+import { Button, Input, ToggleButton } from 'fiber'
 import { isWorkoutRole, workoutRolesByBlockId } from '../lib/workouts/integration'
 import { cookRolesByBlockId, isCookRole } from '../lib/recipes/integration'
 
@@ -204,23 +204,23 @@ export function TasksPage() {
       </div>
 
       {isMobile ? (
-        <button type="button" className="task-view-trigger" onClick={() => setMobileViewOpen(true)}>
+        <Button unstyled type="button" className="task-view-trigger" onClick={() => setMobileViewOpen(true)}>
           <span>{currentView.label}</span><small>{viewCounts[view]}</small><ChevronDown size={14} />
-        </button>
+        </Button>
       ) : (
         <nav className="task-view-tabs" aria-label="Task status view">
-          {TASK_VIEWS.map((item) => <button type="button" key={item.id} className={view === item.id ? 'active' : ''} onClick={() => updateParam('view', item.id, 'my-day')}>{item.label}</button>)}
+          {TASK_VIEWS.map((item) => <Button unstyled type="button" key={item.id} className={view === item.id ? 'active' : ''} onClick={() => updateParam('view', item.id, 'my-day')}>{item.label}</Button>)}
         </nav>
       )}
 
       <div className="task-controls-row">
-        <label className="task-search"><Search size={15} /><input value={query} onChange={(event) => updateParam('q', event.target.value, '')} placeholder="Search tasks" /></label>
+        <label className="task-search"><Search size={15} /><Input value={query} onChange={(event) => updateParam('q', event.target.value, '')} placeholder="Search tasks" /></label>
         <TaskFilterPopover priority={priority} tag={tag} thread={thread} sort={sort} tagDefinitions={tagDefinitions} threadOptions={threadOptions} onChange={onFilterChange} activeCount={activeFilterCount} />
         {mode !== 'board' && <FilterSelect label="Group by" value={groupBy} onChange={(value) => updateParam('group', value, 'schedule')} options={GROUP_OPTIONS} />}
         <div className="task-mode-toggle" role="group" aria-label="Display mode">
-          <button type="button" aria-pressed={mode === 'list'} aria-label="List view" onClick={() => updateParam('mode', 'list', isMobile ? 'compact' : 'list')}><List size={14} /></button>
-          <button type="button" aria-pressed={mode === 'compact'} aria-label="Compact view" onClick={() => updateParam('mode', 'compact', isMobile ? 'compact' : 'list')}><AlignJustify size={14} /></button>
-          <button type="button" aria-pressed={mode === 'board'} aria-label="Board view" onClick={() => updateParam('mode', 'board', isMobile ? 'compact' : 'list')}><Kanban size={14} /></button>
+          <ToggleButton unstyled pressed={mode === 'list'} aria-label="List view" onClick={() => updateParam('mode', 'list', isMobile ? 'compact' : 'list')}><List size={14} /></ToggleButton>
+          <ToggleButton unstyled pressed={mode === 'compact'} aria-label="Compact view" onClick={() => updateParam('mode', 'compact', isMobile ? 'compact' : 'list')}><AlignJustify size={14} /></ToggleButton>
+          <ToggleButton unstyled pressed={mode === 'board'} aria-label="Board view" onClick={() => updateParam('mode', 'board', isMobile ? 'compact' : 'list')}><Kanban size={14} /></ToggleButton>
         </div>
       </div>
 
@@ -230,7 +230,7 @@ export function TasksPage() {
         {tag !== 'all' && <Chip interactive onRemove={() => updateParam('tag', 'all')}>#{tagName(tag, tagDefinitions)}</Chip>}
         {thread !== 'all' && <Chip interactive accent="thread" onRemove={() => updateParam('thread', 'all')}>{threadTitle(thread, threadOptions)}</Chip>}
         {sort !== 'smart' && <Chip interactive onRemove={() => updateParam('sort', 'smart', 'smart')}>{sortLabel(sort)}</Chip>}
-        <button type="button" className="task-filter-clear" onClick={clearAllFilters}>Clear all</button>
+        <Button unstyled type="button" className="task-filter-clear" onClick={clearAllFilters}>Clear all</Button>
       </div>}
 
       {selected.size > 0 && <BulkBar ids={[...selected]} onClear={() => setSelected(new Set())} />}
@@ -273,7 +273,7 @@ export function TasksPage() {
         </>
       )}
 
-      {isMobile && <button type="button" className="task-fab" aria-label="Add task" onClick={() => setMobileQuickAddOpen(true)}><Plus size={22} /></button>}
+      {isMobile && <Button unstyled type="button" className="task-fab" aria-label="Add task" onClick={() => setMobileQuickAddOpen(true)}><Plus size={22} /></Button>}
 
       {isMobile && mobileQuickAddOpen && (
         <div className="layer-backdrop task-mobile-sheet-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) setMobileQuickAddOpen(false) }}>
@@ -286,9 +286,9 @@ export function TasksPage() {
       {isMobile && mobileViewOpen && (
         <div className="layer-backdrop task-mobile-sheet-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) setMobileViewOpen(false) }}>
           <div className="task-mobile-sheet" role="dialog" aria-label="Choose view">
-            {TASK_VIEWS.map((item) => <button type="button" key={item.id} className={`task-view-picker-row${view === item.id ? ' active' : ''}`} onClick={() => { updateParam('view', item.id, 'my-day'); setMobileViewOpen(false) }}>
+            {TASK_VIEWS.map((item) => <Button unstyled type="button" key={item.id} className={`task-view-picker-row${view === item.id ? ' active' : ''}`} onClick={() => { updateParam('view', item.id, 'my-day'); setMobileViewOpen(false) }}>
               <span>{item.label}</span><small>{viewCounts[item.id]}</small>
-            </button>)}
+            </Button>)}
           </div>
         </div>
       )}
@@ -321,8 +321,8 @@ function QuickAdd({ autoFocus = false, onCreated }: { autoFocus?: boolean; onCre
     void createTask({ text, dueDate: dueDate || undefined, priority: priority || undefined }).then(() => { setText(''); setDueDate(''); setPriority(''); onCreated?.() }).finally(() => setBusy(false))
   }}>
     <Plus size={18} />
-    <input autoFocus={autoFocus} className="task-quick-title" value={text} onChange={(event) => setText(event.target.value)} placeholder="Add a task to today’s journal" aria-label="New task title" />
-    <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} aria-label="New task due date" />
+    <Input autoFocus={autoFocus} className="task-quick-title" value={text} onChange={(event) => setText(event.target.value)} placeholder="Add a task to today’s journal" aria-label="New task title" />
+    <Input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} aria-label="New task due date" />
     <select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority | '')} aria-label="New task priority"><option value="">Priority</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
     <Button type="submit" disabled={!text.trim() || busy}>{busy ? 'Adding…' : 'Add task'}</Button>
   </form>
@@ -356,7 +356,7 @@ export function TaskBranch(props: {
 
 function BulkBar({ ids, onClear }: { ids: string[]; onClear: () => void }) {
   const [date, setDate] = useState('')
-  return <div className="task-bulk-bar"><strong>{ids.length} selected</strong><Button size="sm" onClick={() => void bulkSetTaskStatus(ids, 'done').then(onClear)}>Complete</Button><Button variant="outline" size="sm" onClick={() => void bulkSetTaskStatus(ids, 'in_progress').then(onClear)}>Start</Button><select aria-label="Set selected priority" defaultValue="" onChange={(event) => { if (event.target.value) void bulkSetTaskPriority(ids, event.target.value as TaskPriority).then(onClear) }}><option value="">Set priority</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><input type="date" aria-label="Set selected due date" value={date} onChange={(event) => { setDate(event.target.value); if (event.target.value) void bulkSetTaskDueDate(ids, event.target.value).then(onClear) }} /><Button variant="ghost" size="sm" onClick={onClear}>Clear</Button></div>
+  return <div className="task-bulk-bar"><strong>{ids.length} selected</strong><Button size="sm" onClick={() => void bulkSetTaskStatus(ids, 'done').then(onClear)}>Complete</Button><Button variant="outline" size="sm" onClick={() => void bulkSetTaskStatus(ids, 'in_progress').then(onClear)}>Start</Button><select aria-label="Set selected priority" defaultValue="" onChange={(event) => { if (event.target.value) void bulkSetTaskPriority(ids, event.target.value as TaskPriority).then(onClear) }}><option value="">Set priority</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><Input type="date" aria-label="Set selected due date" value={date} onChange={(event) => { setDate(event.target.value); if (event.target.value) void bulkSetTaskDueDate(ids, event.target.value).then(onClear) }} /><Button variant="ghost" size="sm" onClick={onClear}>Clear</Button></div>
 }
 
 function scheduleGroups(roots: TaskRecord[], today: string) {

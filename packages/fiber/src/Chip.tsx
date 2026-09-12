@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { Button } from './Button'
 
 type ChipAccent = 'thread' | 'task' | 'idea' | 'question' | 'decision' | 'danger' | 'neutral'
 
@@ -41,7 +42,7 @@ export function Chip(props: ChipProps) {
 
   if (props.interactive) {
     return (
-      <button type="button" className={classes} {...props.buttonProps}>
+      <Button unstyled type="button" className={classes} {...props.buttonProps}>
         {icon}
         <span>{children}</span>
         {props.onRemove ? (
@@ -58,7 +59,7 @@ export function Chip(props: ChipProps) {
             <X size={11} aria-hidden="true" />
           </span>
         ) : null}
-      </button>
+      </Button>
     )
   }
 

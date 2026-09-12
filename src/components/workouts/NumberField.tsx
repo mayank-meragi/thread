@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Input } from 'fiber'
 
 function round(value: number): number {
   return Math.round(value * 1000) / 1000
@@ -53,7 +54,7 @@ export function NumberField({
   return (
     <label className="number-field">
       <span className="number-field-label">{label}</span>
-      <input
+      <Input
         className="number-field-input"
         type="number"
         inputMode={inputMode}

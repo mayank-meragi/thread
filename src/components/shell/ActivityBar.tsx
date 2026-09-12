@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { Bot, BookOpenText, ChefHat, Dumbbell, ListTodo, Plus, Rss, Search, Settings } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { RailSyncIndicator, type RailSyncIndicatorProps } from './RailSyncIndicator'
@@ -30,12 +31,12 @@ export function ActivityBar({ hidden, onOpenCommand, onOpenChat, sync }: Activit
         ))}
       </nav>
       <div className="rail-foot">
-        <button type="button" className="rail-nav-item" aria-label="AI chat" title="AI chat" onClick={onOpenChat}>
+        <Button unstyled type="button" className="rail-nav-item" aria-label="AI chat" title="AI chat" onClick={onOpenChat}>
           <Bot size={18} />
-        </button>
-        <button type="button" className="rail-create" aria-label="Create or go" title="Create or go (⌘⇧P)" onClick={onOpenCommand} aria-keyshortcuts="Meta+Shift+P Control+Shift+P">
+        </Button>
+        <Button unstyled type="button" className="rail-create" aria-label="Create or go" title="Create or go (⌘⇧P)" onClick={onOpenCommand} aria-keyshortcuts="Meta+Shift+P Control+Shift+P">
           <Plus size={18} />
-        </button>
+        </Button>
         <RailSyncIndicator {...sync} />
       </div>
     </aside>

@@ -1,3 +1,4 @@
+import { ToggleButton } from 'fiber'
 import {
   CircleHelp,
   Diamond,
@@ -55,12 +56,11 @@ export function MobileEditorToolbar({ visible, top, activeKind, onAction }: Mobi
             ? activeKind === action
             : false
           return (
-            <button
+            <ToggleButton unstyled
               key={action}
-              type="button"
+              pressed={action === 'indent' || action === 'outdent' || action === 'wikilink' ? undefined : pressed}
               className={`${groupStart ? 'group-start ' : ''}toolbar-${action}`}
               aria-label={label}
-              aria-pressed={action === 'indent' || action === 'outdent' || action === 'wikilink' ? undefined : pressed}
               title={label}
               onPointerDown={(event) => {
                 event.preventDefault()
@@ -75,7 +75,7 @@ export function MobileEditorToolbar({ visible, top, activeKind, onAction }: Mobi
             >
               <Icon size={18} strokeWidth={1.8} />
               <span>{shortLabel}</span>
-            </button>
+            </ToggleButton>
           )
         })}
       </div>

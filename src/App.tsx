@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { BookOpenText, ChefHat, Dumbbell, ListTodo, Menu, Plus, Rss } from 'lucide-react'
 import { HashRouter, NavLink, useLocation, useNavigate } from 'react-router-dom'
@@ -106,7 +107,7 @@ function AppShell() {
       <nav className="mobile-nav" aria-label="Mobile primary destinations">
         <NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}><BookOpenText size={19} /><span>Today</span></NavLink>
         <NavLink to="/tasks" className={({ isActive }) => isActive ? 'active' : ''}><ListTodo size={19} /><span>Tasks</span></NavLink>
-        <button
+        <Button unstyled
           type="button"
           className="mobile-create"
           aria-label="Create or go"
@@ -114,10 +115,10 @@ function AppShell() {
           onClick={openCommand}
         >
           <span className="mobile-create-mark"><Plus size={19} /></span><span>Create</span>
-        </button>
+        </Button>
         <NavLink to="/workouts" className={({ isActive }) => isActive ? 'active' : ''}><Dumbbell size={19} /><span>Workouts</span></NavLink>
         <div className="mobile-more" ref={mobileMoreRef}>
-          <button
+          <Button unstyled
             type="button"
             className={`mobile-more-trigger${location.pathname === '/feeds' || location.pathname.startsWith('/recipe') ? ' active' : ''}`}
             aria-label="More navigation"
@@ -126,7 +127,7 @@ function AppShell() {
             onClick={() => setMobileMoreOpen((current) => !current)}
           >
             <Menu size={19} aria-hidden="true" /><span>More</span>
-          </button>
+          </Button>
           {mobileMoreOpen && (
             <div className="mobile-more-menu" role="menu" aria-label="More destinations">
               <NavLink to="/feeds" role="menuitem" onClick={() => setMobileMoreOpen(false)}><Rss size={17} aria-hidden="true" /><span>Feed</span></NavLink>

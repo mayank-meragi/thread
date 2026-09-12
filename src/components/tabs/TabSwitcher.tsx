@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { useEffect, useRef } from 'react'
 import { BookOpenText, ListTodo, Search, Settings } from 'lucide-react'
 import { TabLabel } from '../TabLabel'
@@ -46,7 +47,7 @@ export function TabSwitcher({ tabs, selected, onHighlight, onCommit, onCancel }:
           {tabs.map((tab, index) => {
             const { Icon, kind } = iconForPath(tab.path)
             return (
-              <button
+              <Button unstyled
                 key={tab.id}
                 type="button"
                 role="option"
@@ -57,7 +58,7 @@ export function TabSwitcher({ tabs, selected, onHighlight, onCommit, onCancel }:
               >
                 <span className={`tab-card-icon ${kind}`}><Icon size={14} /></span>
                 <span className="tab-card-label"><TabLabel path={tab.path} /></span>
-              </button>
+              </Button>
             )
           })}
         </div>

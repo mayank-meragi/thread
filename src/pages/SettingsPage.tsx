@@ -25,7 +25,7 @@ import { commandRegistry } from '../lib/commands'
 import { revokeCapability, useTrustedCapabilities } from '../lib/threadscript/trustedCapabilities'
 import { MetadataSchemas } from '../components/MetadataSchemas'
 import { clearRssProxyConfig, generateRssProxyAccessKey, getRssProxyConfig, saveRssProxyConfig, testRssProxyConnection } from '../lib/rssProxy'
-import { Button, ButtonLink } from '../components/ui'
+import { Button, ButtonLink, Input, ToggleButton } from 'fiber'
 import { refreshAllFeeds } from '../lib/rss'
 import { getRssSettings, RSS_REFRESH_INTERVALS, saveRssSettings, type RssRefreshInterval } from '../lib/rssSettings'
 import { formatAIUsageCost, groupAIUsage, summarizeAIUsage, type AIUsageFeature, type AIUsagePeriod } from '../lib/aiUsage'
@@ -358,11 +358,11 @@ export function SettingsPage() {
       <div className="settings-layout">
         <nav className="settings-nav" aria-label="Settings categories">
           {SETTINGS_CATEGORIES.map(({ id, label, description, Icon }) => (
-            <button type="button" className={activeCategory === id ? 'is-active' : ''} aria-current={activeCategory === id ? 'page' : undefined} onClick={() => chooseCategory(id)} key={id}>
+            <Button unstyled type="button" className={activeCategory === id ? 'is-active' : ''} aria-current={activeCategory === id ? 'page' : undefined} onClick={() => chooseCategory(id)} key={id}>
               <Icon size={17} />
               <span><strong>{label}</strong><small>{description}</small></span>
               {id === 'sync' && conflicts.length > 0 ? <b className="settings-nav-alert" aria-label={`${conflicts.length} unresolved sync conflicts`}>{conflicts.length}</b> : null}
-            </button>
+            </Button>
           ))}
         </nav>
 
@@ -377,11 +377,11 @@ export function SettingsPage() {
                     <div className="theme-group-label">{mode}</div>
                     <div className="theme-options">
                       {themes.filter((item) => item.mode === mode).map((item) => (
-                        <button type="button" className="theme-option" aria-pressed={theme === item.id} onClick={() => chooseTheme(item.id)} key={item.id}>
+                        <ToggleButton unstyled pressed={theme === item.id} type="button" className="theme-option" onClick={() => chooseTheme(item.id)} key={item.id}>
                           <span className="theme-swatches" aria-hidden="true">{item.swatches.map((color) => <span key={color} style={{ background: color }} />)}</span>
                           <span className="theme-option-name">{item.name}</span>
                           <span className="theme-check">{theme === item.id && <Check size={14} />}</span>
-                        </button>
+                        </ToggleButton>
                       ))}
                     </div>
                   </div>
@@ -395,8 +395,8 @@ export function SettingsPage() {
 
             <section className="settings-card">
               <div className="settings-title"><Rss size={20} /><div><h2>RSS proxy</h2><p>Each Thread user deploys and controls their own stateless proxy. Public HTTP and HTTPS feeds are supported; private feeds with credentials are intentionally rejected.</p></div></div>
-              <label><span>Worker URL</span><input type="url" value={rssProxyUrl} onChange={(event) => setRssProxyUrl(event.target.value)} placeholder="https://thread-rss-proxy.your-name.workers.dev" /></label>
-              <label><span>Worker access key</span><input type={showRssProxyKey ? 'text' : 'password'} value={rssProxyKey} onChange={(event) => setRssProxyKey(event.target.value)} placeholder="Generate a key, then add the same secret to Wrangler" autoComplete="off" /></label>
+              <label><span>Worker URL</span><Input type="url" value={rssProxyUrl} onChange={(event) => setRssProxyUrl(event.target.value)} placeholder="https://thread-rss-proxy.your-name.workers.dev" /></label>
+              <label><span>Worker access key</span><Input type={showRssProxyKey ? 'text' : 'password'} value={rssProxyKey} onChange={(event) => setRssProxyKey(event.target.value)} placeholder="Generate a key, then add the same secret to Wrangler" autoComplete="off" /></label>
               <div className="settings-actions">
                 <Button variant="outline" onClick={() => { setRssProxyKey(generateRssProxyAccessKey()); setShowRssProxyKey(true) }}><Rss size={15} /> Generate key</Button>
                 <Button variant="ghost" onClick={() => setShowRssProxyKey((current) => !current)}>{showRssProxyKey ? <EyeOff size={15} /> : <Eye size={15} />}{showRssProxyKey ? 'Hide key' : 'Show key'}</Button>
@@ -460,24 +460,24 @@ export function SettingsPage() {
                     <div className="conflict-hunk" key={hunk.index}>
                       <div className="conflict-hunk-label">near “{hunk.blockLabel}”</div>
                       <div className="conflict-hunk-sides">
-                        <Button
+                        <ToggleButton
                           variant="outline"
-                          aria-pressed={choice === 'local'}
+                          pressed={choice === 'local'}
                           disabled={resolving === conflict.id}
                           onClick={() => setHunkChoice(conflict.id, hunk.index, 'local')}
                         >
                           <div className="conflict-hunk-side-title">This browser</div>
                           <pre className="conflict-hunk-text">{hunk.local || '(removed)'}</pre>
-                        </Button>
-                        <Button
+                        </ToggleButton>
+                        <ToggleButton
                           variant="outline"
-                          aria-pressed={choice === 'remote'}
+                          pressed={choice === 'remote'}
                           disabled={resolving === conflict.id}
                           onClick={() => setHunkChoice(conflict.id, hunk.index, 'remote')}
                         >
                           <div className="conflict-hunk-side-title">Repository</div>
                           <pre className="conflict-hunk-text">{hunk.remote || '(removed)'}</pre>
-                        </Button>
+                        </ToggleButton>
                       </div>
                     </div>
                   )
@@ -513,10 +513,10 @@ export function SettingsPage() {
       <section className="settings-card" id="sync-settings">
         <div className="settings-title"><GitBranch size={20} /><div><h2 ref={syncHeadingRef} tabIndex={-1}>GitHub sync</h2><p>Thread works locally first. Connect a private repository for backup and multi-device sync.</p></div></div>
         <div className="field-grid">
-          <label><span>Data repository</span><input value={repo} onChange={(event) => setRepo(event.target.value)} placeholder="you/thread-data" /></label>
-          <label><span>Branch</span><input value={branch} onChange={(event) => setBranch(event.target.value)} /></label>
+          <label><span>Data repository</span><Input value={repo} onChange={(event) => setRepo(event.target.value)} placeholder="you/thread-data" /></label>
+          <label><span>Branch</span><Input value={branch} onChange={(event) => setBranch(event.target.value)} /></label>
         </div>
-        <label><span>Fine-grained token</span><input type="password" value={token} onChange={(event) => setToken(event.target.value)} placeholder="github_pat_…" /></label>
+        <label><span>Fine-grained token</span><Input type="password" value={token} onChange={(event) => setToken(event.target.value)} placeholder="github_pat_…" /></label>
         <div className="security-note"><ShieldCheck size={16} /><span>Stored only in this browser and sent only to api.github.com. Restrict it to the data repository with Contents read/write access.</span></div>
         {syncStatus && (
           <p className="settings-hint">
@@ -592,7 +592,7 @@ export function SettingsPage() {
               <div className="ai-key-row" key={provider}>
                 <label>
                   <span>{PROVIDER_LABELS[provider]} API key{saved ? ' · saved' : ''}</span>
-                  <input
+                  <Input
                     type="password"
                     value={keyDrafts[provider] ?? ''}
                     onChange={(event) => setKeyDrafts((current) => ({ ...current, [provider]: event.target.value }))}
@@ -623,7 +623,7 @@ export function SettingsPage() {
         <div className="settings-title"><BarChart3 size={20} /><div><h2>AI usage</h2><p>Provider-reported tokens across synced devices. Dollar amounts are estimates, not invoice totals.</p></div></div>
         <div className="ai-usage-period" role="group" aria-label="AI usage period">
           {([['today', 'Today'], ['30-days', 'Last 30 days'], ['all-time', 'All time']] as const).map(([value, label]) => (
-            <button type="button" key={value} className={usagePeriod === value ? 'is-active' : ''} aria-pressed={usagePeriod === value} onClick={() => setUsagePeriod(value)}>{label}</button>
+            <ToggleButton unstyled pressed={usagePeriod === value} type="button" key={value} className={usagePeriod === value ? 'is-active' : ''} onClick={() => setUsagePeriod(value)}>{label}</ToggleButton>
           ))}
         </div>
         {usageSummary.runCount === 0 ? (
@@ -695,7 +695,7 @@ export function SettingsPage() {
               </div>
             </div>
             <div className="field-grid">
-              <label><span>Name</span><input value={newPersonaName} onChange={(event) => setNewPersonaName(event.target.value)} placeholder="Career coach" /></label>
+              <label><span>Name</span><Input value={newPersonaName} onChange={(event) => setNewPersonaName(event.target.value)} placeholder="Career coach" /></label>
               <label><span>Icon</span><IconPicker value={newPersonaIcon} onChange={setNewPersonaIcon} /></label>
               <label className="persona-prompt-field"><span>System prompt</span><textarea value={newPersonaPrompt} onChange={(event) => setNewPersonaPrompt(event.target.value)} rows={3} placeholder="You are a supportive career coach…" /></label>
               <div className="settings-actions">
@@ -752,6 +752,7 @@ export function SettingsPage() {
       </section>
 
           </section>
+
         </div>
       </div>
     </article>
@@ -830,7 +831,7 @@ function PersonaRow({
 
   return (
     <div className="persona-create-form field-grid">
-      <label><span>Name</span><input value={name} onChange={(event) => setName(event.target.value)} /></label>
+      <label><span>Name</span><Input value={name} onChange={(event) => setName(event.target.value)} /></label>
       <label><span>Icon</span><IconPicker value={icon} onChange={setIcon} /></label>
       <label className="persona-prompt-field"><span>System prompt</span><textarea value={systemPrompt} onChange={(event) => setSystemPrompt(event.target.value)} rows={3} /></label>
       <div className="settings-actions">

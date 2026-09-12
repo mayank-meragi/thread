@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { AlertTriangle, Cloud, CloudOff } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { GitHubSyncProgress } from '../../lib/github'
@@ -41,7 +42,7 @@ export function RailSyncIndicator({
     return <div className="rail-sync rail-sync-busy" role="status" aria-live="polite" title={detail} aria-label={detail}><Cloud size={16} /></div>
   }
   if (pending > 0) {
-    return <button type="button" className="rail-sync rail-sync-pending" onClick={onSync} aria-label={`Pending. ${pending} ${pending === 1 ? 'change' : 'changes'} waiting. Sync now.`} title="Pending changes"><Cloud size={16} /></button>
+    return <Button unstyled type="button" className="rail-sync rail-sync-pending" onClick={onSync} aria-label={`Pending. ${pending} ${pending === 1 ? 'change' : 'changes'} waiting. Sync now.`} title="Pending changes"><Cloud size={16} /></Button>
   }
-  return <button type="button" className="rail-sync" onClick={onRefresh} aria-label="Up to date. Refresh all data from GitHub now." title="Refresh from GitHub"><Cloud size={16} /></button>
+  return <Button unstyled type="button" className="rail-sync" onClick={onRefresh} aria-label="Up to date. Refresh all data from GitHub now." title="Refresh from GitHub"><Cloud size={16} /></Button>
 }

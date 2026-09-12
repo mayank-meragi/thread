@@ -14,7 +14,7 @@ import {
 } from '../db'
 import { DEFAULT_TAG_COLOR } from '../lib/tagColors'
 import { isWorkoutSystemTag } from '../lib/workouts/systemTags'
-import { Button } from './ui'
+import { Button, Input } from 'fiber'
 
 const FIELD_TYPES: Array<{ value: PropertyType; label: string }> = [
   { value: 'text', label: 'Text' },
@@ -52,7 +52,7 @@ export function MetadataSchemas() {
         void run(async () => { await createTag(name); setNewSchema('') })
       }}>
         <Hash size={15} />
-        <input value={newSchema} onChange={(event) => setNewSchema(event.target.value)} placeholder="New schema tag" aria-label="New schema tag" />
+        <Input value={newSchema} onChange={(event) => setNewSchema(event.target.value)} placeholder="New schema tag" aria-label="New schema tag" />
         <Button type="submit" variant="outline" disabled={!newSchema.trim()}><Plus size={14} /> Create schema</Button>
       </form>
 
@@ -69,7 +69,7 @@ export function MetadataSchemas() {
           if (!name) return
           void run(async () => { await createPropertyDefinition({ name, type: newFieldType }); setNewField('') })
         }}>
-          <input value={newField} onChange={(event) => setNewField(event.target.value)} placeholder="New field name" aria-label="New field name" />
+          <Input value={newField} onChange={(event) => setNewField(event.target.value)} placeholder="New field name" aria-label="New field name" />
           <select value={newFieldType} onChange={(event) => setNewFieldType(event.target.value as PropertyType)} aria-label="New field type">
             {FIELD_TYPES.map((type) => <option value={type.value} key={type.value}>{type.label}</option>)}
           </select>
@@ -118,7 +118,7 @@ function SchemaEditor({ tag, definitions, onError }: { tag: TagDefinitionRecord;
       <div className="schema-editor-body">
         <div className="schema-name-row">
           <input type="color" value={color} onChange={(event) => setColor(event.target.value)} aria-label={`${tag.name} color`} />
-          <label><span>Schema name</span><input value={name} disabled={isSystem} onChange={(event) => setName(event.target.value)} /></label>
+          <label><span>Schema name</span><Input value={name} disabled={isSystem} onChange={(event) => setName(event.target.value)} /></label>
         </div>
         <div className="schema-column-head"><span>Field</span><span>Required</span><span>Default</span></div>
         <div className="schema-fields">
@@ -161,7 +161,7 @@ function DefaultField({ definition, disabled, value, onChange }: { definition: P
   if ((definition.type === 'select' || definition.type === 'status') && definition.options?.length) {
     return <select aria-label={`${definition.name} default`} disabled={disabled} value={typeof value === 'string' ? value : ''} onChange={(event) => onChange(event.target.value || undefined)}><option value="">No default</option>{definition.options.map((option) => <option value={option.id} key={option.id}>{option.label}</option>)}</select>
   }
-  return <input
+  return <Input
     aria-label={`${definition.name} default`}
     disabled={disabled}
     type={definition.type === 'date' ? 'date' : definition.type === 'number' ? 'number' : definition.type === 'url' ? 'url' : 'text'}

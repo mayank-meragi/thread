@@ -1,0 +1,8 @@
+{
+  "name": "fiber",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts", "./styles.css": "./src/styles.css" },
+  "peerDependencies": { "react": ">=18", "react-router-dom": ">=6", "lucide-react": "^1.0.0" }
+}

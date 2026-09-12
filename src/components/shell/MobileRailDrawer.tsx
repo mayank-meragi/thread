@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { animated, useSpring } from '@react-spring/web'
@@ -168,7 +169,7 @@ export function MobileRailDrawer() {
       >
         <header {...bindHandle()} className="mobile-rail-head" style={{ touchAction: 'pan-y' }}>
           <div className="mobile-rail-tabs" role="tablist">
-            <button
+            <Button unstyled
               type="button"
               role="tab"
               aria-selected={tab === 'context'}
@@ -176,8 +177,8 @@ export function MobileRailDrawer() {
               onClick={() => setTab('context')}
             >
               <PanelRight size={14} aria-hidden="true" /> Context
-            </button>
-            <button
+            </Button>
+            <Button unstyled
               type="button"
               role="tab"
               aria-selected={tab === 'chat'}
@@ -185,16 +186,16 @@ export function MobileRailDrawer() {
               onClick={() => setTab('chat')}
             >
               <MessageSquare size={14} aria-hidden="true" /> Chat
-            </button>
+            </Button>
           </div>
-          <button
+          <Button unstyled
             type="button"
             className="mobile-rail-close"
             aria-label="Close panel"
             onClick={() => settle(false)}
           >
             <X size={17} aria-hidden="true" />
-          </button>
+          </Button>
         </header>
 
         <div className="mobile-rail-body">

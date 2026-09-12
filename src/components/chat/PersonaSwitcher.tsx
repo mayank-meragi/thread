@@ -1,3 +1,4 @@
+import { Button, MenuItem } from 'fiber'
 import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import type { PersonaRecord } from '../../db'
@@ -34,7 +35,7 @@ export function PersonaSwitcher({
 
   return (
     <div className="persona-switcher" ref={wrapRef}>
-      <button
+      <Button unstyled
         type="button"
         className="persona-switcher-trigger"
         aria-haspopup="listbox"
@@ -44,19 +45,19 @@ export function PersonaSwitcher({
         <DynamicIcon name={active?.icon ?? 'Bot'} size={14} />
         <span>{active?.name ?? 'Persona'}</span>
         <ChevronDown size={13} />
-      </button>
+      </Button>
       {open && (
         <div className="menu-panel persona-switcher-panel" role="listbox" aria-label="Personas">
           {personas.map((persona) => {
             const Icon = iconFor(persona.icon)
             const isActive = persona.id === activePersonaId
             return (
-              <button
+              <MenuItem
                 key={persona.id}
                 type="button"
                 role="option"
                 aria-selected={isActive}
-                className={isActive ? 'menu-item persona-option active' : 'menu-item persona-option'}
+                className={isActive ? 'persona-option active' : 'persona-option'}
                 onClick={() => {
                   onChange(persona.id)
                   setOpen(false)
@@ -65,7 +66,7 @@ export function PersonaSwitcher({
                 <Icon size={14} />
                 <span>{persona.name}</span>
                 {isActive && <Check size={13} />}
-              </button>
+              </MenuItem>
             )
           })}
         </div>

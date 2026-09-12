@@ -6,7 +6,7 @@ import { daysBetween, formatDay, isoToday, shiftDay } from '../lib/dates'
 import { planMeal, removeMealPlan } from '../lib/recipes/mutations'
 import { getMealPlanRange, listRecipes } from '../lib/recipes/selectors'
 import type { MealPlanView, MealType } from '../lib/recipes/types'
-import { Button, ButtonLink } from '../components/ui'
+import { Button, ButtonLink } from 'fiber'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 const MEAL_LABEL: Record<MealType, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' }

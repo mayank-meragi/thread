@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { useEffect, useState } from 'react'
 import type { IDockviewPanelHeaderProps } from 'dockview-react'
 
@@ -13,13 +14,13 @@ export function ContextTab({ api, containerApi }: IDockviewPanelHeaderProps) {
 
   return (
     <div className={`tab-chip${isActive ? ' active' : ''}`}>
-      <button
+      <Button unstyled
         type="button"
         className="tab-chip-main"
         onClick={() => api.setActive()}
       >
         <span className="tab-chip-label">Context</span>
-      </button>
+      </Button>
     </div>
   )
 }

@@ -8,7 +8,7 @@ import { MarkdownEditor } from '../components/MarkdownEditor'
 import { TodayCooking } from '../components/TodayCooking'
 import { TodayTasks } from '../components/TodayTasks'
 import { DatePicker } from '../components/DatePicker'
-import { Button } from '../components/ui'
+import { Button } from 'fiber'
 
 const INITIAL_DAYS = 14
 const LOAD_BATCH = 14

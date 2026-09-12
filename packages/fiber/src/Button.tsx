@@ -10,11 +10,15 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize
   loading?: boolean
   iconOnly?: boolean
+  /** Preserve a specialized control's existing visual treatment while centralizing button behavior. */
+  unstyled?: boolean
 }
 
 const sizeClass: Record<ButtonSize, string> = { sm: 'btn-sm', md: '', lg: 'btn-lg' }
 
-function buttonClasses(variant: ButtonVariant, size: ButtonSize, iconOnly: boolean, loading: boolean, className?: string) {
+function buttonClasses(variant: ButtonVariant, size: ButtonSize, iconOnly: boolean, loading: boolean, className?: string, unstyled = false) {
+  if (unstyled) return [loading ? 'btn-loading' : '', className].filter(Boolean).join(' ')
+
   return ['btn', `btn-${variant}`, sizeClass[size], iconOnly ? 'btn-icon' : '', loading ? 'btn-loading' : '', className]
     .filter(Boolean)
     .join(' ')
@@ -22,10 +26,10 @@ function buttonClasses(variant: ButtonVariant, size: ButtonSize, iconOnly: boole
 
 /** Shared button primitive — consolidates the repo's ad hoc button selectors. */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = 'solid', size = 'md', loading = false, iconOnly = false, disabled, className, children, type = 'button', ...rest },
+  { variant = 'solid', size = 'md', loading = false, iconOnly = false, unstyled = false, disabled, className, children, type = 'button', ...rest },
   ref,
 ) {
-  const classes = buttonClasses(variant, size, iconOnly, loading, className)
+  const classes = buttonClasses(variant, size, iconOnly, loading, className, unstyled)
 
   return (
     <button

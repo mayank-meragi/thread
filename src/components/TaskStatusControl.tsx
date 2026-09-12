@@ -1,3 +1,4 @@
+import { Button, MenuItem } from 'fiber'
 import { useEffect, useRef, useState } from 'react'
 import { Ban, Check, Circle, CircleDotDashed, LoaderCircle, OctagonAlert } from 'lucide-react'
 import type { TaskRecord, TaskStatus } from '../db'
@@ -42,7 +43,7 @@ export function TaskStatusControl({ task, compact = false }: { task: TaskRecord;
 
   return (
     <div className="task-status-wrap" ref={wrapRef}>
-      <button
+      <Button unstyled
         type="button"
         className={`task-status-button status-${task.status}${compact ? ' compact' : ''}`}
         aria-label={`Status: ${TASK_STATUS_LABELS[task.status]}`}
@@ -51,14 +52,14 @@ export function TaskStatusControl({ task, compact = false }: { task: TaskRecord;
       >
         <TaskStatusIcon status={task.status} size={compact ? 13 : 15} />
         {!compact && <span>{TASK_STATUS_LABELS[task.status]}</span>}
-      </button>
+      </Button>
       {open && <div className="menu-panel task-status-menu" role="menu">
         {(Object.keys(TASK_STATUS_LABELS) as TaskStatus[]).map((status) => (
-          <button type="button" role="menuitem" key={status} className={`menu-item status-${status}`} onClick={() => void choose(status)}>
+          <MenuItem key={status} className={`status-${status}`} onClick={() => void choose(status)}>
             <TaskStatusIcon status={status} size={14} />
             <span>{TASK_STATUS_LABELS[status]}</span>
             {task.status === status && <CircleDotDashed size={12} />}
-          </button>
+          </MenuItem>
         ))}
       </div>}
     </div>

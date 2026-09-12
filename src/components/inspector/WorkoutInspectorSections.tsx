@@ -7,7 +7,7 @@ import { elapsedMs, formatDuration, tallySets } from '../../lib/workouts/present
 import type { WorkoutRole } from '../../lib/workouts/systemTags'
 import type { WorkoutView } from '../../lib/workouts/types'
 import { SetEditor } from '../workouts/SetEditor'
-import { Button } from '../ui'
+import { Button, Input } from 'fiber'
 
 function toLocalInput(value: PropertyValue | undefined): string {
   if (typeof value !== 'string') return ''
@@ -75,11 +75,11 @@ function WorkoutSection({
       <div className="task-detail-grid">
         <label>
           <span>Started</span>
-          <input type="datetime-local" value={toLocalInput(values.get('workout-started-at'))} onChange={(event) => setTime('workout-started-at', event.target.value)} />
+          <Input type="datetime-local" value={toLocalInput(values.get('workout-started-at'))} onChange={(event) => setTime('workout-started-at', event.target.value)} />
         </label>
         <label>
           <span>Finished</span>
-          <input type="datetime-local" value={toLocalInput(values.get('workout-finished-at'))} onChange={(event) => setTime('workout-finished-at', event.target.value)} />
+          <Input type="datetime-local" value={toLocalInput(values.get('workout-finished-at'))} onChange={(event) => setTime('workout-finished-at', event.target.value)} />
         </label>
       </div>
       {tally && (

@@ -35,6 +35,8 @@
 .menu-item[aria-disabled='true'] { opacity: var(--disabled-opacity); cursor: default; }
 .menu-item[disabled]:hover,
 .menu-item[aria-disabled='true']:hover { background: transparent; }
+.menu-item-danger { color: var(--danger); }
+.menu-item-danger:hover:not([disabled]) { background: var(--danger-soft); }
 .menu-divider { height: 1px; margin: 4px 8px; background: var(--line-soft); }
 
 /* ---------------------------------------------------------------------- */
@@ -76,6 +78,7 @@
 /* Field — single input/select/textarea recipe with focus/error/hint states. */
 .field { display: grid; gap: 6px; }
 .field-label { color: var(--muted); font-size: var(--text-meta); font-weight: 500; }
+.field-required { color: var(--danger); }
 .field-control {
   width: 100%;
   min-width: 0;
@@ -96,8 +99,9 @@ textarea.field-control { min-height: 80px; padding: 9px 11px; resize: vertical; 
   box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
 }
 .field-control:disabled { opacity: var(--disabled-opacity); cursor: default; }
-.field.field-error .field-control { border-color: var(--danger); }
-.field-hint { color: var(--muted); font-size: var(--text-meta); }
+.field.field-error .field-control,
+.field-control[aria-invalid="true"] { border-color: var(--danger); }
+.field-hint { color: var(--muted); font-size: var(--text-meta); line-height: 1.4; }
 .field-hint.field-hint-error { color: var(--danger); }
 
 /* ---------------------------------------------------------------------- */

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { createPropertyDefinition, type PropertyDefinitionRecord, type PropertyType } from '../../db'
 import { PROPERTY_TYPES } from './propertyTypes'
-import { Button } from '../ui'
+import { Button, Input, MenuItem } from 'fiber'
 
 const MAX_ROWS = 8
 
@@ -105,7 +105,7 @@ export function AddPropertyControl({
 
   return (
     <div className="add-property" ref={wrapRef}>
-      <input
+      <Input
         ref={inputRef}
         className="add-property-input"
         value={query}
@@ -118,20 +118,18 @@ export function AddPropertyControl({
       {open && (matches.length > 0 || showCreate || exactAssigned) && (
         <div className="menu-panel add-property-menu" role="listbox">
           {matches.map((definition, index) => (
-            <Button
-              variant="ghost"
-              size="sm"
+            <MenuItem
               key={definition.id}
               role="option"
               aria-selected={index === highlighted}
-              className={index === highlighted ? 'menu-item active' : 'menu-item'}
+              className={index === highlighted ? 'active' : undefined}
               onMouseEnter={() => setHighlighted(index)}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => assignExisting(definition.id)}
             >
               <span>{definition.name}</span>
               <small className="add-property-type">{definition.type.replace('_', ' ')}</small>
-            </Button>
+            </MenuItem>
           ))}
           {showCreate && (
             <div

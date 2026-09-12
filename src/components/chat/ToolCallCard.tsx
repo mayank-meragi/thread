@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { useState } from 'react'
 import { Check, ChevronRight, Loader2, X } from 'lucide-react'
 import { useToolArgsStatus, type ToolCallMessagePartProps } from '@assistant-ui/react'
@@ -52,14 +53,14 @@ export function ToolCallCard({ toolName, status, args, argsText, result }: ToolC
 
   return (
     <div className="chat-tool">
-      <button type="button" className="chat-tool-row" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+      <Button unstyled type="button" className="chat-tool-row" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
         <ChevronRight size={14} className="chat-tool-chevron" data-open={open || undefined} aria-hidden="true" />
         <span className="chat-tool-label">{LABEL[name] ?? toolName}</span>
         {pill ? <span className="chat-tool-arg">{pill}</span> : null}
         <span className="chat-tool-status" data-state={running ? 'running' : failed ? 'error' : 'ok'} aria-hidden="true">
           {running ? <Loader2 size={13} className="chat-spin" /> : failed ? <X size={13} /> : <Check size={13} />}
         </span>
-      </button>
+      </Button>
 
       {open ? (
         <div className="chat-tool-detail">

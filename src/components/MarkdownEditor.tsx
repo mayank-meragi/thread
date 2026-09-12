@@ -41,6 +41,7 @@ import { replaceAll } from '@milkdown/utils'
 import { MobileEditorToolbar, type ToolbarAction, type ToolbarBlockKind } from './MobileEditorToolbar'
 import { openBlockInspector } from '../lib/inspectorTarget'
 import { workoutRoleFromTagIds, type WorkoutRole } from '../lib/workouts/systemTags'
+import { createButtonElement } from 'fiber'
 
 interface MarkdownEditorProps {
   day: string
@@ -760,8 +761,7 @@ async function installBlockMetadataControls(view: EditorView, day: string, onOpe
     }
     let button = dom.querySelector<HTMLButtonElement>(':scope > .block-property-trigger')
     if (!button) {
-      button = document.createElement('button')
-      button.type = 'button'
+      button = createButtonElement()
       button.className = 'block-property-trigger'
       button.contentEditable = 'false'
       button.textContent = '···'
@@ -820,8 +820,7 @@ async function installCollapseControls(root: HTMLElement, day: string): Promise<
       existing?.remove()
     } else {
       const blockId = `${day}:editor:${index}`
-      const button = existing ?? document.createElement('button')
-      button.type = 'button'
+      const button = existing ?? createButtonElement()
       button.className = 'collapse-toggle'
       button.contentEditable = 'false'
       button.tabIndex = 0

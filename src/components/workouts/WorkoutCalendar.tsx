@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { shiftDay } from '../../lib/dates'
 import { workoutLensState } from '../../lib/workouts/presentation'
 import type { WorkoutView } from '../../lib/workouts/types'
-import { Button } from '../ui'
+import { Button, ToggleButton } from 'fiber'
 
 function monthStart(month: string): string {
   return `${month}-01`
@@ -63,17 +63,17 @@ export function WorkoutCalendar({
           const active = items.some((item) => workoutLensState(item) === 'active')
           const status = active ? 'active' : completed ? 'completed' : items.length ? 'planned' : undefined
           return (
-            <button
+            <ToggleButton unstyled
               type="button"
               key={day}
+              pressed={selected}
               className={`workout-calendar-day${outside ? ' outside' : ''}${selected ? ' selected' : ''}${status ? ` has-${status}` : ''}`}
-              aria-pressed={selected}
               aria-label={`${dayLabel(day)}${items.length ? `, ${items.length} workout${items.length === 1 ? '' : 's'}` : ''}`}
               onClick={() => onDayChange(selected ? undefined : day)}
             >
               <span>{Number(day.slice(-2))}</span>
               {items.length > 0 && <i aria-hidden="true">{items.length > 1 ? items.length : ''}</i>}
-            </button>
+            </ToggleButton>
           )
         })}
       </div>

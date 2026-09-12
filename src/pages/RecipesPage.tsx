@@ -6,7 +6,7 @@ import { ImportDialog } from '../components/recipes/ImportDialog'
 import { createRecipeThread } from '../lib/recipes/mutations'
 import { listRecipes } from '../lib/recipes/selectors'
 import type { RecipeView } from '../lib/recipes/types'
-import { Button, ButtonLink } from '../components/ui'
+import { Button, ButtonLink, Input } from 'fiber'
 
 function RecipeCard({ recipe }: { recipe: RecipeView }) {
   const servings = recipe.properties.get('recipe-servings')
@@ -85,7 +85,7 @@ export function RecipesPage() {
               void submitNewRecipe()
             }}
           >
-            <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="New recipe name" aria-label="New recipe name" />
+            <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="New recipe name" aria-label="New recipe name" />
             <Button type="submit" disabled={busy || !title.trim()}><Plus size={16} aria-hidden="true" /> New recipe</Button>
           </form>
         </div>
@@ -110,7 +110,7 @@ export function RecipesPage() {
         </div>
       ) : (
         <>
-          <label className="workout-search recipes-search"><Search size={15} aria-hidden="true" /><span className="sr-only">Search recipes</span><input value={query} placeholder="Search recipes" onChange={(event) => setQuery(event.target.value)} /></label>
+          <label className="workout-search recipes-search"><Search size={15} aria-hidden="true" /><span className="sr-only">Search recipes</span><Input value={query} placeholder="Search recipes" onChange={(event) => setQuery(event.target.value)} /></label>
           <div className="recipes-grid">{filtered.map((recipe) => <RecipeCard key={recipe.thread.id} recipe={recipe} />)}</div>
         </>
       )}

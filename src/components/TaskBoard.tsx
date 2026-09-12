@@ -4,7 +4,7 @@ import type { BlockTagRecord, MentionRecord, TagDefinitionRecord, TaskRecord, Ta
 import { formatDay, isoToday } from '../lib/dates'
 import { setTaskStatus } from '../lib/tasks'
 import { TaskStatusIcon } from './TaskStatusControl'
-import { Button } from './ui'
+import { Button } from 'fiber'
 
 const EMPTY_SELECTION = new Set<string>()
 function NOOP_SELECT(): void {}

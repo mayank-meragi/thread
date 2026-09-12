@@ -3,7 +3,7 @@ import { X } from 'lucide-react'
 import { RECIPE_CATEGORY_OPTIONS } from '../../lib/blockMetadata'
 import { importRecipeFromUrl, type RecipeImportDraft } from '../../lib/recipes/import'
 import { createRecipeThread, replaceRecipeMarkdown, updateRecipeProperties } from '../../lib/recipes/mutations'
-import { Button } from '../ui'
+import { Button, Field, Input } from 'fiber'
 
 interface ImportDialogProps {
   onClose: () => void
@@ -81,10 +81,8 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
 
         {stage.kind === 'url' || stage.kind === 'fetching' ? (
           <>
-            <label className="field">
-              <span className="field-label">Recipe URL</span>
-              <input
-                className="field-control"
+            <Field label="Recipe URL">
+              <Input
                 autoFocus
                 type="url"
                 value={url}
@@ -92,7 +90,7 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
                 placeholder="https://example.com/some-recipe"
                 disabled={stage.kind === 'fetching'}
               />
-            </label>
+            </Field>
             {error && <p className="banner banner-error" role="alert">{error}</p>}
             <div className="recipes-import-actions">
               <Button variant="outline" onClick={onClose}>Cancel</Button>
@@ -103,23 +101,19 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
           </>
         ) : (
           <>
-            <label className="field">
-              <span className="field-label">Title</span>
-              <input className="field-control" value={title} onChange={(event) => setTitle(event.target.value)} disabled={stage.kind === 'saving'} />
-            </label>
+            <Field label="Title">
+              <Input value={title} onChange={(event) => setTitle(event.target.value)} disabled={stage.kind === 'saving'} />
+            </Field>
             <div className="recipes-import-numbers">
-              <label className="field">
-                <span className="field-label">Servings</span>
-                <input className="field-control" type="number" min={1} value={servings} onChange={(event) => setServings(event.target.value)} disabled={stage.kind === 'saving'} />
-              </label>
-              <label className="field">
-                <span className="field-label">Prep (min)</span>
-                <input className="field-control" type="number" min={0} value={prepMinutes} onChange={(event) => setPrepMinutes(event.target.value)} disabled={stage.kind === 'saving'} />
-              </label>
-              <label className="field">
-                <span className="field-label">Cook (min)</span>
-                <input className="field-control" type="number" min={0} value={cookMinutes} onChange={(event) => setCookMinutes(event.target.value)} disabled={stage.kind === 'saving'} />
-              </label>
+              <Field label="Servings">
+                <Input type="number" min={1} value={servings} onChange={(event) => setServings(event.target.value)} disabled={stage.kind === 'saving'} />
+              </Field>
+              <Field label="Prep (min)">
+                <Input type="number" min={0} value={prepMinutes} onChange={(event) => setPrepMinutes(event.target.value)} disabled={stage.kind === 'saving'} />
+              </Field>
+              <Field label="Cook (min)">
+                <Input type="number" min={0} value={cookMinutes} onChange={(event) => setCookMinutes(event.target.value)} disabled={stage.kind === 'saving'} />
+              </Field>
             </div>
             <div className="field">
               <span className="field-label">Category</span>
@@ -138,17 +132,17 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
                 ))}
               </div>
             </div>
-            <label className="field">
-                <span className="field-label">Recipe outline (edit freely)</span>
+            <Field label="Recipe outline (edit freely)" hint="Review the tags, indentation, ingredient preparations, cookware and timer annotations before saving." controlId="recipe-import-outline">
               <textarea
                 className="field-control recipes-import-steps"
+                id="recipe-import-outline"
+                aria-describedby="recipe-import-outline-hint"
                 value={stepsText}
                 onChange={(event) => setStepsText(event.target.value)}
                 disabled={stage.kind === 'saving'}
                 rows={8}
               />
-              <span className="field-hint">Review the tags, indentation, ingredient preparations, cookware and timer annotations before saving.</span>
-            </label>
+            </Field>
             {error && <p className="banner banner-error" role="alert">{error}</p>}
             <div className="recipes-import-actions">
               <Button variant="outline" onClick={onClose} disabled={stage.kind === 'saving'}>Cancel</Button>

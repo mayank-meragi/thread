@@ -1,3 +1,4 @@
+import { Button, ToggleButton } from 'fiber'
 import { useEffect, useState } from 'react'
 import { Search, Settings, Sparkle } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -38,7 +39,7 @@ export function TitleBar({ activityBarHidden, onToggleActivityBar, onOpenCommand
         <span className="title-bar-date">{formatShortDate(isoToday())}</span>
       </div>
 
-      <button
+      <Button unstyled
         type="button"
         className="title-bar-search"
         onClick={onOpenCommand}
@@ -49,11 +50,11 @@ export function TitleBar({ activityBarHidden, onToggleActivityBar, onOpenCommand
         <Search size={13} />
         <span>Search notes…</span>
         <kbd>⌘⇧P</kbd>
-      </button>
+      </Button>
 
       <div className="title-bar-actions">
         <RailSyncIndicator {...sync} />
-        <button
+        <Button unstyled
           type="button"
           className="title-bar-search-icon"
           onClick={onOpenCommand}
@@ -61,7 +62,7 @@ export function TitleBar({ activityBarHidden, onToggleActivityBar, onOpenCommand
           title="Create or go"
         >
           <Search size={16} />
-        </button>
+        </Button>
         <Link
           to="/settings"
           className="title-bar-settings-icon"
@@ -71,27 +72,27 @@ export function TitleBar({ activityBarHidden, onToggleActivityBar, onOpenCommand
           <Settings size={16} />
         </Link>
         <div className="title-bar-toggles">
-          <button
+          <ToggleButton unstyled
             type="button"
+            pressed={!activityBarHidden}
             className="tap-target-sm title-bar-toggle"
             aria-label={activityBarHidden ? 'Show activity bar' : 'Hide activity bar'}
-            aria-pressed={!activityBarHidden}
             title={activityBarHidden ? 'Show activity bar' : 'Hide activity bar'}
             onClick={onToggleActivityBar}
           >
             <LayoutToggleIcon side="left" filled={!activityBarHidden} />
-          </button>
-          <button
+          </ToggleButton>
+          <ToggleButton unstyled
             type="button"
+            pressed={!railHidden}
             className="tap-target-sm title-bar-toggle"
             aria-label={railHidden ? 'Show context panel' : 'Hide context panel'}
-            aria-pressed={!railHidden}
             aria-keyshortcuts="Meta+\\ Control+\\"
             title={railHidden ? 'Show context panel (⌘\\)' : 'Hide context panel (⌘\\)'}
             onClick={toggleRail}
           >
             <LayoutToggleIcon side="right" filled={!railHidden} />
-          </button>
+          </ToggleButton>
         </div>
       </div>
     </header>

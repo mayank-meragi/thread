@@ -11,7 +11,7 @@ import {
   type TagDefinitionRecord,
 } from '../../db'
 import { PROPERTY_TYPES } from './propertyTypes'
-import { Button } from '../ui'
+import { Button, Input, ToggleButton } from 'fiber'
 
 // A property field edits either a block's property or a thread's property; the
 // control and validation are identical, only the mutation differs.
@@ -58,7 +58,7 @@ export function PropertyControl({
   }
 
   if (definition.type === 'boolean') {
-    return <Button variant="outline" size="sm" className={value === true ? 'property-boolean active' : 'property-boolean'} aria-pressed={value === true} onClick={() => void save(value !== true)}><span>{value === true && <Check size={12} />}</span>{value === true ? 'Yes' : 'No'}</Button>
+    return <ToggleButton variant="outline" size="sm" pressed={value === true} className={value === true ? 'property-boolean active' : 'property-boolean'} onClick={() => void save(value !== true)}><span>{value === true && <Check size={12} />}</span>{value === true ? 'Yes' : 'No'}</ToggleButton>
   }
   if ((definition.type === 'select' || definition.type === 'status') && definition.options?.length) {
     return <select value={typeof value === 'string' ? value : ''} onChange={(event) => void save(event.target.value)}>
@@ -80,24 +80,24 @@ export function PropertyControl({
     return (
       <div className="property-multi-select" role="group" aria-label={definition.name}>
         {definition.options.map((option) => (
-          <Button
+          <ToggleButton
             key={option.id}
             variant="outline"
             size="sm"
+            pressed={selected.has(option.id)}
             className={selected.has(option.id) ? 'property-chip active' : 'property-chip'}
-            aria-pressed={selected.has(option.id)}
             onClick={() => toggle(option.id)}
           >
             {option.label}
-          </Button>
+          </ToggleButton>
         ))}
       </div>
     )
   }
   if (definition.type === 'multi_select' || definition.type === 'relation') {
-    return <input value={draft} placeholder="Comma-separated values" onChange={(event) => setDraft(event.target.value)} onBlur={() => void save(draft.split(',').map((item) => item.trim()).filter(Boolean))} />
+    return <Input value={draft} placeholder="Comma-separated values" onChange={(event) => setDraft(event.target.value)} onBlur={() => void save(draft.split(',').map((item) => item.trim()).filter(Boolean))} />
   }
-  return <input
+  return <Input
     type={definition.type === 'date' ? 'date' : definition.type === 'datetime' ? 'datetime-local' : definition.type === 'number' ? 'number' : definition.type === 'url' ? 'url' : 'text'}
     value={draft}
     placeholder={compact ? '—' : 'Not set'}
@@ -151,7 +151,7 @@ export function NewPropertyForm({ onDone, onError }: { onDone: (created?: Proper
       onError(null)
       void createPropertyDefinition({ name, type }).then((created) => onDone(created)).catch((caught) => onError(caught instanceof Error ? caught.message : String(caught)))
     }}>
-      <input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Property name" aria-label="Property name" />
+      <Input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Property name" aria-label="Property name" />
       <select value={type} onChange={(event) => setType(event.target.value as PropertyType)} aria-label="Property type">
         {PROPERTY_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
       </select>

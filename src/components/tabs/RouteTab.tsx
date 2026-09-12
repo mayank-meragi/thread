@@ -1,3 +1,4 @@
+import { Button, IconButton, MenuItem } from 'fiber'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
@@ -44,7 +45,7 @@ export function RouteTab({ params, api, containerApi }: IDockviewPanelHeaderProp
         setMenu({ x: event.clientX, y: event.clientY })
       }}
     >
-      <button
+      <Button unstyled
         type="button"
         className="tab-chip-main"
         onClick={() => api.setActive()}
@@ -56,10 +57,9 @@ export function RouteTab({ params, api, containerApi }: IDockviewPanelHeaderProp
         }}
       >
         <span className="tab-chip-label"><TabLabel path={params.path} /></span>
-      </button>
+      </Button>
       {closable && (
-        <button
-          type="button"
+        <IconButton unstyled
           className="tap-target-sm tab-chip-close"
           aria-label="Close tab"
           onClick={(event) => {
@@ -68,7 +68,7 @@ export function RouteTab({ params, api, containerApi }: IDockviewPanelHeaderProp
           }}
         >
           <X size={12} />
-        </button>
+        </IconButton>
       )}
       {menu &&
         createPortal(
@@ -89,42 +89,39 @@ export function RouteTab({ params, api, containerApi }: IDockviewPanelHeaderProp
                 top: Math.min(menu.y, window.innerHeight - 190),
               }}
             >
-              <button
+              <MenuItem
                 type="button"
                 role="menuitem"
-                className="menu-item"
                 disabled={!splittable}
                 title={splittable ? undefined : 'A split needs at least two tabs in this group'}
                 onClick={() => runAction(() => void splitPanel(containerApi, api.id, 'right'))}
               >
                 Split right
-              </button>
-              <button
+              </MenuItem>
+              <MenuItem
                 type="button"
                 role="menuitem"
-                className="menu-item"
                 disabled={!splittable}
                 title={splittable ? undefined : 'A split needs at least two tabs in this group'}
                 onClick={() => runAction(() => void splitPanel(containerApi, api.id, 'below'))}
               >
                 Split below
-              </button>
-              <button
+              </MenuItem>
+              <MenuItem
                 type="button"
                 role="menuitem"
-                className="menu-item"
                 disabled={!movable}
                 title={movable ? undefined : 'No other group to move this tab to'}
                 onClick={() => runAction(() => void moveToNextGroup(containerApi, api.id))}
               >
                 Move to next group
-              </button>
+              </MenuItem>
               {closable && (
                 <>
                   <div className="menu-divider link-context-divider" />
-                  <button type="button" role="menuitem" className="menu-item" onClick={() => runAction(() => api.close())}>
+                  <MenuItem onClick={() => runAction(() => api.close())}>
                     Close tab
-                  </button>
+                  </MenuItem>
                 </>
               )}
             </div>

@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Copy, History, Plus, RotateCcw, Square } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -290,7 +291,7 @@ function PersonaChat({
           >
             <Plus size={15} />
           </ThreadListPrimitive.New>
-          <button
+          <Button unstyled
             type="button"
             className={view === 'history' ? 'header-action active' : 'header-action'}
             aria-label="Session history"
@@ -298,7 +299,7 @@ function PersonaChat({
             onClick={() => setView((current) => (current === 'history' ? 'chat' : 'history'))}
           >
             <History size={15} />
-          </button>
+          </Button>
         </div>
       </div>
       <div className="chat-panel-body">

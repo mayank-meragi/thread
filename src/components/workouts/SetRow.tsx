@@ -1,3 +1,4 @@
+import { Button, Input } from 'fiber'
 import { useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import { useWorkoutSetDraft } from '../../hooks/useWorkoutSetDraft'
@@ -37,7 +38,7 @@ export function SetRow({ set, index }: { set: WorkoutSetView; index: number }) {
         <div className="set-row-index">{index + 1}</div>
 
         <label className="set-row-field">
-          <input
+          <Input
             className="set-row-input"
             type="number"
             inputMode="numeric"
@@ -52,7 +53,7 @@ export function SetRow({ set, index }: { set: WorkoutSetView; index: number }) {
         </label>
 
         <label className="set-row-field">
-          <input
+          <Input
             className="set-row-input"
             type="number"
             inputMode="decimal"
@@ -66,7 +67,7 @@ export function SetRow({ set, index }: { set: WorkoutSetView; index: number }) {
           <span className="set-row-unit">{draft.loadUnit ?? 'kg'}</span>
         </label>
 
-        <button
+        <Button unstyled
           type="button"
           className={`set-row-done${isDone ? ' is-done' : ''}`}
           disabled={busy || isDone}
@@ -74,19 +75,19 @@ export function SetRow({ set, index }: { set: WorkoutSetView; index: number }) {
           onClick={() => void complete()}
         >
           <Check size={16} aria-hidden="true" />
-        </button>
+        </Button>
       </div>
 
       {error && <p className="workout-inline-error" role="alert">{error}</p>}
 
-      <button
+      <Button unstyled
         type="button"
         className="set-row-details-toggle"
         aria-expanded={detailsOpen}
         onClick={() => setDetailsOpen((open) => !open)}
       >
         <ChevronDown size={13} aria-hidden="true" /> {hasDetails ? 'RPE / duration / distance' : 'More details'}
-      </button>
+      </Button>
 
       {detailsOpen && (
         <div className="set-row-details-grid">

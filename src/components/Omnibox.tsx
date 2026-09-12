@@ -1,3 +1,4 @@
+import { Button, Input } from 'fiber'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpenText, FileText, GitBranch, ListPlus, PanelRight, Search } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -322,7 +323,7 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
       <section className="dialog command-sheet" role="dialog" aria-modal="true" aria-label="Omnibox">
         <label className="command-input">
           <Search size={18} />
-          <input
+          <Input
             ref={inputRef}
             value={rawValue}
             onChange={(event) => setRawValue(event.target.value)}
@@ -344,7 +345,7 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
                   <small>{items.filter((candidate) => candidate.group === item.group).length}</small>
                 </div>
               )}
-              <button
+              <Button unstyled
                 ref={(element) => { itemRefs.current[index] = element }}
                 type="button"
                 className={index === highlightedIndex ? 'command-item-active' : undefined}
@@ -353,7 +354,7 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
               >
                 <span className={`command-icon${item.iconClassName ? ` ${item.iconClassName}` : ''}`}>{item.icon}</span>
                 <span><strong>{item.title}</strong><small>{item.subtitle}</small></span>
-              </button>
+              </Button>
             </Fragment>
           ))}
           {items.length === 0 && <p className="empty-hint">No matches for "{query}".</p>}

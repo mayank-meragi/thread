@@ -7,7 +7,7 @@ import { addSet, deleteWorkoutItem, skipExercise } from '../../lib/workouts/muta
 import { exerciseSummary, sourceHref, stripStructuralTag } from '../../lib/workouts/presentation'
 import type { WorkoutExerciseView } from '../../lib/workouts/types'
 import { SetRow } from './SetRow'
-import { Button } from '../ui'
+import { Button, MenuItem } from 'fiber'
 
 function exerciseName(exercise: WorkoutExerciseView): string {
   return exercise.exerciseThread?.title
@@ -67,9 +67,9 @@ function GuideDetails({ exercise }: { exercise: WorkoutExerciseView }) {
   if (!hasChips && !hasDetails) return null
   return (
     <div className="exercise-guide">
-      <button type="button" className="exercise-guide-toggle" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+      <Button unstyled type="button" className="exercise-guide-toggle" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
         <ChevronDown size={14} aria-hidden="true" /> {open ? 'Hide guide details' : 'Guide details'}
-      </button>
+      </Button>
       {open && (
         <>
           {hasChips && (
@@ -183,25 +183,18 @@ export function ActiveExercise({
                   <a className="menu-item" role="menuitem" href={sourceHref(exercise.task)}>
                     <ExternalLink size={15} aria-hidden="true" /> Open source line
                   </a>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="menu-item"
-                    role="menuitem"
+                  <MenuItem
                     disabled={exercise.task.status === 'canceled'}
                     onClick={() => void run(() => skipExercise(exercise.task.id))}
                   >
                     <SkipForward size={15} aria-hidden="true" /> Skip exercise
-                  </Button>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    className="menu-item"
-                    role="menuitem"
+                  </MenuItem>
+                  <MenuItem
+                    className="menu-item-danger"
                     onClick={() => void run(() => deleteWorkoutItem(exercise.task.id))}
                   >
                     <Trash2 size={15} aria-hidden="true" /> Delete exercise
-                  </Button>
+                  </MenuItem>
                 </div>
               </>
             )}

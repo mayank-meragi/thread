@@ -1,3 +1,4 @@
+import { Button, ToggleButton } from 'fiber'
 import { useMemo, useState } from 'react'
 import { AlignJustify, ArrowLeft, CheckCircle2, ChevronRight, Circle, GitBranch, HelpCircle, Kanban, Lightbulb, List, MoreHorizontal, Quote } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -142,9 +143,9 @@ export function ThreadPage() {
           <>
             <div className="thread-task-toolbar">
               <div className="task-mode-toggle" role="group" aria-label="Display mode">
-                <button type="button" aria-pressed={taskMode === 'list'} aria-label="List view" onClick={() => setTaskMode('list')}><List size={14} /></button>
-                <button type="button" aria-pressed={taskMode === 'compact'} aria-label="Compact view" onClick={() => setTaskMode('compact')}><AlignJustify size={14} /></button>
-                <button type="button" aria-pressed={taskMode === 'board'} aria-label="Board view" onClick={() => setTaskMode('board')}><Kanban size={14} /></button>
+                <ToggleButton unstyled pressed={taskMode === 'list'} aria-label="List view" onClick={() => setTaskMode('list')}><List size={14} /></ToggleButton>
+                <ToggleButton unstyled pressed={taskMode === 'compact'} aria-label="Compact view" onClick={() => setTaskMode('compact')}><AlignJustify size={14} /></ToggleButton>
+                <ToggleButton unstyled pressed={taskMode === 'board'} aria-label="Board view" onClick={() => setTaskMode('board')}><Kanban size={14} /></ToggleButton>
               </div>
             </div>
             {taskMode === 'board' ? (
@@ -289,7 +290,7 @@ function ThreadOccurrence({
       <li key={block.id} className={isCollapsed ? 'is-collapsed' : ''}>
         <div className="outline-row">
           {descendants.length ? (
-            <button
+            <Button unstyled
               type="button"
               className="outline-toggle"
               aria-label={isCollapsed ? 'Expand bullet' : 'Collapse bullet'}
@@ -303,16 +304,16 @@ function ThreadOccurrence({
               })}
             >
               <ChevronRight size={14} />
-            </button>
+            </Button>
           ) : onToggleChecked ? (
-            <button
+            <Button unstyled
               type="button"
               className="outline-check"
               aria-label={block.checked ? 'Mark not done' : 'Mark done'}
               onClick={onToggleChecked}
             >
               {block.checked ? <CheckCircle2 size={14} /> : <Circle size={14} />}
-            </button>
+            </Button>
           ) : <span className={`outline-bullet${block.kind !== 'thought' ? ` outline-kind-${block.kind}` : ''}`}>
             {block.kind === 'idea' && <Lightbulb size={12} />}
             {block.kind === 'question' && <HelpCircle size={12} />}
@@ -333,7 +334,7 @@ function ThreadOccurrence({
           >
             <WikiText text={block.markdown} />
           </span>
-          <button type="button" className="outline-property-button" aria-label={`Edit properties for ${block.plainText || 'block'}`} onClick={() => onInspect(block.id)}><MoreHorizontal size={14} /></button>
+          <Button unstyled type="button" className="outline-property-button" aria-label={`Edit properties for ${block.plainText || 'block'}`} onClick={() => onInspect(block.id)}><MoreHorizontal size={14} /></Button>
           {isCollapsed && <small className="collapsed-count">{countDescendants(block.id, children)}</small>}
         </div>
         {!isCollapsed && descendants.length > 0 && <ul>{descendants.map(renderBranch)}</ul>}

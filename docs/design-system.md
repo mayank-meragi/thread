@@ -1,7 +1,8 @@
 # Thread design system
 
 This documents the token layer and shared primitives introduced to consolidate Thread's UI styling
-(`src/styles/tokens.css`, `base.css`, `primitives.css`, `features.css`, and `src/components/ui/`).
+(`src/styles/tokens.css`, `base.css`, `packages/fiber/src/styles.css`, `features.css`, and
+`packages/fiber/src/`).
 Read it before adding a new theme, a new popover/modal/banner, or new small type.
 
 ## File layout
@@ -12,13 +13,22 @@ Read it before adding a new theme, a new popover/modal/banner, or new small type
    `dracula`, `nord`, `catppuccin-mocha`), and theme-independent tokens (typography, spacing, radius,
    state) that don't vary per theme.
 2. **`base.css`** — global element resets (box-sizing, `sr-only`, focus-visible, forced-colors).
-3. **`primitives.css`** — shared CSS classes (`.menu-panel`, `.dialog`/`.sheet`, `.field`, `.banner`,
+3. **`packages/fiber/src/styles.css`** — shared CSS classes (`.menu-panel`, `.dialog`/`.sheet`, `.field`, `.banner`,
    `.btn`, `.chip`, `.empty-state`, `.spin`) that bespoke widgets compose onto.
 4. **`features.css`** — everything page/component-specific. A feature rule that composes a primitive
    keeps only its own positioning/sizing overrides; it should not re-declare border, radius,
    background, or shadow that the primitive already provides.
 
-`src/components/ui/` holds the React primitives: `Button`, `Chip`, `EmptyState`, `Spinner`.
+`packages/fiber/src/` holds the React primitives: `Button`, `ButtonLink`, `IconButton`,
+`ToggleButton`, `MenuItem`, `Field`, `Input`, `Chip`, `EmptyState`, and `Spinner`.
+All React-rendered buttons use `Button`; specialized controls such as tabs, calendar cells, and
+interactive rows pass `unstyled` to retain their semantic feature styling while sharing the native
+button defaults. Editor integrations that render outside React use `createButtonElement()` from the
+same module.
+
+The living gallery is available on Fiber's standalone page (`/thread/fiber.html` in development);
+use it to review each component's supported variants and interaction states before introducing a
+new one-off control.
 
 ## Adding a theme
 
@@ -93,6 +103,10 @@ below against the new palette before shipping it.
   down for bottom sheets, not sideways for edge panels).
 - **`.field` / `.field-control`** — input/select/textarea recipe with `:focus-visible`, `.field-error`,
   and `.field-hint` states.
+- **`Field` + `Input`** — the React form pairing for labeled single-line controls. `Field` owns the
+  label, generated control ID, required marker, and hint/error relationship; `Input` consumes that
+  context and preserves the shared control states. Textareas, selects, and native toggles remain
+  native until their dedicated Fiber primitives are introduced.
 - **`.banner` (`.banner-info`/`.banner-warning`/`.banner-error`/`.banner-success`)** — replaces
   `.form-error`, `.inspector-error`, `.chat-message-error`.
 
@@ -136,7 +150,7 @@ count changes without re-announcing on every arrow-key move.
 
 ## Motion
 
-- `@keyframes spin` and `.spin` live in `primitives.css`; `Spinner.tsx` and the in-progress task
+- `@keyframes spin` and `.spin` live in `packages/fiber/src/styles.css`; `Spinner.tsx` and the in-progress task
   status icon both use it.
 - `@media (prefers-reduced-motion: reduce)` in `features.css` zeroes `animation-duration`,
   `transition-duration`, and `scroll-behavior` on every element via the universal selector, so it

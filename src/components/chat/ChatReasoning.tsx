@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { useState } from 'react'
 import { Brain, ChevronRight, Loader2 } from 'lucide-react'
 import { MessagePartPrimitive, type ReasoningMessagePartProps } from '@assistant-ui/react'
@@ -14,7 +15,7 @@ export function ChatReasoning({ status }: ReasoningMessagePartProps) {
 
   return (
     <div className="chat-reasoning">
-      <button
+      <Button unstyled
         type="button"
         className="chat-tool-row"
         aria-expanded={open}
@@ -28,7 +29,7 @@ export function ChatReasoning({ status }: ReasoningMessagePartProps) {
             <Loader2 size={13} className="chat-spin" />
           </span>
         </MessagePartPrimitive.InProgress>
-      </button>
+      </Button>
 
       {open ? (
         <div className="chat-reasoning-body">

@@ -22,7 +22,7 @@ import {
 import { kindLabel } from '../lib/blockMetadata'
 import { formatDay } from '../lib/dates'
 import { closeInspector, getInspectorTarget, INSPECTOR_TARGET_EVENT, type InspectorTarget } from '../lib/inspectorTarget'
-import { Button } from './ui'
+import { Button, Field, Input, ToggleButton } from 'fiber'
 import { NewPropertyForm, PropertyField } from './inspector/PropertyField'
 import { TaskDraft } from './inspector/TaskDraft'
 import { WorkoutInspectorSections } from './inspector/WorkoutInspectorSections'
@@ -208,8 +208,8 @@ export function ContextualInspector() {
             <TaskDraft key={`description:${task.id}:${task.description}`} label="Description" value={task.description ?? ''} multiline placeholder="Add the context needed to finish this…" onSave={(value) => run(() => setTaskDescription(task.id, value))} />
 
             <div className="task-detail-grid">
-              <label><span>Start</span><input type="date" value={task.startDate ?? ''} onChange={(event) => void run(() => setTaskStartDate(task.id, event.target.value || undefined))} /></label>
-              <label><span>Due</span><input type="date" value={task.dueDate ?? ''} onChange={(event) => void run(() => setTaskDueDate(task.id, event.target.value || undefined))} /></label>
+              <label><span>Start</span><Input type="date" value={task.startDate ?? ''} onChange={(event) => void run(() => setTaskStartDate(task.id, event.target.value || undefined))} /></label>
+              <label><span>Due</span><Input type="date" value={task.dueDate ?? ''} onChange={(event) => void run(() => setTaskDueDate(task.id, event.target.value || undefined))} /></label>
               <label><span>Priority</span><select value={task.priority ?? ''} onChange={(event) => void run(() => setTaskPriority(task.id, event.target.value as TaskPriority || undefined))}><option value="">None</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
               <EstimateField taskId={task.id} minutes={task.estimatedMinutes} run={run} />
             </div>
@@ -224,13 +224,13 @@ export function ContextualInspector() {
 
             <section className="inspector-section">
               <div className="inspector-section-title"><span>Subtasks</span><small>{subtasks.length}</small></div>
-              {subtasks.map((subtask) => <button type="button" className="task-detail-subtask" key={subtask.id} onClick={() => { window.location.hash = `/?date=${subtask.day}&block=${subtask.id}` }}><span className={`subtask-dot status-${subtask.status}`} />{subtask.text}</button>)}
+              {subtasks.map((subtask) => <Button unstyled type="button" className="task-detail-subtask" key={subtask.id} onClick={() => { window.location.hash = `/?date=${subtask.day}&block=${subtask.id}` }}><span className={`subtask-dot status-${subtask.status}`} />{subtask.text}</Button>)}
               <form className="task-detail-add" onSubmit={(event) => {
                 event.preventDefault()
                 if (!subtaskText.trim()) return
                 void run(async () => { await createSubtask(task.id, subtaskText); setSubtaskText('') })
               }}>
-                <ListPlus size={15} /><input value={subtaskText} onChange={(event) => setSubtaskText(event.target.value)} placeholder="Add a subtask" /><Button type="submit" size="sm">Add</Button>
+                <ListPlus size={15} /><Input value={subtaskText} onChange={(event) => setSubtaskText(event.target.value)} placeholder="Add a subtask" /><Button type="submit" size="sm">Add</Button>
               </form>
             </section>
 
@@ -263,16 +263,16 @@ export function ContextualInspector() {
             <div className="inspector-tags">
               {tags.map((tag) => {
                 const application = appliedTags.find((item) => item.tagId === tag.id)
-                return <button
+                return <ToggleButton unstyled
                   type="button"
                   key={tag.id}
+                  pressed={applied.has(tag.id)}
                   className={`${applied.has(tag.id) ? 'inspector-tag active' : 'inspector-tag'}${tag.propertyIds.length ? ' has-schema' : ''}${application?.source === 'inline' ? ' is-inline' : ''}`}
-                  aria-pressed={applied.has(tag.id)}
                   title={application?.source === 'inline' ? 'Typed in this block' : tag.propertyIds.length ? 'Metadata schema' : undefined}
                   onClick={() => void run(() => applied.has(tag.id) ? removeBlockTag(blockId, tag.id) : addBlockTag(blockId, tag.id))}
                 >
                   {tag.propertyIds.length > 0 ? <Sparkles size={11} /> : application?.source === 'inline' ? <Hash size={11} /> : applied.has(tag.id) ? <Check size={11} /> : null}#{tag.name}
-                </button>
+                </ToggleButton>
               })}
               <form className="inspector-inline-create" onSubmit={(event) => {
                 event.preventDefault()
@@ -285,7 +285,7 @@ export function ContextualInspector() {
                 })
               }}>
                 <Hash size={13} />
-                <input value={newTag} onChange={(event) => setNewTag(event.target.value)} placeholder="New tag" aria-label="New tag name" />
+                <Input value={newTag} onChange={(event) => setNewTag(event.target.value)} placeholder="New tag" aria-label="New tag name" />
                 <Button type="submit" variant="ghost" size="sm" iconOnly aria-label="Create and add tag" disabled={!newTag.trim()}><Plus size={13} /></Button>
               </form>
             </div>
@@ -363,10 +363,8 @@ function EstimateField({ taskId, minutes, run }: { taskId: string; minutes: numb
   }
 
   return (
-    <label className={validationError ? 'field field-error' : 'field'}>
-      <span>Estimate</span>
-      <input className="field-control" type="number" min="1" value={draft} placeholder="Minutes" onChange={(event) => setDraft(event.target.value)} onBlur={commit} />
-      {validationError && <small className="field-hint field-hint-error">{validationError}</small>}
-    </label>
+    <Field label="Estimate" error={validationError}>
+      <Input type="number" min="1" value={draft} placeholder="Minutes" onChange={(event) => setDraft(event.target.value)} onBlur={commit} />
+    </Field>
   )
 }

@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { useEffect, useRef, useState } from 'react'
 import { ListFilter } from 'lucide-react'
 import type { TagDefinitionRecord } from '../db'
@@ -37,11 +38,11 @@ export function TaskFilterPopover({ priority, tag, thread, sort, tagDefinitions,
 
   return (
     <div className="task-filter-popover" ref={wrapRef}>
-      <button type="button" className="task-filter-trigger" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+      <Button unstyled type="button" className="task-filter-trigger" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
         <ListFilter size={14} />
         <span>Filters</span>
         {activeCount > 0 && <span className="task-filter-trigger-badge">{activeCount}</span>}
-      </button>
+      </Button>
       {open && (
         <>
           <div className="task-filter-backdrop" onClick={() => setOpen(false)} />

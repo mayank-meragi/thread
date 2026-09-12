@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { db } from '../db'
 import { formatDay } from '../lib/dates'
 import { searchDays } from '../lib/search'
+import { Input } from 'fiber'
 
 export function SearchPage() {
   const [query, setQuery] = useState('')
@@ -23,7 +24,7 @@ export function SearchPage() {
       <h1>Search</h1>
       <label className="search-box">
         <Search size={18} />
-        <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search blocks and threads" />
+        <Input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search blocks and threads" />
         <kbd>⌘ K</kbd>
       </label>
 

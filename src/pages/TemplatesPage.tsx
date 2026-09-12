@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { FileText, GitBranch, Trash2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
@@ -32,7 +33,7 @@ export function TemplatesPage() {
               <GitBranch size={15} />
               <span>{template.title}</span>
             </Link>
-            <button
+            <Button unstyled
               type="button"
               className="tap-target-sm"
               aria-label={`Remove ${template.title} from templates`}
@@ -40,7 +41,7 @@ export function TemplatesPage() {
               onClick={() => void setThreadIsTemplate(template.id, false)}
             >
               <Trash2 size={14} />
-            </button>
+            </Button>
           </div>
         ))}
         {sorted.length === 0 && (

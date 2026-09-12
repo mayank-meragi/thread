@@ -24,6 +24,7 @@ import type { WorkoutRole } from './workouts/systemTags'
 import { WIKI_TITLE } from './wikilinks'
 import { slugifyTag } from './hashtags'
 import { TAG_HREF_PREFIX, TAG_TITLE } from './taglinks'
+import { createButtonElement } from 'fiber'
 
 interface InlineSuggestionOptions {
   getThreads: () => Promise<ThreadSuggestion[]>
@@ -278,8 +279,7 @@ function createMenuController(
       status.textContent = `${entries.length} ${activeTrigger.kind === 'slash' ? 'command' : activeTrigger.kind === 'hashtag' ? 'tag' : 'thread'}${entries.length === 1 ? '' : 's'} found`
       menu.setAttribute('aria-activedescendant', optionId(activeIndex))
       entries.forEach((entry, index) => {
-        const button = document.createElement('button')
-        button.type = 'button'
+        const button = createButtonElement()
         button.id = optionId(index)
         button.className = `menu-item suggestion-option${index === activeIndex ? ' active' : ''}`
         button.setAttribute('role', 'option')

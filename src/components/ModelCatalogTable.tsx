@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, RotateCcw, Trash2 } from 'lucide-react'
 import type { AIProvider } from '../lib/ai'
-import { Button } from './ui'
+import { Button, Input } from 'fiber'
 import {
   DEFAULT_MODELS,
   PROVIDER_IDS,
@@ -146,14 +146,14 @@ export function ModelCatalogTable() {
                     </select>
                   </td>
                   <td>
-                    <input
+                    <Input
                       value={row.label}
                       onChange={(event) => patchRow(row.uid, { label: event.target.value })}
                       placeholder={row.id.trim() || 'Display name'}
                     />
                   </td>
                   <td>
-                    <input
+                    <Input
                       value={row.id}
                       onChange={(event) => patchRow(row.uid, { id: event.target.value })}
                       placeholder="provider-model-id"
@@ -171,7 +171,7 @@ export function ModelCatalogTable() {
                     />
                   </td>
                   <td className="models-col-num">
-                    <input
+                    <Input
                       type="number"
                       min="0"
                       step="0.01"
@@ -182,7 +182,7 @@ export function ModelCatalogTable() {
                     />
                   </td>
                   <td className="models-col-num">
-                    <input
+                    <Input
                       type="number"
                       min="0"
                       step="0.01"

@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { X } from 'lucide-react'
 import type { IDockviewHeaderActionsProps } from 'dockview-react'
 import { TOGGLE_RAIL_EVENT } from '../../lib/dockviewActions'
@@ -8,7 +9,7 @@ export function GroupActions({ location }: IDockviewHeaderActionsProps) {
   if (location?.type !== 'edge') return null
   return (
     <div className="rail-header-actions">
-      <button
+      <Button unstyled
         type="button"
         className="header-action"
         aria-label="Hide context panel"
@@ -16,7 +17,7 @@ export function GroupActions({ location }: IDockviewHeaderActionsProps) {
         onClick={() => window.dispatchEvent(new Event(TOGGLE_RAIL_EVENT))}
       >
         <X size={14} />
-      </button>
+      </Button>
     </div>
   )
 }

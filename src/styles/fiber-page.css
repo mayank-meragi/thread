@@ -1,0 +1,68 @@
+/* Fiber's standalone catalog lives outside the Thread workbench. Keep its
+   chrome quiet so the component specimens remain the visual focus. */
+.fiber-page { min-height: 100%; overflow: auto; background: var(--canvas); color: var(--ink); }
+.fiber-page-topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 62px; padding: 0 32px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 92%, transparent); }
+.fiber-page-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); font-size: var(--text-sm); font-weight: 600; }
+.fiber-page-brand-mark { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--thread); border-radius: var(--radius-sm); background: var(--thread-soft); color: var(--thread); }
+.fiber-page-back { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 10px; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--muted); font-size: var(--text-sm); }
+.fiber-page-back:hover { border-color: var(--line); background: var(--control); color: var(--ink); }
+.fiber-page-main { width: min(1120px, 100%); margin: 0 auto; padding: 42px 28px 64px; }
+.fiber-page .settings-category-header { margin-bottom: 18px; }
+.fiber-page .settings-category-header h2 { margin: 0 0 5px; font: 600 24px/1.15 var(--font-display); color: var(--ink); }
+.fiber-page .settings-category-header p { margin: 0; color: var(--muted); font-size: var(--text-sm); line-height: 1.5; }
+.fiber-gallery-header { display: flex; align-items: flex-start; gap: 12px; }
+.fiber-gallery-mark { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto; border: 1px solid var(--thread); border-radius: var(--radius-md); background: var(--thread-soft); color: var(--thread); }
+.fiber-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 0 0 18px; padding: 22px 24px; border-left: 3px solid var(--thread); background: var(--control); }
+.fiber-hero h3 { max-width: 470px; margin: 7px 0 6px; font: 600 25px/1.08 var(--font-display); color: var(--ink); }
+.fiber-hero p { max-width: 520px; margin: 0; color: var(--muted); font-size: var(--text-sm); line-height: 1.5; }
+.fiber-kicker { color: var(--thread); font: 500 10px/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; }
+.fiber-hero-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.fiber-browser { display: grid; grid-template-columns: 196px minmax(0, 1fr); min-height: 500px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--paper); }
+.fiber-component-nav { padding: 14px 10px 16px; border-right: 1px solid var(--line); background: var(--canvas); }
+.fiber-component-nav-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 8px 10px; color: var(--ink); font-size: var(--text-sm); font-weight: 600; }
+.fiber-component-nav-head strong { display: grid; place-items: center; min-width: 22px; height: 22px; border-radius: var(--radius-pill); background: var(--thread-soft); color: var(--thread); font: 500 var(--text-meta) var(--font-mono); }
+.fiber-component-nav-list { display: grid; gap: 3px; }
+.fiber-component-nav-list button { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 38px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font: 500 var(--text-sm)/1.2 var(--font-ui); text-align: left; cursor: pointer; }
+.fiber-component-nav-list button:hover { background: var(--control); color: var(--ink); }
+.fiber-component-nav-list button.is-active { border-color: var(--line); background: var(--paper); color: var(--thread); box-shadow: var(--shadow-1); }
+.fiber-component-nav-dot { width: 6px; height: 6px; flex: 0 0 auto; border: 1px solid currentColor; border-radius: 50%; }
+.fiber-component-nav-list button.is-active .fiber-component-nav-dot { background: currentColor; }
+.fiber-component-nav-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fiber-component-nav-note { margin: 22px 8px 0; color: var(--muted); font-size: var(--text-meta); line-height: 1.45; }
+.fiber-detail { min-width: 0; padding: 24px; }
+.fiber-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.fiber-detail-header h3 { margin: 7px 0 6px; color: var(--ink); font: 600 28px/1.08 var(--font-display); }
+.fiber-detail-header p { max-width: 540px; margin: 0; color: var(--muted); font-size: var(--text-sm); line-height: 1.5; }
+.fiber-detail-header code { flex: 0 0 auto; color: var(--muted); font: 400 var(--text-meta) var(--font-mono); }
+.fiber-detail-stage { min-height: 318px; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line); }
+.fiber-detail-content { display: grid; gap: 26px; max-width: 650px; }
+.fiber-demo-block { display: grid; gap: 12px; }
+.fiber-field-demo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; max-width: 650px; }
+.fiber-demo-label { color: var(--muted); font: 500 var(--text-meta) var(--font-mono); letter-spacing: .04em; text-transform: uppercase; }
+.fiber-detail-note { max-width: 570px; margin: 0; padding-top: 17px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: var(--text-sm); line-height: 1.55; }
+.fiber-button-row, .fiber-icon-row, .fiber-chip-row, .fiber-spinner-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.fiber-icon-row { min-height: 48px; }
+.fiber-state-note { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: var(--text-meta); }
+.fiber-menu-demo { max-width: 300px; margin-bottom: 10px; }
+.fiber-menu-demo .menu-item { justify-content: space-between; }
+.fiber-spinner-row { min-height: 52px; color: var(--thread); }
+.fiber-empty-demo { max-width: 460px; border: 1px solid var(--line); background: var(--control); }
+.fiber-empty-demo .empty-state { min-height: 170px; padding: 20px 8px; }
+.fiber-empty-demo .empty-state-title { font-size: 16px; }
+
+@media (max-width: 760px) {
+  .fiber-page-topbar { padding: 0 16px; }
+  .fiber-page-main { padding: 28px 16px 48px; }
+  .fiber-hero { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .fiber-hero-actions { width: 100%; }
+  .fiber-hero-actions .btn { flex: 1; }
+  .fiber-browser { grid-template-columns: 1fr; }
+  .fiber-component-nav { border-right: 0; border-bottom: 1px solid var(--line); }
+  .fiber-component-nav-list { display: flex; overflow-x: auto; gap: 5px; padding-bottom: 2px; }
+  .fiber-component-nav-list button { width: auto; min-width: max-content; padding: 0 10px; }
+  .fiber-component-nav-note { display: none; }
+  .fiber-detail { padding: 20px; }
+  .fiber-detail-header { flex-direction: column; gap: 8px; }
+  .fiber-detail-header code { order: -1; }
+  .fiber-field-demo-grid { grid-template-columns: 1fr; }
+}

@@ -18,7 +18,7 @@ import {
 } from '../lib/workouts/presentation'
 import { formatShortDate } from '../lib/dates'
 import type { WorkoutExerciseView, WorkoutView } from '../lib/workouts/types'
-import { Button, ButtonLink } from '../components/ui'
+import { Button, ButtonLink } from 'fiber'
 
 const STATE_LABEL = { planned: 'Planned', active: 'Active', completed: 'Completed', canceled: 'Canceled' } as const
 

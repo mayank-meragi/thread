@@ -1,3 +1,4 @@
+import { ToggleButton } from 'fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Code2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -109,10 +110,10 @@ export function QueryBlock({ source }: { source: string }) {
       : null)
 
   const toggle = (
-    <button type="button" className="query-block-toggle" onClick={toggleCode} aria-pressed={!codeHidden}>
+    <ToggleButton unstyled pressed={!codeHidden} type="button" className="query-block-toggle" onClick={toggleCode}>
       <Code2 size={13} />
       {codeHidden ? 'Show query' : 'Hide query'}
-    </button>
+    </ToggleButton>
   )
 
   if (errorText) {

@@ -5,6 +5,7 @@ import { ArrowLeft, ShoppingCart } from 'lucide-react'
 import { formatQuantity } from '../lib/recipes/cooklangTokens'
 import { formatShortDate, isoToday, shiftDay } from '../lib/dates'
 import { getShoppingList } from '../lib/recipes/selectors'
+import { Input } from 'fiber'
 
 export function ShoppingListPage() {
   const [params, setParams] = useSearchParams()
@@ -39,8 +40,8 @@ export function ShoppingListPage() {
       </header>
 
       <div className="shopping-list-range">
-        <label>From <input type="date" value={startDay} onChange={(event) => setRange('start', event.target.value)} /></label>
-        <label>To <input type="date" value={endDay} onChange={(event) => setRange('end', event.target.value)} /></label>
+        <label>From <Input type="date" value={startDay} onChange={(event) => setRange('start', event.target.value)} /></label>
+        <label>To <Input type="date" value={endDay} onChange={(event) => setRange('end', event.target.value)} /></label>
         <span>{formatShortDate(startDay)} – {formatShortDate(endDay)}</span>
       </div>
 

@@ -1,3 +1,4 @@
+import { Button } from 'fiber'
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import type { IDockviewPanelHeaderProps } from 'dockview-react'
@@ -22,14 +23,14 @@ export function ChatTab({ api, containerApi }: IDockviewPanelHeaderProps) {
         }
       }}
     >
-      <button
+      <Button unstyled
         type="button"
         className="tab-chip-main"
         onClick={() => api.setActive()}
       >
         <span className="tab-chip-label">Chat</span>
-      </button>
-      <button
+      </Button>
+      <Button unstyled
         type="button"
         className="tap-target-sm tab-chip-close"
         aria-label="Close chat panel"
@@ -39,7 +40,7 @@ export function ChatTab({ api, containerApi }: IDockviewPanelHeaderProps) {
         }}
       >
         <X size={12} />
-      </button>
+      </Button>
     </div>
   )
 }

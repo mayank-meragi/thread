@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Check } from 'lucide-react'
 import type { PropertyValue } from '../../db'
 import { updateSet, type SetPropertyInput } from '../../lib/workouts/mutations'
-import { Button } from '../ui'
+import { Button, Input } from 'fiber'
 
 const LOAD_UNITS = ['kg', 'lb'] as const
 const DISTANCE_UNITS = ['m', 'km', 'mi'] as const
@@ -89,7 +89,7 @@ export function SetEditor({
         {NUMBER_FIELDS.map((field) => (
           <label key={field.key} className="set-editor-field">
             <span>{field.label}</span>
-            <input
+            <Input
               type="number"
               inputMode={field.inputMode}
               step={field.step}

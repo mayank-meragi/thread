@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Pause, Play, RotateCcw } from 'lucide-react'
-import { Button } from '../ui'
+import { Button } from 'fiber'
 
 function formatClock(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60)

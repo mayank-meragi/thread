@@ -1,3 +1,4 @@
+import { ToggleButton } from 'fiber'
 import { useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -64,14 +65,13 @@ export function ThreadProperties({ threadId, isTemplate }: { threadId: string; i
 
         <div className="thread-properties-template">
           <span>Template</span>
-          <button
-            type="button"
+          <ToggleButton unstyled
+            pressed={isTemplate}
             className={isTemplate ? 'property-boolean active' : 'property-boolean'}
-            aria-pressed={isTemplate}
             onClick={() => void setThreadIsTemplate(threadId, !isTemplate)}
           >
             {isTemplate ? 'Yes' : 'No'}
-          </button>
+            </ToggleButton>
         </div>
       </div>
     </details>

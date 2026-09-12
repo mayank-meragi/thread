@@ -1,3 +1,4 @@
+import { MenuItem } from 'fiber'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 
 export type OpenTab = (path: string, options?: { background?: boolean }) => void
@@ -101,16 +102,15 @@ export function TabsApiProvider({ openTab, children }: { openTab: OpenTab; child
             style={{ left: Math.min(longPressMenu.x, window.innerWidth - 190), top: longPressMenu.y }}
             onClick={(event) => event.stopPropagation()}
           >
-            <button
+            <MenuItem
               type="button"
-              className="menu-item"
               onClick={() => {
                 openTab(longPressMenu.href.slice(1), { background: true })
                 setLongPressMenu(null)
               }}
             >
               Open in New Tab
-            </button>
+            </MenuItem>
           </div>
         </div>
       )}

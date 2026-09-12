@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { renameThread } from '../db'
+import { Input } from 'fiber'
 
 // Inline-editable thread heading. Commits on Enter/blur (same commit-on-blur
 // idea as inspector/TaskDraft), reverts on Escape or an empty value.
@@ -45,7 +46,7 @@ export function EditableThreadTitle({ threadId, title }: { threadId: string; tit
   }
 
   return (
-    <input
+    <Input
       ref={inputRef}
       className="thread-title thread-title-input"
       value={draft}

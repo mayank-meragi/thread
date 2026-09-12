@@ -5,4 +5,12 @@ export default defineConfig({
   plugins: [react()],
   base: '/thread/',
   server: { host: '127.0.0.1' },
+  build: {
+    rollupOptions: {
+      input: {
+        thread: 'index.html',
+        fiber: 'fiber.html',
+      },
+    },
+  },
 })

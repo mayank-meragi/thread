@@ -1,3 +1,4 @@
+import { ToggleButton } from 'fiber'
 import { useMemo, useState } from 'react'
 import { Activity, Award, Clock3, Flame, TrendingUp } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -168,7 +169,7 @@ export function ExerciseDetail({ exercise }: { exercise: ExerciseProgress }) {
       {metric ? (
         <>
           <div className="exercise-metric-tabs" aria-label="Progress metric">
-            {available.map((item) => <button type="button" className={item === metric ? 'active' : ''} aria-pressed={item === metric} key={item} onClick={() => setRequestedMetric(item)}>{METRIC_LABELS[item]}</button>)}
+            {available.map((item) => <ToggleButton unstyled pressed={item === metric} type="button" className={item === metric ? 'active' : ''} key={item} onClick={() => setRequestedMetric(item)}>{METRIC_LABELS[item]}</ToggleButton>)}
           </div>
           <div className="workout-chart exercise-progress-chart" role="img" aria-label={`${METRIC_LABELS[metric]} progression for ${exercise.title}`}>
             <ResponsiveContainer width="100%" height="100%">

@@ -1,3 +1,4 @@
+import { Button, Input } from 'fiber'
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { DynamicIcon, iconFor, PERSONA_ICON_NAMES } from '../lib/icons'
@@ -36,15 +37,14 @@ export function IconPicker({ value, onChange }: { value: string; onChange: (icon
 
   return (
     <div className="icon-picker" ref={wrapRef}>
-      <button type="button" className="icon-picker-trigger" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
+      <Button unstyled type="button" className="icon-picker-trigger" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
         <DynamicIcon name={value} size={16} />
         <ChevronDown size={13} />
-      </button>
+      </Button>
       {open && (
         <div className="menu-panel icon-picker-panel" role="dialog" aria-label="Choose an icon">
-          <input
+          <Input
             autoFocus
-            className="field-control"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search icons…"
@@ -53,7 +53,7 @@ export function IconPicker({ value, onChange }: { value: string; onChange: (icon
             {filtered.map((name) => {
               const ItemIcon = iconFor(name)
               return (
-                <button
+                <Button unstyled
                   key={name}
                   type="button"
                   className={name === value ? 'is-selected' : ''}
@@ -64,7 +64,7 @@ export function IconPicker({ value, onChange }: { value: string; onChange: (icon
                   }}
                 >
                   <ItemIcon size={16} />
-                </button>
+                </Button>
               )
             })}
             {filtered.length === 0 && <p className="icon-picker-empty">No icons match.</p>}
