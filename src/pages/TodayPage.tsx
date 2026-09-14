@@ -8,7 +8,7 @@ import { MarkdownEditor } from '../components/MarkdownEditor'
 import { TodayCooking } from '../components/TodayCooking'
 import { TodayTasks } from '../components/TodayTasks'
 import { DatePicker } from '../components/DatePicker'
-import { ActionGroup, Button } from 'fiber'
+import { ActionGroup, Button, SectionHeader } from 'fiber'
 
 const INITIAL_DAYS = 14
 const LOAD_BATCH = 14
@@ -329,10 +329,10 @@ function DaySection({ date, isToday, registerSection, onActive, onChange, paramB
 
   return (
     <section ref={combinedRef} className="day-section" data-date={date}>
-      <header className="day-section-heading">
-        <div className="eyebrow">{isToday ? 'Today' : label.weekday}</div>
-        <h2>{label.weekday}, <span>{label.full}</span></h2>
-      </header>
+      <SectionHeader
+        className="day-section-heading"
+        title={<div className="day-section-title"><div className="eyebrow">{isToday ? 'Today' : label.weekday}</div><h2>{label.weekday}, <span>{label.full}</span></h2></div>}
+      />
 
       <div ref={editorWrapRef}>
         <MarkdownEditor key={date} day={date} initialValue={day.markdown} onChange={handleChange} onReady={jumpToBlock} autoFocus={isToday && captureRequested} />

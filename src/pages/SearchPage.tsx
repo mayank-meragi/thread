@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { db } from '../db'
 import { formatDay } from '../lib/dates'
 import { searchDays } from '../lib/search'
-import { SearchField } from 'fiber'
+import { SearchField, SectionHeader } from 'fiber'
 
 export function SearchPage() {
   const [query, setQuery] = useState('')
@@ -32,14 +32,14 @@ export function SearchPage() {
       />
 
       {!normalized && <>
-        <h2>Recent threads</h2>
+        <SectionHeader className="section-label" title={<h2>Recent threads</h2>} meta={threads.length} />
         <div className="thread-cards">
           {threads.map((thread) => <Link to={`/thread/${thread.id}`} key={thread.id}><span className="thread-dot" />{thread.title}</Link>)}
         </div>
       </>}
 
       {normalized && <div className="search-results">
-        <div className="section-label"><span>Journal days</span><small>{results.length}</small></div>
+        <SectionHeader className="section-label" title="Journal days" meta={results.length} />
         {results.map((day) => (
           <div className="search-result" key={day.date}>
             <small>{formatDay(day.date).weekday}, {formatDay(day.date).full}</small>

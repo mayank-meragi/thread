@@ -10,7 +10,7 @@ import { addNote, addSection, addStep, addStepToSection, convertUnsectionedSteps
 import { getRecipe } from '../lib/recipes/selectors'
 import type { RecipeIngredient } from '../lib/recipes/cooklangTokens'
 import type { RecipeSectionView, RecipeStepView } from '../lib/recipes/types'
-import { ActionGroup, Button, Input, Select, Tabs, Textarea } from 'fiber'
+import { ActionGroup, Button, Input, SectionHeader, Select, Tabs, Textarea, Tooltip } from 'fiber'
 
 type RecipePanel = 'ingredients' | 'cookware' | 'steps'
 
@@ -220,11 +220,14 @@ function SectionForm({ title, onChange, onSubmit, onCancel, saving, submitLabel 
 function SectionStepList({ section, onSave, onRemove, onAddNote, onSaveNote, onRemoveNote, onRequestAddSection, onRemoveSection, activeSectionFormId, sectionTitle, onSectionTitleChange, onSubmitSection, onCancelSection, addingSection }: { section: RecipeSectionView; onSave: (step: RecipeStepView, text: string) => Promise<void>; onRemove: (step: RecipeStepView) => void; onAddNote: (step: RecipeStepView, text: string) => Promise<void>; onSaveNote: (note: { id: string; text: string }, text: string) => Promise<void>; onRemoveNote: (note: { id: string; text: string }) => Promise<void>; onRequestAddSection: (sectionId: string) => void; onRemoveSection: (section: RecipeSectionView) => Promise<void>; activeSectionFormId: string | null; sectionTitle: string; onSectionTitleChange: (value: string) => void; onSubmitSection: () => void; onCancelSection: () => void; addingSection: boolean }) {
   return (
     <div className="recipe-section-block" data-depth={section.depth}>
-      <div className="recipe-section-heading">
-        <h3 className="recipe-section-title">{section.title}</h3>
-        <Button type="button" variant="ghost" size="sm" iconOnly className="recipe-section-add" aria-label={`Add nested section under ${section.title}`} onClick={() => onRequestAddSection(section.id)}><Plus size={15} aria-hidden="true" /></Button>
-        <Button type="button" variant="danger" size="sm" iconOnly className="recipe-section-remove" aria-label={`Delete section ${section.title}`} onClick={() => void onRemoveSection(section)}><Trash2 size={14} aria-hidden="true" /></Button>
-      </div>
+      <SectionHeader
+        className="recipe-section-heading"
+        title={<h3 className="recipe-section-title">{section.title}</h3>}
+        actions={<>
+          <Tooltip content={`Add nested section under ${section.title}`}><Button type="button" variant="ghost" size="sm" iconOnly className="recipe-section-add" aria-label={`Add nested section under ${section.title}`} onClick={() => onRequestAddSection(section.id)}><Plus size={15} aria-hidden="true" /></Button></Tooltip>
+          <Tooltip content={`Delete section ${section.title}`}><Button type="button" variant="danger" size="sm" iconOnly className="recipe-section-remove" aria-label={`Delete section ${section.title}`} onClick={() => void onRemoveSection(section)}><Trash2 size={14} aria-hidden="true" /></Button></Tooltip>
+        </>}
+      />
       {activeSectionFormId === section.id && <SectionForm title={sectionTitle} onChange={onSectionTitleChange} onSubmit={onSubmitSection} onCancel={onCancelSection} saving={addingSection} />}
       {section.notes.length > 0 && <div className="recipe-section-notes">{section.notes.map((note) => <NoteEditor key={note.id} note={note} onSave={(text) => onSaveNote(note, text)} onRemove={() => onRemoveNote(note)} />)}</div>}
       {section.steps.length > 0 && <ol className="recipe-step-list">{section.steps.map((step, index) => <StepEditor key={step.id} step={step} displayIndex={index + 1} onSave={(text) => onSave(step, text)} onRemove={() => onRemove(step)} onAddNote={(text) => onAddNote(step, text)} onSaveNote={onSaveNote} onRemoveNote={onRemoveNote} />)}</ol>}
@@ -466,14 +469,15 @@ export function RecipePage() {
       />
 
       <section id={panelId('ingredients')} className={`recipe-ingredients-panel recipe-tab-panel${activePanel === 'ingredients' ? ' is-active' : ''}`} role="tabpanel" aria-labelledby={tabId('ingredients')}>
-        <header className="recipe-panel-head">
-          <h2>Ingredients</h2>
-          <div className="recipe-servings-scaler" aria-label="Servings">
+        <SectionHeader
+          className="recipe-panel-head"
+          title={<h2>Ingredients</h2>}
+          actions={<div className="recipe-servings-scaler" aria-label="Servings">
             <Button variant="ghost" size="sm" iconOnly onClick={() => changeServings(servings - 1)} aria-label="Fewer servings"><Minus size={14} aria-hidden="true" /></Button>
             <span>{servings} serving{servings === 1 ? '' : 's'}</span>
             <Button variant="ghost" size="sm" iconOnly onClick={() => changeServings(servings + 1)} aria-label="More servings"><Plus size={14} aria-hidden="true" /></Button>
-          </div>
-        </header>
+          </div>}
+        />
         {recipe.ingredients.length ? (
           <IngredientTotals ingredients={recipe.ingredients} sections={recipe.sections} unsectionedSteps={recipe.unsectionedSteps} scaleFactor={scaleFactor} />
         ) : (
@@ -482,7 +486,7 @@ export function RecipePage() {
       </section>
 
       <section id={panelId('cookware')} className={`recipe-cookware-panel recipe-tab-panel${activePanel === 'cookware' ? ' is-active' : ''}`} role="tabpanel" aria-labelledby={tabId('cookware')}>
-        <h2>Cookware</h2>
+        <SectionHeader className="recipe-panel-head" title={<h2>Cookware</h2>} />
         {recipe.cookware.length ? (
           <CookwareTotals cookware={recipe.cookware} sections={recipe.sections} unsectionedSteps={recipe.unsectionedSteps} />
         ) : (
@@ -491,15 +495,12 @@ export function RecipePage() {
       </section>
 
       <section id={panelId('steps')} className={`recipe-steps-panel recipe-tab-panel${activePanel === 'steps' ? ' is-active' : ''}`} role="tabpanel" aria-labelledby={tabId('steps')}>
-        <div className="recipe-panel-title-row">
-          <h2>Steps</h2>
-          <Button type="button" variant="outline" size="sm" onClick={() => openSectionForm('')}><Plus size={14} aria-hidden="true" /> Add section</Button>
-        </div>
+        <SectionHeader className="recipe-panel-title-row" title={<h2>Steps</h2>} actions={<Button type="button" variant="outline" size="sm" onClick={() => openSectionForm('')}><Plus size={14} aria-hidden="true" /> Add section</Button>} />
         {newSectionParentId === '' && <SectionForm title={newSectionTitle} onChange={setNewSectionTitle} onSubmit={() => void submitNewSection()} onCancel={() => { setNewSectionParentId(null); setNewSectionTitle('') }} saving={addingSection} />}
         {recipe.steps.length || recipe.sections.length || recipe.unsectionedNotes.length ? (
           <>
             {recipe.sections.map((section) => <SectionStepList key={section.id} section={section} onSave={(step, text) => updateStep(threadId, step.index, text)} onRemove={(step) => void removeStep(threadId, step.index)} onAddNote={addNoteToStep} onSaveNote={saveRecipeNote} onRemoveNote={deleteRecipeNote} onRequestAddSection={openSectionForm} onRemoveSection={deleteRecipeSection} activeSectionFormId={newSectionParentId} sectionTitle={newSectionTitle} onSectionTitleChange={setNewSectionTitle} onSubmitSection={() => void submitNewSection()} onCancelSection={() => { setNewSectionParentId(null); setNewSectionTitle('') }} addingSection={addingSection} />)}
-            {recipe.unsectionedSteps.length > 0 && <div className="recipe-section-block recipe-section-ungrouped"><div className="recipe-section-heading"><h3 className="recipe-section-title">General steps</h3><Button type="button" variant="outline" size="sm" className="recipe-section-convert" onClick={openConvertOtherSteps}>Convert to section</Button></div>{convertingOtherSteps && <SectionForm title={newSectionTitle} onChange={setNewSectionTitle} onSubmit={() => void submitConvertOtherSteps()} onCancel={() => { setConvertingOtherSteps(false); setNewSectionTitle('') }} saving={addingSection} submitLabel="Convert to section" savingLabel="Converting…" />}<ol className="recipe-step-list">{recipe.unsectionedSteps.map((step, index) => <StepEditor key={step.id} step={step} displayIndex={index + 1} onSave={(text) => updateStep(threadId, step.index, text)} onRemove={() => void removeStep(threadId, step.index)} onAddNote={(text) => addNoteToStep(step, text)} onSaveNote={saveRecipeNote} onRemoveNote={deleteRecipeNote} />)}</ol></div>}
+            {recipe.unsectionedSteps.length > 0 && <div className="recipe-section-block recipe-section-ungrouped"><SectionHeader className="recipe-section-heading" title={<h3 className="recipe-section-title">General steps</h3>} actions={<Button type="button" variant="outline" size="sm" className="recipe-section-convert" onClick={openConvertOtherSteps}>Convert to section</Button>} />{convertingOtherSteps && <SectionForm title={newSectionTitle} onChange={setNewSectionTitle} onSubmit={() => void submitConvertOtherSteps()} onCancel={() => { setConvertingOtherSteps(false); setNewSectionTitle('') }} saving={addingSection} submitLabel="Convert to section" savingLabel="Converting…" />}<ol className="recipe-step-list">{recipe.unsectionedSteps.map((step, index) => <StepEditor key={step.id} step={step} displayIndex={index + 1} onSave={(text) => updateStep(threadId, step.index, text)} onRemove={() => void removeStep(threadId, step.index)} onAddNote={(text) => addNoteToStep(step, text)} onSaveNote={saveRecipeNote} onRemoveNote={deleteRecipeNote} />)}</ol></div>}
             {recipe.unsectionedNotes.length > 0 && <div className="recipe-section-notes">{recipe.unsectionedNotes.map((note) => <NoteEditor key={note.id} note={note} onSave={(text) => saveRecipeNote(note, text)} onRemove={() => deleteRecipeNote(note)} />)}</div>}
           </>
         ) : (

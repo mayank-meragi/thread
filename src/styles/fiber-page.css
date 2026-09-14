@@ -32,6 +32,11 @@
 .fiber-demo-label { color: var(--muted); font: 500 var(--text-meta) var(--font-mono); letter-spacing: .04em; text-transform: uppercase; }
 .fiber-detail-note { max-width: 570px; margin: 0; padding-top: 12px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: var(--text-sm); line-height: 1.5; }
 .fiber-button-row, .fiber-icon-row, .fiber-chip-row, .fiber-spinner-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.fiber-list-demo { max-width: 680px; border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
+.fiber-list-demo .list-row-trailing .btn { flex: 0 0 auto; }
+.fiber-tooltip-demo { display: flex; align-items: center; gap: 14px; min-height: 72px; padding: 18px; overflow: visible; }
+.fiber-section-header-demo { max-width: 680px; }
+.fiber-section-header-demo .section-header-title h3 { margin: 0; color: inherit; font: inherit; }
 .fiber-check-demo { display: grid; gap: 11px; max-width: 460px; }
 .fiber-icon-row { min-height: 48px; }
 .fiber-state-note { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: var(--text-meta); }

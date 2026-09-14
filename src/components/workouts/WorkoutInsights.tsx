@@ -1,4 +1,4 @@
-import { SegmentedControl } from 'fiber'
+import { SectionHeader, SegmentedControl } from 'fiber'
 import { useMemo, useState } from 'react'
 import { Activity, Award, Clock3, Flame, TrendingUp } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -73,10 +73,12 @@ export function WeeklyTrainingChart({ insights }: { insights: Insights }) {
   const populated = insights.weekly.some((point) => point.workouts > 0)
   return (
     <section className="workout-insight-panel workout-weekly-panel">
-      <header className="workout-panel-head">
-        <div><h2>Training pulse</h2><p>Completed sessions by week</p></div>
-        <strong>{insights.summary.completedWorkouts}</strong>
-      </header>
+      <SectionHeader
+        className="workout-panel-head"
+        title={<h2>Training pulse</h2>}
+        description="Completed sessions by week"
+        meta={insights.summary.completedWorkouts}
+      />
       {populated ? (
         <>
           <div className="workout-chart" role="img" aria-label="Line chart of completed workouts per week">
@@ -100,7 +102,7 @@ export function WeeklyTrainingChart({ insights }: { insights: Insights }) {
 export function RecentPrs({ insights }: { insights: Insights }) {
   return (
     <section className="workout-insight-panel">
-      <header className="workout-panel-head"><div><h2>Recent records</h2><p>Strict improvements after your baseline</p></div><Award size={19} aria-hidden="true" /></header>
+      <SectionHeader className="workout-panel-head" title={<h2>Recent records</h2>} description="Strict improvements after your baseline" actions={<Award size={19} aria-hidden="true" />} />
       {insights.prs.length ? (
         <div className="workout-pr-list">
           {insights.prs.slice(0, 6).map((pr) => (
@@ -121,7 +123,7 @@ export function MuscleDistribution({ insights }: { insights: Insights }) {
   if (!insights.muscles.length) {
     return (
       <section className="workout-insight-panel">
-        <header className="workout-panel-head"><div><h2>Muscle distribution</h2><p>Based on completed sets</p></div></header>
+        <SectionHeader className="workout-panel-head" title={<h2>Muscle distribution</h2>} description="Based on completed sets" />
         <p className="workout-panel-empty">Add primary muscles to exercise guides to see training distribution.</p>
       </section>
     )
@@ -129,7 +131,7 @@ export function MuscleDistribution({ insights }: { insights: Insights }) {
   const data = insights.muscles.slice(0, 8).map((item) => ({ ...item, label: item.classified ? (MUSCLE_LABELS.get(item.muscle) ?? item.muscle) : 'Unclassified' }))
   return (
     <section className="workout-insight-panel">
-      <header className="workout-panel-head"><div><h2>Muscle distribution</h2><p>Share of completed sets</p></div></header>
+      <SectionHeader className="workout-panel-head" title={<h2>Muscle distribution</h2>} description="Share of completed sets" />
       <div className="workout-muscle-chart" role="img" aria-label="Bar chart showing completed sets by primary muscle">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} layout="vertical" margin={{ top: 0, right: 12, bottom: 0, left: 4 }} accessibilityLayer>
@@ -162,10 +164,12 @@ export function ExerciseDetail({ exercise }: { exercise: ExerciseProgress }) {
   const data = exercise.points.map((point) => ({ ...point, value: metric ? progressMetricValue(point, metric) : undefined }))
   return (
     <section className="exercise-progress-detail" aria-labelledby="exercise-progress-title">
-      <header>
-        <div><h2 id="exercise-progress-title">{exercise.title}</h2><p>{exercise.sessions} sessions · {exercise.completedSets} completed sets</p></div>
-        <Link to={`/thread/${exercise.id}`}>Open thread</Link>
-      </header>
+      <SectionHeader
+        className="exercise-progress-header"
+        title={<h2 id="exercise-progress-title">{exercise.title}</h2>}
+        description={`${exercise.sessions} sessions · ${exercise.completedSets} completed sets`}
+        actions={<Link to={`/thread/${exercise.id}`}>Open thread</Link>}
+      />
       {metric ? (
         <>
           <SegmentedControl className="exercise-metric-tabs" density="compact" aria-label="Progress metric" value={metric} onValueChange={(value) => setRequestedMetric(value as StrengthMetric)} options={available.map((item) => ({ value: item, label: METRIC_LABELS[item] }))} />
@@ -184,7 +188,7 @@ export function ExerciseDetail({ exercise }: { exercise: ExerciseProgress }) {
         </>
       ) : <p className="workout-panel-empty">Record load or reps on completed sets to see progression.</p>}
       <div className="exercise-recent-sets">
-        <h3>Recent sets</h3>
+        <SectionHeader className="exercise-recent-sets-header" title={<h3>Recent sets</h3>} />
         {exercise.recentSets.map((set) => (
           <div key={set.id} className="exercise-recent-set-row">
             <time dateTime={set.day}>{set.day}</time>

@@ -7,7 +7,7 @@ import { elapsedMs, formatDuration, tallySets } from '../../lib/workouts/present
 import type { WorkoutRole } from '../../lib/workouts/systemTags'
 import type { WorkoutView } from '../../lib/workouts/types'
 import { SetEditor } from '../workouts/SetEditor'
-import { Button, Input } from 'fiber'
+import { Button, Input, SectionHeader } from 'fiber'
 
 function toLocalInput(value: PropertyValue | undefined): string {
   if (typeof value !== 'string') return ''
@@ -68,7 +68,7 @@ function WorkoutSection({
 
   return (
     <section className="inspector-section">
-      <div className="inspector-section-title"><span><Dumbbell size={14} aria-hidden="true" /> Workout</span></div>
+      <SectionHeader title={<><Dumbbell size={14} aria-hidden="true" /> Workout</>} />
       <a className="inspector-workout-link" href={`#/workout/${task.day}/${task.id}`} onClick={onNavigate}>
         <ExternalLink size={13} aria-hidden="true" /> Open workout
       </a>
@@ -105,7 +105,7 @@ function ExerciseSection({
 
   return (
     <section className="inspector-section">
-      <div className="inspector-section-title"><span><Dumbbell size={14} aria-hidden="true" /> Exercise</span></div>
+      <SectionHeader title={<><Dumbbell size={14} aria-hidden="true" /> Exercise</>} />
       {view?.exerciseThread && (
         <a className="inspector-workout-link" href={`#/thread/${view.exerciseThread.id}`} onClick={onNavigate}>
           <GitBranch size={13} aria-hidden="true" /> {view.exerciseThread.title}
@@ -134,7 +134,7 @@ function SetSection({
 }) {
   return (
     <section className="inspector-section">
-      <div className="inspector-section-title"><span><Dumbbell size={14} aria-hidden="true" /> Set measurements</span></div>
+      <SectionHeader title={<><Dumbbell size={14} aria-hidden="true" /> Set measurements</>} />
       <SetEditor key={task.id} setTaskId={task.id} properties={values} />
       <OpenWorkoutLink workout={workout} onNavigate={onNavigate} />
     </section>

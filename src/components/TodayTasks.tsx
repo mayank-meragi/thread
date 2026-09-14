@@ -1,4 +1,4 @@
-import { Button } from 'fiber'
+import { Button, ListRow, SectionHeader } from 'fiber'
 import { useState } from 'react'
 import { CalendarClock, Check, ChevronRight } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -28,13 +28,12 @@ export function TodayTasks({ today }: TodayTasksProps) {
 
   return (
     <section className="today-tasks" aria-labelledby="today-tasks-heading">
-      <header className="today-tasks-heading">
-        <div>
-          <div className="eyebrow">Across your journal</div>
-          <h2 id="today-tasks-heading">Tasks</h2>
-        </div>
-        <CalendarClock size={18} />
-      </header>
+      <SectionHeader
+        className="today-tasks-heading"
+        title={<h2 id="today-tasks-heading">Tasks</h2>}
+        description="Across your journal"
+        actions={<CalendarClock size={18} aria-hidden="true" />}
+      />
 
       {overdue.length > 0 && <TaskGroup title="Overdue" tasks={overdue} tone="overdue" />}
       <TaskGroup title="Due today" tasks={dueToday} tone="today" empty="Nothing due today" />
@@ -71,24 +70,26 @@ function TaskGroup({
         <small>{tasks.length}</small>
       </Button>
       {collapsed ? null : tasks.length ? tasks.map((task) => (
-        <div className="today-task-row" key={task.id}>
-          <Button unstyled
+        <ListRow
+          className="today-task-row"
+          key={task.id}
+          leading={<Button unstyled
             type="button"
             className={isDone ? 'task-check is-checked' : 'task-check'}
             aria-label={isDone ? `Mark ${task.text} not done` : `Complete ${task.text}`}
             onClick={() => void setTaskStatus(task.id, isDone ? 'not_started' : 'done')}
           >
             <Check size={12} />
-          </Button>
-          <Link className={isDone ? 'today-task-text is-done' : 'today-task-text'} to={`/?date=${task.day}&block=${task.blockId}`}>{task.text}</Link>
-          <span className="today-task-meta">
+          </Button>}
+          title={<Link className={isDone ? 'today-task-text is-done' : 'today-task-text'} to={`/?date=${task.day}&block=${task.blockId}`}>{task.text}</Link>}
+          trailing={<span className="today-task-meta">
             {isDone
               ? task.completedAt && <time dateTime={task.completedAt}>{formatTaskTime(task.completedAt)}</time>
               : <time dateTime={task.dueDate}>{formatTaskDate(task.dueDate!)}</time>}
             {task.priority && <span className={`priority-chip priority-${task.priority}`}>{capitalize(task.priority)}</span>}
             {task.totalSubtasks > 0 && <span>{task.completedSubtasks}/{task.totalSubtasks}</span>}
-          </span>
-        </div>
+          </span>}
+        />
       )) : <div className="task-group-empty">{empty}</div>}
     </div>
   )

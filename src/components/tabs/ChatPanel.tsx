@@ -1,4 +1,4 @@
-import { Button } from 'fiber'
+import { Button, Tooltip } from 'fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Copy, History, Plus, RotateCcw, Square } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -283,23 +283,25 @@ function PersonaChat({
       <div className="chat-panel-header">
         <PersonaSwitcher personas={personas} activePersonaId={personaId} onChange={onChangePersona} />
         <div className="chat-panel-header-actions">
-          <ThreadListPrimitive.New
-            className="header-action"
-            aria-label="New session"
-            title="New session"
-            onClick={() => setView('chat')}
-          >
-            <Plus size={15} />
-          </ThreadListPrimitive.New>
-          <Button unstyled
-            type="button"
-            className={view === 'history' ? 'header-action active' : 'header-action'}
-            aria-label="Session history"
-            title="Session history"
-            onClick={() => setView((current) => (current === 'history' ? 'chat' : 'history'))}
-          >
-            <History size={15} />
-          </Button>
+          <Tooltip content="New session">
+            <ThreadListPrimitive.New
+              className="header-action"
+              aria-label="New session"
+              onClick={() => setView('chat')}
+            >
+              <Plus size={15} />
+            </ThreadListPrimitive.New>
+          </Tooltip>
+          <Tooltip content="Session history">
+            <Button unstyled
+              type="button"
+              className={view === 'history' ? 'header-action active' : 'header-action'}
+              aria-label="Session history"
+              onClick={() => setView((current) => (current === 'history' ? 'chat' : 'history'))}
+            >
+              <History size={15} />
+            </Button>
+          </Tooltip>
         </div>
       </div>
       <div className="chat-panel-body">

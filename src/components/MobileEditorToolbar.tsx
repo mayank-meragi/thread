@@ -61,7 +61,6 @@ export function MobileEditorToolbar({ visible, top, activeKind, onAction }: Mobi
               pressed={action === 'indent' || action === 'outdent' || action === 'wikilink' ? undefined : pressed}
               className={`${groupStart ? 'group-start ' : ''}toolbar-${action}`}
               aria-label={label}
-              title={label}
               onPointerDown={(event) => {
                 event.preventDefault()
                 event.stopPropagation()

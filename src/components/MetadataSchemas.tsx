@@ -14,7 +14,7 @@ import {
 } from '../db'
 import { DEFAULT_TAG_COLOR } from '../lib/tagColors'
 import { isWorkoutSystemTag } from '../lib/workouts/systemTags'
-import { Button, Checkbox, Input, Select } from 'fiber'
+import { Button, Checkbox, Input, SectionHeader, Select } from 'fiber'
 
 const FIELD_TYPES: Array<{ value: PropertyType; label: string }> = [
   { value: 'text', label: 'Text' },
@@ -40,10 +40,11 @@ export function MetadataSchemas() {
 
   return (
     <section className="settings-card schema-settings-card">
-      <div className="settings-title">
-        <Sparkles size={20} />
-        <div><h2>Metadata schemas</h2><p>Turn a tag into a reusable set of fields. Applying it to any block adds the schema and its defaults.</p></div>
-      </div>
+      <SectionHeader
+        className="settings-title schema-card-header"
+        title={<><Sparkles size={20} aria-hidden="true" /><h2>Metadata schemas</h2></>}
+        description="Turn a tag into a reusable set of fields. Applying it to any block adds the schema and its defaults."
+      />
 
       <form className="schema-create" onSubmit={(event) => {
         event.preventDefault()

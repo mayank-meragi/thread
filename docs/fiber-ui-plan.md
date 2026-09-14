@@ -58,7 +58,31 @@ SearchField is now the shared recipe for the main Search page, task and workout
 filters, recipe search, and icon-picker filtering. Its affordances stay inside
 the control while each surface keeps its own sizing and layout rules.
 
-## Phase 4 status — segmented choices started
+## Phase 4 status — component migration in progress
+
+### Migration order
+
+Thread will replace legacy patterns one Fiber component at a time. The active
+sequence is:
+
+1. `SectionHeader` — migrate recurring section headings first, including
+   settings, task groups and board columns, workout insight panels, journal day
+   headings, inspector sections, and recipe panels. Remove the corresponding
+   legacy heading selectors after the surface is verified.
+2. `ListRow` — migrate dense, repeated rows next, including task, workout,
+   exercise, and other list surfaces that fit the shared slot contract. Remove
+   the legacy row markup/styles only after every in-scope consumer is covered.
+3. `Tooltip` — replace native `title` bubbles for icon actions and abbreviated
+   metadata. Keep native titles only where they are the only practical
+   explanation for a disabled control or non-interactive element.
+
+For each component, completion requires a repository-wide usage search, visual
+and responsive review, keyboard/accessibility checks, passing tests and build,
+and removal of unused legacy styles. The next component does not start until
+that checklist is complete.
+
+The `SectionHeader` slice is complete for the in-scope recurring headings;
+the next active migration is `ListRow`.
 
 `SegmentedControl` is now available in Fiber with one selected value, native
 radio semantics, and Arrow/Home/End keyboard movement. Workout insight range
@@ -72,6 +96,20 @@ their existing responsive presentation remains intact.
 `ActionGroup` now supplies shared spacing and wrapping for related commands.
 Feeds, Recipes, Meal Plan, and Today compose it in their headers while keeping
 button emphasis and page-specific responsive rules local.
+
+`SectionHeader` now owns compact section hierarchy and optional metadata or
+actions. Settings, task groups and board columns, workout insight panels,
+journal day headings, inspector sections, and recipe panels use the shared
+alignment contract while retaining their existing content and spacing.
+
+`ListRow` is now available for dense, scannable content with leading/status,
+description, metadata, selection, and trailing-action slots. The Workouts,
+Today tasks, and workout overview rows use it while preserving their existing
+responsive layout and link behavior.
+
+`Tooltip` now provides short, accessible context on hover and keyboard focus.
+The Fiber gallery demonstrates its placement contract, while icon actions,
+abbreviated metadata, and native title bubbles in migrated surfaces use it.
 
 ## Agreed decisions
 

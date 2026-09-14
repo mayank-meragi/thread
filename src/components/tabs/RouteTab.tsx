@@ -1,4 +1,4 @@
-import { Button, IconButton, MenuItem } from 'fiber'
+import { Button, IconButton, MenuItem, Tooltip } from 'fiber'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
@@ -89,33 +89,36 @@ export function RouteTab({ params, api, containerApi }: IDockviewPanelHeaderProp
                 top: Math.min(menu.y, window.innerHeight - 190),
               }}
             >
-              <MenuItem
-                type="button"
-                role="menuitem"
-                disabled={!splittable}
-                title={splittable ? undefined : 'A split needs at least two tabs in this group'}
-                onClick={() => runAction(() => void splitPanel(containerApi, api.id, 'right'))}
-              >
-                Split right
-              </MenuItem>
-              <MenuItem
-                type="button"
-                role="menuitem"
-                disabled={!splittable}
-                title={splittable ? undefined : 'A split needs at least two tabs in this group'}
-                onClick={() => runAction(() => void splitPanel(containerApi, api.id, 'below'))}
-              >
-                Split below
-              </MenuItem>
-              <MenuItem
-                type="button"
-                role="menuitem"
-                disabled={!movable}
-                title={movable ? undefined : 'No other group to move this tab to'}
-                onClick={() => runAction(() => void moveToNextGroup(containerApi, api.id))}
-              >
-                Move to next group
-              </MenuItem>
+              <Tooltip content={splittable ? null : 'A split needs at least two tabs in this group'}>
+                <MenuItem
+                  type="button"
+                  role="menuitem"
+                  disabled={!splittable}
+                  onClick={() => runAction(() => void splitPanel(containerApi, api.id, 'right'))}
+                >
+                  Split right
+                </MenuItem>
+              </Tooltip>
+              <Tooltip content={splittable ? null : 'A split needs at least two tabs in this group'}>
+                <MenuItem
+                  type="button"
+                  role="menuitem"
+                  disabled={!splittable}
+                  onClick={() => runAction(() => void splitPanel(containerApi, api.id, 'below'))}
+                >
+                  Split below
+                </MenuItem>
+              </Tooltip>
+              <Tooltip content={movable ? null : 'No other group to move this tab to'}>
+                <MenuItem
+                  type="button"
+                  role="menuitem"
+                  disabled={!movable}
+                  onClick={() => runAction(() => void moveToNextGroup(containerApi, api.id))}
+                >
+                  Move to next group
+                </MenuItem>
+              </Tooltip>
               {closable && (
                 <>
                   <div className="menu-divider link-context-divider" />

@@ -9,13 +9,16 @@ import { Field } from './Field'
 import { FormLayout } from './FormLayout'
 import { Input } from './Input'
 import { MenuItem } from './MenuItem'
+import { ListRow } from './ListRow'
 import { RadioGroup } from './RadioGroup'
 import { SearchField } from './SearchField'
 import { SegmentedControl } from './SegmentedControl'
+import { SectionHeader } from './SectionHeader'
 import { Select } from './Select'
 import { Spinner } from './Spinner'
 import { Tabs } from './Tabs'
 import { Textarea } from './Textarea'
+import { Tooltip } from './Tooltip'
 
 describe('Fiber primitive contracts', () => {
   it('keeps a loading button label visible while exposing busy state', () => {
@@ -169,5 +172,60 @@ describe('Fiber primitive contracts', () => {
     expect(markup).toContain('data-density="compact"')
     expect(markup).toContain('Save')
     expect(markup).toContain('Cancel')
+  })
+
+  it('renders dense rows with slots and native activation semantics', () => {
+    const markup = renderToStaticMarkup(
+      <ListRow
+        title="Review notes"
+        description="Capture the decision and next action."
+        meta={<time dateTime="2026-09-14">Today</time>}
+        status="In progress"
+        leading="•"
+        trailing="Open"
+        selected
+        density="compact"
+        onActivate={() => undefined}
+      />,
+    )
+
+    expect(markup).toContain('list-row list-row-interactive is-selected')
+    expect(markup).toContain('data-density="compact"')
+    expect(markup).toContain('list-row-status')
+    expect(markup).toContain('Review notes')
+    expect(markup).toContain('<button')
+  })
+
+  it('describes tooltip triggers without replacing their native semantics', () => {
+    const markup = renderToStaticMarkup(
+      <Tooltip content="Hide the context panel" side="right">
+        <button type="button" aria-label="Hide context panel">×</button>
+      </Tooltip>,
+    )
+
+    expect(markup).toContain('class="tooltip"')
+    expect(markup).toContain('data-side="right"')
+    expect(markup).toContain('role="tooltip"')
+    expect(markup).toContain('aria-describedby="fiber-tooltip-')
+    expect(markup).toContain('class="tooltip-trigger"')
+  })
+
+  it('keeps section titles, metadata, and actions in one alignment contract', () => {
+    const markup = renderToStaticMarkup(
+      <SectionHeader
+        title={<h3>Subtasks</h3>}
+        description="Keep the next action visible."
+        meta="3"
+        actions={<Button size="sm">Add</Button>}
+        density="compact"
+      />,
+    )
+
+    expect(markup).toContain('class="section-header"')
+    expect(markup).toContain('data-density="compact"')
+    expect(markup).toContain('section-header-description')
+    expect(markup).toContain('section-header-meta')
+    expect(markup).toContain('section-header-actions')
+    expect(markup).toContain('<h3>Subtasks</h3>')
   })
 })

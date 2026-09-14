@@ -1,4 +1,4 @@
-import { Button } from 'fiber'
+import { Button, Tooltip } from 'fiber'
 import { AlertTriangle, Cloud, CloudOff } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { GitHubSyncProgress } from '../../lib/github'
@@ -25,24 +25,24 @@ export function RailSyncIndicator({
   onRefresh,
 }: RailSyncIndicatorProps) {
   if (!connected) {
-    return <Link to="/settings?focus=sync" className="rail-sync" aria-label="Local only. Notes are saved on this device. Connect GitHub sync." title="Local only"><CloudOff size={16} /></Link>
+    return <Tooltip content="Local only"><Link to="/settings?focus=sync" className="rail-sync" aria-label="Local only. Notes are saved on this device. Connect GitHub sync."><CloudOff size={16} /></Link></Tooltip>
   }
   if (conflicts > 0 || error) {
     const detail = conflicts > 0 ? `${conflicts} ${conflicts === 1 ? 'conflict' : 'conflicts'} to resolve` : 'Sync could not finish'
-    return <Link to="/settings?focus=sync" className="rail-sync rail-sync-alert" aria-label={`Needs attention. ${detail}. Open sync settings.`} title="Needs attention"><AlertTriangle size={16} /></Link>
+    return <Tooltip content="Needs attention"><Link to="/settings?focus=sync" className="rail-sync rail-sync-alert" aria-label={`Needs attention. ${detail}. Open sync settings.`}><AlertTriangle size={16} /></Link></Tooltip>
   }
   if (progress.phase === 'backing-off') {
     const until = progress.retryAt ? new Date(progress.retryAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'shortly'
-    return <Link to="/settings?focus=sync" className="rail-sync rail-sync-alert" aria-label={`GitHub sync paused until ${until}. Open sync settings.`} title={`Sync paused until ${until}`}><AlertTriangle size={16} /></Link>
+    return <Tooltip content={`Sync paused until ${until}`}><Link to="/settings?focus=sync" className="rail-sync rail-sync-alert" aria-label={`GitHub sync paused until ${until}. Open sync settings.`}><AlertTriangle size={16} /></Link></Tooltip>
   }
   if (syncing) {
     const detail = progress.phase === 'catching-up' && progress.totalFiles
       ? `Catching up ${progress.processedFiles ?? 0} of ${progress.totalFiles}`
       : 'Checking GitHub'
-    return <div className="rail-sync rail-sync-busy" role="status" aria-live="polite" title={detail} aria-label={detail}><Cloud size={16} /></div>
+    return <Tooltip content={detail}><div className="rail-sync rail-sync-busy" role="status" aria-live="polite" aria-label={detail}><Cloud size={16} /></div></Tooltip>
   }
   if (pending > 0) {
-    return <Button unstyled type="button" className="rail-sync rail-sync-pending" onClick={onSync} aria-label={`Pending. ${pending} ${pending === 1 ? 'change' : 'changes'} waiting. Sync now.`} title="Pending changes"><Cloud size={16} /></Button>
+    return <Tooltip content="Pending changes"><Button unstyled type="button" className="rail-sync rail-sync-pending" onClick={onSync} aria-label={`Pending. ${pending} ${pending === 1 ? 'change' : 'changes'} waiting. Sync now.`}><Cloud size={16} /></Button></Tooltip>
   }
-  return <Button unstyled type="button" className="rail-sync" onClick={onRefresh} aria-label="Up to date. Refresh all data from GitHub now." title="Refresh from GitHub"><Cloud size={16} /></Button>
+  return <Tooltip content="Refresh from GitHub"><Button unstyled type="button" className="rail-sync" onClick={onRefresh} aria-label="Up to date. Refresh all data from GitHub now."><Cloud size={16} /></Button></Tooltip>
 }

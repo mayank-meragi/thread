@@ -13,17 +13,20 @@ import {
   FormLayout,
   IconButton,
   Input,
+  ListRow,
   MenuItem,
   RadioGroup,
   SearchField,
   SegmentedControl,
   Select,
+  SectionHeader,
   Spinner,
   Status,
   Tabs,
   Tag,
   Textarea,
   Token,
+  Tooltip,
   ToggleButton,
   type ButtonVariant,
 } from 'fiber'
@@ -44,6 +47,9 @@ const COMPONENTS = [
   { id: 'segmented-control', label: 'SegmentedControl', group: 'Navigation', description: 'Mutually exclusive choices with native radio semantics and predictable arrow-key movement.' },
   { id: 'tabs', label: 'Tabs', group: 'Navigation', description: 'Panel navigation with one selected tab, one focus stop, and explicit tab-to-panel relationships.' },
   { id: 'action-group', label: 'ActionGroup', group: 'Actions', description: 'A single spacing contract for related commands without hiding their priority or meaning.' },
+  { id: 'list-row', label: 'ListRow', group: 'Rows', description: 'A dense row recipe for scannable titles, metadata, status, and trailing actions.' },
+  { id: 'tooltip', label: 'Tooltip', group: 'Feedback', description: 'Quiet hover and focus context for icon actions and abbreviated metadata.' },
+  { id: 'section-header', label: 'SectionHeader', group: 'Rows', description: 'Compact section hierarchy with optional description, metadata, and actions.' },
   { id: 'button-link', label: 'ButtonLink', group: 'Navigation', description: 'Router-aware navigation that carries the same visual language as a button.' },
   { id: 'icon-button', label: 'IconButton', group: 'Compact action', description: 'An icon-only action with a consistent hit target and an explicit accessible label.' },
   { id: 'toggle-button', label: 'ToggleButton', group: 'Stateful action', description: 'A pressed-state button for view modes, filters, and persistent choices.' },
@@ -278,6 +284,34 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
             <p className="fiber-detail-note">ActionGroup owns rhythm and wrapping; each action still carries its own emphasis, label, and native behavior.</p>
           </div>
         )
+      case 'list-row':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Dense content rows</span>
+              <div className="fiber-list-demo">
+                <ListRow
+                  leading={<CircleDot size={14} />}
+                  title="Review the launch notes"
+                  status="In progress"
+                  description="Capture the final decision and the next action."
+                  meta={<><span>Today</span><span>3 comments</span></>}
+                  trailing={<Button variant="ghost" size="sm">Open</Button>}
+                  selected
+                />
+                <ListRow
+                  leading={<Check size={14} />}
+                  title="Archive the old draft"
+                  description="A quieter row keeps the list easy to scan."
+                  meta={<span>Yesterday</span>}
+                  trailing={<span className="fiber-state-note">Done</span>}
+                  density="compact"
+                />
+              </div>
+            </div>
+            <p className="fiber-detail-note">ListRow owns alignment, density, selection, and focus treatment. Use the interactive form for a single-action row; keep trailing controls in a static row to avoid nested buttons.</p>
+          </div>
+        )
       case 'button-link':
         return (
           <div className="fiber-detail-content">
@@ -359,6 +393,40 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
               <div className="fiber-spinner-row"><Spinner size={18} /><Spinner size={24} label="Syncing workspace" /></div>
             </div>
             <p className="fiber-detail-note">Spinner announces itself as a status and works at multiple sizes without changing surrounding layout.</p>
+          </div>
+        )
+      case 'tooltip':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Context on hover or focus</span>
+              <div className="fiber-tooltip-demo">
+                <Tooltip content="Add a new item">
+                  <IconButton aria-label="Add a new item"><Plus size={17} /></IconButton>
+                </Tooltip>
+                <Tooltip content="This action keeps the current view open." side="right">
+                  <Button variant="outline">Keep this view</Button>
+                </Tooltip>
+              </div>
+            </div>
+            <p className="fiber-detail-note">Tooltip adds short context to a native trigger on pointer hover and keyboard focus. Use it for icon actions or abbreviated metadata, not for essential instructions.</p>
+          </div>
+        )
+      case 'section-header':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Quiet hierarchy</span>
+              <div className="fiber-section-header-demo">
+                <SectionHeader
+                  title={<h3>Workout history</h3>}
+                  description="Review recent sessions and keep the next one moving."
+                  meta="8 sessions"
+                  actions={<Button variant="outline" size="sm">View all</Button>}
+                />
+              </div>
+            </div>
+            <p className="fiber-detail-note">SectionHeader aligns a section’s title, supporting description, metadata, and actions without adding a decorative eyebrow or a second wrapper recipe.</p>
           </div>
         )
       case 'empty-state':

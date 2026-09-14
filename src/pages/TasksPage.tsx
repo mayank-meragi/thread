@@ -10,7 +10,7 @@ import { TaskRow, type TaskDisplayMode } from '../components/TaskRow'
 import { TaskBoard } from '../components/TaskBoard'
 import { TaskFilterPopover, type TaskFilterKey } from '../components/TaskFilterPopover'
 import { Chip } from 'fiber'
-import { Button, Input, SearchField, SegmentedControl, Select } from 'fiber'
+import { Button, Input, SearchField, SectionHeader, SegmentedControl, Select } from 'fiber'
 import { isWorkoutRole, workoutRolesByBlockId } from '../lib/workouts/integration'
 import { cookRolesByBlockId, isCookRole } from '../lib/recipes/integration'
 
@@ -257,7 +257,7 @@ export function TasksPage() {
       ) : (
         <>
           {groups.map((group) => <section className={`task-list-group group-${group.id}`} key={group.id}>
-            <header><span>{group.label}</span><small>{group.tasks.length}</small></header>
+            <SectionHeader title={group.label} meta={group.tasks.length} />
             <div>
               {group.tasks.map((task) => <TaskBranch
                 key={task.id}

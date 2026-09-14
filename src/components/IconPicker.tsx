@@ -1,4 +1,4 @@
-import { Button, SearchField } from 'fiber'
+import { Button, SearchField, Tooltip } from 'fiber'
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { DynamicIcon, iconFor, PERSONA_ICON_NAMES } from '../lib/icons'
@@ -54,18 +54,19 @@ export function IconPicker({ value, onChange }: { value: string; onChange: (icon
             {filtered.map((name) => {
               const ItemIcon = iconFor(name)
               return (
-                <Button unstyled
-                  key={name}
-                  type="button"
-                  className={name === value ? 'is-selected' : ''}
-                  title={name}
-                  onClick={() => {
-                    onChange(name)
-                    setOpen(false)
-                  }}
-                >
-                  <ItemIcon size={16} />
-                </Button>
+                <Tooltip key={name} content={name}>
+                  <Button unstyled
+                    type="button"
+                    className={name === value ? 'is-selected' : ''}
+                    aria-label={name}
+                    onClick={() => {
+                      onChange(name)
+                      setOpen(false)
+                    }}
+                  >
+                    <ItemIcon size={16} />
+                  </Button>
+                </Tooltip>
               )
             })}
             {filtered.length === 0 && <p className="icon-picker-empty">No icons match.</p>}

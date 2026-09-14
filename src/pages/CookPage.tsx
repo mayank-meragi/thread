@@ -13,7 +13,7 @@ import {
 } from '../lib/recipes/lifecycle'
 import { getCookSession } from '../lib/recipes/selectors'
 import type { CookStepView } from '../lib/recipes/types'
-import { Button, Checkbox } from 'fiber'
+import { Button, Checkbox, SectionHeader } from 'fiber'
 
 // A task's stored text keeps the structural tag (`#[cook-step] foo`); accept
 // the legacy unbracketed form too because older task records may contain it.
@@ -101,7 +101,7 @@ export function CookPage() {
       {error && <p className="add-exercise-error" role="alert">{error}</p>}
 
       <section className="cook-ingredients-panel">
-        <h2>Ingredients</h2>
+        <SectionHeader className="cook-panel-header" title={<h2>Ingredients</h2>} />
         {session.ingredients.length ? (
           <ul className="cook-ingredient-checklist">
             {session.ingredients.map((ingredient) => (
@@ -123,7 +123,7 @@ export function CookPage() {
       </section>
 
       <section className="cook-steps-panel">
-        <h2>Steps</h2>
+        <SectionHeader className="cook-panel-header" title={<h2>Steps</h2>} />
         <ol className="cook-step-list">
           {session.steps.map((step, index) => {
             const state = stepState(step)

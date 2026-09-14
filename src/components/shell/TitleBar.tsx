@@ -1,4 +1,4 @@
-import { Button, ToggleButton } from 'fiber'
+import { Button, ToggleButton, Tooltip } from 'fiber'
 import { useEffect, useState } from 'react'
 import { Search, Settings, Sparkle } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -39,60 +39,65 @@ export function TitleBar({ activityBarHidden, onToggleActivityBar, onOpenCommand
         <span className="title-bar-date">{formatShortDate(isoToday())}</span>
       </div>
 
-      <Button unstyled
-        type="button"
-        className="title-bar-search"
-        onClick={onOpenCommand}
-        aria-label="Open create or go menu"
-        aria-keyshortcuts="Meta+Shift+P Control+Shift+P"
-        title="Create or go (⌘⇧P)"
-      >
-        <Search size={13} />
-        <span>Search notes…</span>
-        <kbd>⌘⇧P</kbd>
-      </Button>
+      <Tooltip className="title-bar-search-tooltip" content="Create or go (⌘⇧P)">
+        <Button unstyled
+          type="button"
+          className="title-bar-search"
+          onClick={onOpenCommand}
+          aria-label="Open create or go menu"
+          aria-keyshortcuts="Meta+Shift+P Control+Shift+P"
+        >
+          <Search size={13} />
+          <span>Search notes…</span>
+          <kbd>⌘⇧P</kbd>
+        </Button>
+      </Tooltip>
 
       <div className="title-bar-actions">
         <RailSyncIndicator {...sync} />
-        <Button unstyled
-          type="button"
-          className="title-bar-search-icon"
-          onClick={onOpenCommand}
-          aria-label="Open create or go menu"
-          title="Create or go"
-        >
-          <Search size={16} />
-        </Button>
-        <Link
-          to="/settings"
-          className="title-bar-settings-icon"
-          aria-label="Settings"
-          title="Settings"
-        >
-          <Settings size={16} />
-        </Link>
+        <Tooltip content="Create or go">
+          <Button unstyled
+            type="button"
+            className="title-bar-search-icon"
+            onClick={onOpenCommand}
+            aria-label="Open create or go menu"
+          >
+            <Search size={16} />
+          </Button>
+        </Tooltip>
+        <Tooltip content="Settings">
+          <Link
+            to="/settings"
+            className="title-bar-settings-icon"
+            aria-label="Settings"
+          >
+            <Settings size={16} />
+          </Link>
+        </Tooltip>
         <div className="title-bar-toggles">
-          <ToggleButton unstyled
-            type="button"
-            pressed={!activityBarHidden}
-            className="tap-target-sm title-bar-toggle"
-            aria-label={activityBarHidden ? 'Show activity bar' : 'Hide activity bar'}
-            title={activityBarHidden ? 'Show activity bar' : 'Hide activity bar'}
-            onClick={onToggleActivityBar}
-          >
-            <LayoutToggleIcon side="left" filled={!activityBarHidden} />
-          </ToggleButton>
-          <ToggleButton unstyled
-            type="button"
-            pressed={!railHidden}
-            className="tap-target-sm title-bar-toggle"
-            aria-label={railHidden ? 'Show context panel' : 'Hide context panel'}
-            aria-keyshortcuts="Meta+\\ Control+\\"
-            title={railHidden ? 'Show context panel (⌘\\)' : 'Hide context panel (⌘\\)'}
-            onClick={toggleRail}
-          >
-            <LayoutToggleIcon side="right" filled={!railHidden} />
-          </ToggleButton>
+          <Tooltip content={activityBarHidden ? 'Show activity bar' : 'Hide activity bar'}>
+            <ToggleButton unstyled
+              type="button"
+              pressed={!activityBarHidden}
+              className="tap-target-sm title-bar-toggle"
+              aria-label={activityBarHidden ? 'Show activity bar' : 'Hide activity bar'}
+              onClick={onToggleActivityBar}
+            >
+              <LayoutToggleIcon side="left" filled={!activityBarHidden} />
+            </ToggleButton>
+          </Tooltip>
+          <Tooltip content={railHidden ? 'Show context panel' : 'Hide context panel'}>
+            <ToggleButton unstyled
+              type="button"
+              pressed={!railHidden}
+              className="tap-target-sm title-bar-toggle"
+              aria-label={railHidden ? 'Show context panel' : 'Hide context panel'}
+              aria-keyshortcuts="Meta+\\ Control+\\"
+              onClick={toggleRail}
+            >
+              <LayoutToggleIcon side="right" filled={!railHidden} />
+            </ToggleButton>
+          </Tooltip>
         </div>
       </div>
     </header>

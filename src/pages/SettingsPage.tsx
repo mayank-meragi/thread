@@ -25,7 +25,7 @@ import { commandRegistry } from '../lib/commands'
 import { revokeCapability, useTrustedCapabilities } from '../lib/threadscript/trustedCapabilities'
 import { MetadataSchemas } from '../components/MetadataSchemas'
 import { clearRssProxyConfig, generateRssProxyAccessKey, getRssProxyConfig, saveRssProxyConfig, testRssProxyConnection } from '../lib/rssProxy'
-import { Button, ButtonLink, Input, Select, Textarea, ToggleButton } from 'fiber'
+import { Button, ButtonLink, Input, SectionHeader, Select, Textarea, ToggleButton } from 'fiber'
 import { refreshAllFeeds } from '../lib/rss'
 import { getRssSettings, RSS_REFRESH_INTERVALS, saveRssSettings, type RssRefreshInterval } from '../lib/rssSettings'
 import { formatAIUsageCost, groupAIUsage, summarizeAIUsage, type AIUsageFeature, type AIUsagePeriod } from '../lib/aiUsage'
@@ -368,9 +368,9 @@ export function SettingsPage() {
 
         <div className="settings-content">
           <section className="settings-category" hidden={activeCategory !== 'appearance'} aria-labelledby="settings-category-appearance">
-            <header className="settings-category-header"><h2 id="settings-category-appearance">Appearance</h2><p>Choose how Thread looks on this device.</p></header>
+            <SectionHeader className="settings-category-header" title={<h2 id="settings-category-appearance">Appearance</h2>} description="Choose how Thread looks on this device." />
             <section className="settings-card theme-card">
-              <div className="settings-title"><Palette size={20} /><div><h3>Theme</h3><p>Choose a familiar palette. Your theme stays on this device.</p></div></div>
+              <SectionHeader className="settings-title settings-card-header" title={<><Palette size={20} aria-hidden="true" /><h3>Theme</h3></>} description="Choose a familiar palette. Your theme stays on this device." />
               <div className="theme-groups">
                 {(['Light', 'Dark'] as const).map((mode) => (
                   <div className="theme-group" key={mode}>
@@ -391,10 +391,10 @@ export function SettingsPage() {
           </section>
 
           <section className="settings-category" hidden={activeCategory !== 'rss'} aria-labelledby="settings-category-rss">
-            <header className="settings-category-header"><h2 id="settings-category-rss">RSS feeds</h2><p>Use your own Cloudflare Worker when a publisher blocks direct browser access.</p></header>
+            <SectionHeader className="settings-category-header" title={<h2 id="settings-category-rss">RSS feeds</h2>} description="Use your own Cloudflare Worker when a publisher blocks direct browser access." />
 
             <section className="settings-card">
-              <div className="settings-title"><Rss size={20} /><div><h2>RSS proxy</h2><p>Each Thread user deploys and controls their own stateless proxy. Public HTTP and HTTPS feeds are supported; private feeds with credentials are intentionally rejected.</p></div></div>
+              <SectionHeader className="settings-title settings-card-header" title={<><Rss size={20} aria-hidden="true" /><h2>RSS proxy</h2></>} description="Each Thread user deploys and controls their own stateless proxy. Public HTTP and HTTPS feeds are supported; private feeds with credentials are intentionally rejected." />
               <label><span>Worker URL</span><Input type="url" value={rssProxyUrl} onChange={(event) => setRssProxyUrl(event.target.value)} placeholder="https://thread-rss-proxy.your-name.workers.dev" /></label>
               <label><span>Worker access key</span><Input type={showRssProxyKey ? 'text' : 'password'} value={rssProxyKey} onChange={(event) => setRssProxyKey(event.target.value)} placeholder="Generate a key, then add the same secret to Wrangler" autoComplete="off" /></label>
               <div className="settings-actions">
@@ -411,7 +411,7 @@ export function SettingsPage() {
             </section>
 
             <section className="settings-card rss-refresh-card">
-              <div className="settings-title"><RefreshCw size={20} /><div><h2>Refresh schedule</h2><p>Choose how often Thread checks subscribed feeds while the Feeds screen is open. Turning this off never deletes cached entries.</p></div></div>
+              <SectionHeader className="settings-title settings-card-header" title={<><RefreshCw size={20} aria-hidden="true" /><h2>Refresh schedule</h2></>} description="Choose how often Thread checks subscribed feeds while the Feeds screen is open. Turning this off never deletes cached entries." />
               <label><span>Automatic refresh</span><Select value={rssRefreshIntervalMs} onChange={(event) => changeRssRefreshInterval(event.target.value)}>{RSS_REFRESH_INTERVALS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></label>
               <div className="settings-actions">
                 <Button variant="outline" onClick={() => void refreshRssFeedsNow()} disabled={rssManualState === 'refreshing' || rssFeeds.length === 0}>
@@ -423,7 +423,7 @@ export function SettingsPage() {
             </section>
 
             <section className="settings-card rss-proxy-instructions">
-              <div className="settings-title"><BookOpen size={20} /><div><h2>Setup instructions</h2><p>Run these commands from the Thread repository. Your Worker configuration lives in <code>workers/rss-proxy</code>.</p></div></div>
+              <SectionHeader className="settings-title settings-card-header" title={<><BookOpen size={20} aria-hidden="true" /><h2>Setup instructions</h2></>} description={<span>Run these commands from the Thread repository. Your Worker configuration lives in <code>workers/rss-proxy</code>.</span>} />
               <ol>
                 <li>Generate a key above and copy it somewhere safe.</li>
                 <li>Run <code>npm run rss-worker:login</code> once to authenticate Wrangler.</li>
@@ -436,16 +436,14 @@ export function SettingsPage() {
           </section>
 
           <section className="settings-category" hidden={activeCategory !== 'sync'} aria-labelledby="settings-category-sync">
-            <header className="settings-category-header"><h2 id="settings-category-sync">Data &amp; sync</h2><p>Manage local storage, backup, and multi-device sync.</p></header>
+            <SectionHeader className="settings-category-header" title={<h2 id="settings-category-sync">Data &amp; sync</h2>} description="Manage local storage, backup, and multi-device sync." />
       {conflicts.length > 0 && (
         <section className="settings-card conflicts-card">
-          <div className="settings-title">
-            <AlertTriangle size={20} />
-            <div>
-              <h2>Sync conflicts</h2>
-              <p>Most changes merge automatically. These spots were edited both here and in the data repository -- pick which side to keep.</p>
-            </div>
-          </div>
+          <SectionHeader
+            className="settings-title settings-card-header"
+            title={<><AlertTriangle size={20} aria-hidden="true" /><h2>Sync conflicts</h2></>}
+            description="Most changes merge automatically. These spots were edited both here and in the data repository -- pick which side to keep."
+          />
           {resolveError && <p className="banner banner-error form-error">{resolveError}</p>}
           {conflicts.map((conflict) => {
             const label = conflict.scope === 'day' ? conflict.aggregateId : `thread “${conflict.aggregateId}”`
@@ -511,7 +509,7 @@ export function SettingsPage() {
       )}
 
       <section className="settings-card" id="sync-settings">
-        <div className="settings-title"><GitBranch size={20} /><div><h2 ref={syncHeadingRef} tabIndex={-1}>GitHub sync</h2><p>Thread works locally first. Connect a private repository for backup and multi-device sync.</p></div></div>
+        <SectionHeader className="settings-title settings-card-header" title={<><GitBranch size={20} aria-hidden="true" /><h2 ref={syncHeadingRef} tabIndex={-1}>GitHub sync</h2></>} description="Thread works locally first. Connect a private repository for backup and multi-device sync." />
         <div className="field-grid">
           <label><span>Data repository</span><Input value={repo} onChange={(event) => setRepo(event.target.value)} placeholder="you/thread-data" /></label>
           <label><span>Branch</span><Input value={branch} onChange={(event) => setBranch(event.target.value)} /></label>
@@ -547,17 +545,17 @@ export function SettingsPage() {
       </section>
 
       <section className="settings-card local-card">
-        <div><h2>Local database</h2><p>IndexedDB is the working database. Notes open and save without a network connection.</p></div>
+        <SectionHeader className="settings-card-header" title={<h2>Local database</h2>} description="IndexedDB is the working database. Notes open and save without a network connection." />
         <div className="database-stat"><strong>{pending}</strong><span>changes waiting to sync</span></div>
       </section>
 
           </section>
 
           <section className="settings-category" hidden={activeCategory !== 'ai'} aria-labelledby="settings-category-ai">
-            <header className="settings-category-header"><h2 id="settings-category-ai">AI &amp; personas</h2><p>Connect a model provider and shape the assistants you work with.</p></header>
+            <SectionHeader className="settings-category-header" title={<h2 id="settings-category-ai">AI &amp; personas</h2>} description="Connect a model provider and shape the assistants you work with." />
 
       <section className="settings-card">
-        <div className="settings-title"><Bot size={20} /><div><h2>AI provider</h2><p>Bring your own API key. Keep one key per provider; the active model below is what every persona and chat uses.</p></div></div>
+        <SectionHeader className="settings-title settings-card-header" title={<><Bot size={20} aria-hidden="true" /><h2>AI provider</h2></>} description="Bring your own API key. Keep one key per provider; the active model below is what every persona and chat uses." />
         <div className="field-grid">
           <label>
             <span>Provider</span>
@@ -620,7 +618,7 @@ export function SettingsPage() {
       </section>
 
       <section className="settings-card ai-usage-card">
-        <div className="settings-title"><BarChart3 size={20} /><div><h2>AI usage</h2><p>Provider-reported tokens across synced devices. Dollar amounts are estimates, not invoice totals.</p></div></div>
+        <SectionHeader className="settings-title settings-card-header" title={<><BarChart3 size={20} aria-hidden="true" /><h2>AI usage</h2></>} description="Provider-reported tokens across synced devices. Dollar amounts are estimates, not invoice totals." />
         <div className="ai-usage-period" role="group" aria-label="AI usage period">
           {([['today', 'Today'], ['30-days', 'Last 30 days'], ['all-time', 'All time']] as const).map(([value, label]) => (
             <ToggleButton unstyled pressed={usagePeriod === value} type="button" key={value} className={usagePeriod === value ? 'is-active' : ''} onClick={() => setUsagePeriod(value)}>{label}</ToggleButton>
@@ -661,7 +659,7 @@ export function SettingsPage() {
       </section>
 
       <section className="settings-card">
-        <div className="settings-title"><Users size={20} /><div><h2>Personas</h2><p>Each persona keeps its own notes and sessions, alongside your other threads.</p></div></div>
+        <SectionHeader className="settings-title settings-card-header" title={<><Users size={20} aria-hidden="true" /><h2>Personas</h2></>} description="Each persona keeps its own notes and sessions, alongside your other threads." />
         <div className="persona-settings-list">
           {personas.map((persona) => (
             <PersonaRow
@@ -714,19 +712,19 @@ export function SettingsPage() {
           </section>
 
           <section className="settings-category" hidden={activeCategory !== 'models'} aria-labelledby="settings-category-models">
-            <header className="settings-category-header"><h2 id="settings-category-models">Models</h2><p>The model catalog behind the composer picker and the AI provider card, plus token pricing for cost estimates.</p></header>
+            <SectionHeader className="settings-category-header" title={<h2 id="settings-category-models">Models</h2>} description="The model catalog behind the composer picker and the AI provider card, plus token pricing for cost estimates." />
 
             <ModelCatalogTable />
 
           </section>
 
           <section className="settings-category" hidden={activeCategory !== 'workspace'} aria-labelledby="settings-category-workspace">
-            <header className="settings-category-header"><h2 id="settings-category-workspace">Workspace</h2><p>Define reusable structure for threads and their metadata.</p></header>
+            <SectionHeader className="settings-category-header" title={<h2 id="settings-category-workspace">Workspace</h2>} description="Define reusable structure for threads and their metadata." />
 
             <MetadataSchemas />
 
       <section className="settings-card">
-        <div className="settings-title"><FileText size={20} /><div><h2>Thread templates</h2><p>Mark any thread <em>Use as template</em> in its header, then copy it onto another from the Omnibox (<kbd>⌘⇧P</kbd> → Apply template).</p></div></div>
+        <SectionHeader className="settings-title settings-card-header" title={<><FileText size={20} aria-hidden="true" /><h2>Thread templates</h2></>} description={<span>Mark any thread <em>Use as template</em> in its header, then copy it onto another from the Omnibox (<kbd>⌘⇧P</kbd> → Apply template).</span>} />
         <div className="settings-actions">
           <ButtonLink variant="outline" to="/templates">Manage templates</ButtonLink>
         </div>
@@ -735,15 +733,15 @@ export function SettingsPage() {
           </section>
 
           <section className="settings-category" hidden={activeCategory !== 'security'} aria-labelledby="settings-category-security">
-            <header className="settings-category-header"><h2 id="settings-category-security">Security</h2><p>Review permissions that Thread can reuse without asking.</p></header>
+            <SectionHeader className="settings-category-header" title={<h2 id="settings-category-security">Security</h2>} description="Review permissions that Thread can reuse without asking." />
             <TrustedActionsCard />
           </section>
 
           <section className="settings-category" hidden={activeCategory !== 'help'} aria-labelledby="settings-category-help">
-            <header className="settings-category-header"><h2 id="settings-category-help">Help</h2><p>Learn the language and workflows available in Thread.</p></header>
+            <SectionHeader className="settings-category-header" title={<h2 id="settings-category-help">Help</h2>} description="Learn the language and workflows available in Thread." />
 
       <section className="settings-card">
-        <div className="settings-title"><BookOpen size={20} /><div><h2>Documentation</h2><p>Reference guides for Thread’s features.</p></div></div>
+        <SectionHeader className="settings-title settings-card-header" title={<><BookOpen size={20} aria-hidden="true" /><h2>Documentation</h2></>} description="Reference guides for Thread’s features." />
         <div className="settings-actions">
           <ButtonLink variant="outline" to="/docs/query-language">Query language</ButtonLink>
           <ButtonLink variant="outline" to="/docs/recipe-syntax">Recipe syntax</ButtonLink>
@@ -763,13 +761,11 @@ function TrustedActionsCard() {
   const trusted = useTrustedCapabilities()
   return (
     <section className="settings-card">
-      <div className="settings-title">
-        <ShieldCheck size={20} />
-        <div>
-          <h2>Trusted actions</h2>
-          <p>Choosing <em>Always allow</em> on a proposal skips its confirmation next time. Only non-destructive actions can be trusted.</p>
-        </div>
-      </div>
+      <SectionHeader
+        className="settings-title settings-card-header"
+        title={<><ShieldCheck size={20} aria-hidden="true" /><h2>Trusted actions</h2></>}
+        description={<span>Choosing <em>Always allow</em> on a proposal skips its confirmation next time. Only non-destructive actions can be trusted.</span>}
+      />
       {trusted.length === 0 ? (
         <p className="settings-empty">Nothing trusted yet.</p>
       ) : (

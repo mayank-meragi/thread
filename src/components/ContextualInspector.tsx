@@ -22,7 +22,7 @@ import {
 import { kindLabel } from '../lib/blockMetadata'
 import { formatDay } from '../lib/dates'
 import { closeInspector, getInspectorTarget, INSPECTOR_TARGET_EVENT, type InspectorTarget } from '../lib/inspectorTarget'
-import { Button, Field, Input, Select, ToggleButton } from 'fiber'
+import { Button, Field, Input, SectionHeader, Select, ToggleButton, Tooltip } from 'fiber'
 import { NewPropertyForm, PropertyField } from './inspector/PropertyField'
 import { TaskDraft } from './inspector/TaskDraft'
 import { WorkoutInspectorSections } from './inspector/WorkoutInspectorSections'
@@ -223,7 +223,7 @@ export function ContextualInspector() {
             </div>}
 
             <section className="inspector-section">
-              <div className="inspector-section-title"><span>Subtasks</span><small>{subtasks.length}</small></div>
+              <SectionHeader title="Subtasks" meta={subtasks.length} />
               {subtasks.map((subtask) => <Button unstyled type="button" className="task-detail-subtask" key={subtask.id} onClick={() => { window.location.hash = `/?date=${subtask.day}&block=${subtask.id}` }}><span className={`subtask-dot status-${subtask.status}`} />{subtask.text}</Button>)}
               <form className="task-detail-add field-with-icon" onSubmit={(event) => {
                 event.preventDefault()
@@ -246,7 +246,7 @@ export function ContextualInspector() {
           </>}
 
           <section className="inspector-section">
-            <div className="inspector-section-title"><span><GitBranch size={14} /> Backlinks</span><small>{backlinks.length}</small></div>
+            <SectionHeader title={<><GitBranch size={14} aria-hidden="true" /> Backlinks</>} meta={backlinks.length} />
             <div className="inspector-backlinks">
               {backlinks.map((mention) => (
                 <a key={mention.id} className="inspector-backlink-row" href={`#/thread/${mention.threadId}`} onClick={() => closeInspector()}>
@@ -259,20 +259,23 @@ export function ContextualInspector() {
           </section>
 
           {blockId && <section className="inspector-section">
-            <div className="inspector-section-title"><span><Tag size={14} /> Tags</span><small>{applied.size}</small></div>
+            <SectionHeader title={<><Tag size={14} aria-hidden="true" /> Tags</>} meta={applied.size} />
             <div className="inspector-tags">
               {tags.map((tag) => {
                 const application = appliedTags.find((item) => item.tagId === tag.id)
-                return <ToggleButton unstyled
-                  type="button"
+                return <Tooltip
                   key={tag.id}
-                  pressed={applied.has(tag.id)}
-                  className={`${applied.has(tag.id) ? 'inspector-tag active' : 'inspector-tag'}${tag.propertyIds.length ? ' has-schema' : ''}${application?.source === 'inline' ? ' is-inline' : ''}`}
-                  title={application?.source === 'inline' ? 'Typed in this block' : tag.propertyIds.length ? 'Metadata schema' : undefined}
-                  onClick={() => void run(() => applied.has(tag.id) ? removeBlockTag(blockId, tag.id) : addBlockTag(blockId, tag.id))}
+                  content={application?.source === 'inline' ? 'Typed in this block' : tag.propertyIds.length ? 'Metadata schema' : undefined}
                 >
-                  {tag.propertyIds.length > 0 ? <Sparkles size={11} /> : application?.source === 'inline' ? <Hash size={11} /> : applied.has(tag.id) ? <Check size={11} /> : null}#{tag.name}
-                </ToggleButton>
+                  <ToggleButton unstyled
+                    type="button"
+                    pressed={applied.has(tag.id)}
+                    className={`${applied.has(tag.id) ? 'inspector-tag active' : 'inspector-tag'}${tag.propertyIds.length ? ' has-schema' : ''}${application?.source === 'inline' ? ' is-inline' : ''}`}
+                    onClick={() => void run(() => applied.has(tag.id) ? removeBlockTag(blockId, tag.id) : addBlockTag(blockId, tag.id))}
+                  >
+                    {tag.propertyIds.length > 0 ? <Sparkles size={11} /> : application?.source === 'inline' ? <Hash size={11} /> : applied.has(tag.id) ? <Check size={11} /> : null}#{tag.name}
+                  </ToggleButton>
+                </Tooltip>
               })}
               <form className="inspector-inline-create" onSubmit={(event) => {
                 event.preventDefault()
@@ -292,7 +295,7 @@ export function ContextualInspector() {
           </section>}
 
           {blockId && <section className="inspector-section">
-            <div className="inspector-section-title"><span><Braces size={14} /> Properties</span><small>{properties.length}</small></div>
+            <SectionHeader title={<><Braces size={14} aria-hidden="true" /> Properties</>} meta={properties.length} />
             <div className="inspector-property-list">
               {orderedDefinitions.map((definition) => (
                 <PropertyField

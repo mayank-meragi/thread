@@ -1,6 +1,6 @@
-/* Shared primitives — menu/popover, layer/backdrop/sheet/dialog, field, and
-   banner recipes. Existing feature CSS composes onto these classes
-   incrementally in Phase 3; this file only defines the shapes. */
+/* Shared primitives — menu/popover, layer/backdrop/sheet/dialog, field, row,
+   tooltip, and banner recipes. Existing feature CSS composes onto these
+   classes incrementally; this file only defines the shapes. */
 
 /* ---------------------------------------------------------------------- */
 /* Menu / popover — replaces the ad hoc popover panels in PersonaSwitcher,
@@ -324,6 +324,127 @@ select.field-select:disabled { cursor: default; }
 .action-group-end { justify-content: flex-end; }
 .action-group[data-density='compact'] { gap: var(--component-gap-compact); }
 .action-group[data-density='comfortable'] { gap: var(--component-gap-comfortable); }
+
+/* ---------------------------------------------------------------------- */
+/* List row — dense scan-friendly content with optional status and actions. */
+.list-row {
+  --list-row-padding: 10px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--component-gap);
+  min-height: var(--control-height);
+  padding: var(--list-row-padding) var(--control-padding-inline);
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--surface-base);
+  color: var(--ink);
+}
+.list-row-interactive {
+  width: 100%;
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.list-row:hover { background: var(--control-hover); }
+.list-row.is-selected { background: var(--state-selected-surface); }
+.list-row:focus-visible { position: relative; z-index: 1; outline: var(--focus-ring-width) solid var(--state-focus); outline-offset: -1px; }
+.list-row-leading,
+.list-row-trailing { display: inline-flex; align-items: center; min-width: 0; }
+.list-row-leading { color: var(--muted); }
+.list-row-content { min-width: 0; display: grid; gap: 2px; }
+.list-row-title-line { min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.list-row-title { min-width: 0; overflow: hidden; color: var(--ink); font-size: var(--text-sm); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.list-row-status { flex: 0 0 auto; color: var(--muted); font: 500 var(--text-meta) var(--font-mono); text-transform: uppercase; }
+.list-row-description,
+.list-row-meta { min-width: 0; overflow: hidden; color: var(--muted); font-size: var(--text-meta); text-overflow: ellipsis; white-space: nowrap; }
+.list-row-meta { display: flex; align-items: center; gap: 8px; }
+.list-row-trailing { justify-content: flex-end; color: var(--muted); }
+.list-row[data-density='compact'] { --list-row-padding: 7px; min-height: var(--control-height-compact); gap: var(--component-gap-compact); }
+.list-row[data-density='compact'] .list-row-title { font-size: var(--text-meta); }
+.list-row[data-density='comfortable'] { --list-row-padding: 13px; min-height: var(--control-height-comfortable); gap: var(--component-gap-comfortable); }
+
+@media (forced-colors: active) {
+  .list-row.is-selected { background: Highlight; color: HighlightText; }
+  .list-row.is-selected .list-row-title { color: HighlightText; }
+  .list-row:focus-visible { outline-color: Highlight; }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Tooltip — quiet context for icon actions and abbreviated metadata. */
+.tooltip { position: relative; display: inline-flex; min-width: 0; max-width: 100%; vertical-align: middle; }
+.tooltip-trigger { min-width: 0; }
+.tooltip-content {
+  position: absolute;
+  z-index: 40;
+  width: max-content;
+  max-width: min(240px, 70vw);
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink);
+  color: var(--paper);
+  font: 500 var(--text-meta) var(--font-ui);
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+}
+.tooltip[data-side='top'] .tooltip-content { bottom: calc(100% + 8px); left: 50%; transform: translate(-50%, 4px); }
+.tooltip[data-side='right'] .tooltip-content { top: 50%; left: calc(100% + 8px); transform: translate(4px, -50%); }
+.tooltip[data-side='bottom'] .tooltip-content { top: calc(100% + 8px); left: 50%; transform: translate(-50%, -4px); }
+.tooltip[data-side='left'] .tooltip-content { top: 50%; right: calc(100% + 8px); transform: translate(-4px, -50%); }
+.tooltip:hover .tooltip-content,
+.tooltip:focus-within .tooltip-content { opacity: 1; visibility: visible; }
+.tooltip[data-side='top']:hover .tooltip-content,
+.tooltip[data-side='top']:focus-within .tooltip-content { transform: translate(-50%, 0); }
+.tooltip[data-side='right']:hover .tooltip-content,
+.tooltip[data-side='right']:focus-within .tooltip-content { transform: translate(0, -50%); }
+.tooltip[data-side='bottom']:hover .tooltip-content,
+.tooltip[data-side='bottom']:focus-within .tooltip-content { transform: translate(-50%, 0); }
+.tooltip[data-side='left']:hover .tooltip-content,
+.tooltip[data-side='left']:focus-within .tooltip-content { transform: translate(0, -50%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tooltip-content { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .tooltip-content { border-color: CanvasText; background: CanvasText; color: Canvas; }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Section header — hierarchy first, with quiet metadata and action slots. */
+.section-header {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--component-gap);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.section-header-main { min-width: 0; display: grid; gap: 3px; }
+.section-header-title { min-width: 0; display: inline-flex; align-items: center; gap: 7px; color: var(--ink-soft); font-size: var(--text-meta); font-weight: 600; }
+.section-header-title > svg { flex: 0 0 auto; }
+.section-header-description { color: var(--muted); font-size: var(--text-meta); line-height: 1.35; }
+.section-header-trailing { min-width: 0; display: inline-flex; align-items: center; gap: var(--component-gap); }
+.section-header-meta { flex: 0 0 auto; color: var(--muted); font: 400 var(--text-meta) var(--font-mono); }
+.section-header-actions { display: inline-flex; align-items: center; gap: var(--component-gap-compact); }
+.section-header[data-density='compact'] { padding-bottom: 6px; gap: var(--component-gap-compact); }
+.section-header[data-density='comfortable'] { padding-bottom: 11px; gap: var(--component-gap-comfortable); }
+.section-header[data-density='comfortable'] .section-header-title { font-size: var(--text-sm); }
+
+@media (max-width: 560px) {
+  .section-header { align-items: flex-start; }
+  .section-header-trailing { flex: 0 0 auto; }
+}
 
 /* ---------------------------------------------------------------------- */
 /* Banner — replaces .form-error, .inspector-error, .chat-message-error. */

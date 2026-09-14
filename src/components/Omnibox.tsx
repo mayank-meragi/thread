@@ -1,4 +1,4 @@
-import { Button, Input } from 'fiber'
+import { Button, Input, SectionHeader } from 'fiber'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpenText, FileText, GitBranch, ListPlus, PanelRight, Search } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -335,15 +335,16 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
 
         <div className="command-actions">
           {mode === 'search' && (
-            !normalized && <div className="section-label"><span>Recent threads</span><small>{items.length}</small></div>
+            !normalized && <SectionHeader className="command-section-header" title="Recent threads" meta={items.length} />
           )}
           {items.map((item, index) => (
             <Fragment key={item.id}>
               {mode === 'search' && normalized && item.group !== items[index - 1]?.group && (
-                <div className="section-label">
-                  <span>{item.group}</span>
-                  <small>{items.filter((candidate) => candidate.group === item.group).length}</small>
-                </div>
+                <SectionHeader
+                  className="command-section-header"
+                  title={item.group}
+                  meta={items.filter((candidate) => candidate.group === item.group).length}
+                />
               )}
               <Button unstyled
                 ref={(element) => { itemRefs.current[index] = element }}

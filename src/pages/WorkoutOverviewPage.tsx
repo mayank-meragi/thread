@@ -18,7 +18,7 @@ import {
 } from '../lib/workouts/presentation'
 import { formatShortDate } from '../lib/dates'
 import type { WorkoutExerciseView, WorkoutView } from '../lib/workouts/types'
-import { Button, ButtonLink } from 'fiber'
+import { Button, ButtonLink, ListRow, SectionHeader } from 'fiber'
 
 const STATE_LABEL = { planned: 'Planned', active: 'Active', completed: 'Completed', canceled: 'Canceled' } as const
 
@@ -141,23 +141,20 @@ export function WorkoutOverviewPage() {
       </section>
 
       <section className="overview-exercise-list">
-        <div className="overview-exercise-list-head">
-          <h2>Exercises</h2>
-          <span>{view.exercises.length} movement{view.exercises.length === 1 ? '' : 's'}</span>
-        </div>
+        <SectionHeader className="overview-exercise-list-head" title={<h2>Exercises</h2>} meta={`${view.exercises.length} movement${view.exercises.length === 1 ? '' : 's'}`} />
         {view.exercises.map((exercise) => {
           const image = exercise.guide?.imageUrls[0]
           return (
-            <div className="overview-exercise-row" key={exercise.task.id}>
-              <div className="overview-exercise-thumb">
+            <ListRow
+              className="overview-exercise-row"
+              key={exercise.task.id}
+              leading={<div className="overview-exercise-thumb">
                 {image ? <img src={image} alt="" onError={(event) => { event.currentTarget.style.display = 'none' }} /> : null}
-              </div>
-              <div className="overview-exercise-info">
-                <span className="overview-exercise-name">{exerciseName(exercise)}</span>
-                <span className="overview-exercise-summary">{exerciseSetSummary(exercise)}</span>
-                {exerciseMetaLine(exercise) && <span className="overview-exercise-meta">{exerciseMetaLine(exercise)}</span>}
-              </div>
-            </div>
+              </div>}
+              title={<span className="overview-exercise-name">{exerciseName(exercise)}</span>}
+              description={<span className="overview-exercise-summary">{exerciseSetSummary(exercise)}</span>}
+              meta={exerciseMetaLine(exercise) ? <span className="overview-exercise-meta">{exerciseMetaLine(exercise)}</span> : undefined}
+            />
           )
         })}
       </section>

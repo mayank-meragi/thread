@@ -10,7 +10,7 @@ import { buildWorkoutInsights, type ExerciseProgress, type WorkoutRange } from '
 import { elapsedMs, formatDuration, stripStructuralTag, tallyWorkoutSets, workoutLensState, type WorkoutLensState } from '../lib/workouts/presentation'
 import type { WorkoutView } from '../lib/workouts/types'
 import { formatDay, formatShortDate, isoToday } from '../lib/dates'
-import { Button, ButtonLink, SearchField, Select, SegmentedControl, Tabs, ToggleButton } from 'fiber'
+import { Button, ButtonLink, ListRow, SearchField, SectionHeader, Select, SegmentedControl, Tabs, ToggleButton } from 'fiber'
 
 type WorkoutsView = 'overview' | 'history' | 'exercises'
 const STATE_LABEL: Record<WorkoutLensState, string> = { planned: 'Planned', active: 'Active', completed: 'Completed', canceled: 'Canceled' }
@@ -40,15 +40,13 @@ function WorkoutRow({ workout, detailed = false }: { workout: WorkoutView; detai
   const duration = elapsedMs(workout)
   const href = `/workout/${workout.task.day}/${workout.task.id}/overview`
   return (
-    <div className={`today-workout-row${detailed ? ' workout-history-row' : ''}`}>
-      <span className={`today-workout-state state-${state}`}>{STATE_LABEL[state]}</span>
-      <div className="workout-row-main">
-        <Link className="today-workout-name" to={href}>{workoutLabel(workout)}</Link>
-        {detailed && <span className="workout-row-details">{workout.exercises.length} exercises · {tally.completed}/{tally.total} sets{duration !== undefined ? ` · ${formatDuration(duration)}` : ''}</span>}
-      </div>
-      <time className="today-workout-meta" dateTime={workout.task.day}>{formatDay(workout.task.day).short}</time>
-      <Link className="today-workout-open" to={href}>{state === 'active' ? 'Resume' : 'Open'}</Link>
-    </div>
+    <ListRow
+      className={`today-workout-row${detailed ? ' workout-history-row' : ''}`}
+      leading={<span className={`today-workout-state state-${state}`}>{STATE_LABEL[state]}</span>}
+      title={<Link className="today-workout-name" to={href}>{workoutLabel(workout)}</Link>}
+      description={detailed ? <span className="workout-row-details">{workout.exercises.length} exercises · {tally.completed}/{tally.total} sets{duration !== undefined ? ` · ${formatDuration(duration)}` : ''}</span> : undefined}
+      trailing={<><time className="today-workout-meta" dateTime={workout.task.day}>{formatDay(workout.task.day).short}</time><Link className="today-workout-open" to={href}>{state === 'active' ? 'Resume' : 'Open'}</Link></>}
+    />
   )
 }
 
@@ -150,19 +148,19 @@ export function WorkoutsPage() {
       ) : view === 'overview' ? (
         <div className="workout-overview-dashboard">
           <NextWorkout workouts={workouts} />
-          <div className="workout-dashboard-heading"><div><h2>Your training</h2><p>Completed work in the selected period</p></div><RangeControl range={range} onChange={(next) => setParam('range', next === '4w' ? undefined : next)} /></div>
+          <SectionHeader className="workout-dashboard-heading" title={<h2>Your training</h2>} description="Completed work in the selected period" actions={<RangeControl range={range} onChange={(next) => setParam('range', next === '4w' ? undefined : next)} />} />
           <WorkoutMetricGrid insights={insights} />
           <div className="workout-insight-grid"><WeeklyTrainingChart insights={insights} /><RecentPrs insights={insights} /></div>
           <div className="workout-insight-grid workout-insight-grid-secondary">
             <MuscleDistribution insights={insights} />
-            <section className="workout-insight-panel"><header className="workout-panel-head"><div><h2>Recent sessions</h2><p>Your latest workout log</p></div><Button variant="ghost" size="sm" onClick={() => setParam('view', 'history')}>View history</Button></header>{workouts.some((workout) => workoutLensState(workout) === 'completed') ? workouts.filter((workout) => workoutLensState(workout) === 'completed').slice(0, 5).map((workout) => <WorkoutRow workout={workout} key={workout.task.id} />) : <p className="workout-panel-empty">Completed workouts will appear here.</p>}</section>
+            <section className="workout-insight-panel"><SectionHeader className="workout-panel-head" title={<h2>Recent sessions</h2>} description="Your latest workout log" actions={<Button variant="ghost" size="sm" onClick={() => setParam('view', 'history')}>View history</Button>} />{workouts.some((workout) => workoutLensState(workout) === 'completed') ? workouts.filter((workout) => workoutLensState(workout) === 'completed').slice(0, 5).map((workout) => <WorkoutRow workout={workout} key={workout.task.id} />) : <p className="workout-panel-empty">Completed workouts will appear here.</p>}</section>
           </div>
         </div>
       ) : view === 'history' ? (
         <div className="workout-history-view">
           <WorkoutCalendar month={month} selectedDay={selectedDay} workouts={workouts} onMonthChange={(next) => setParam('month', next === today.slice(0, 7) ? undefined : next)} onDayChange={(day) => setParam('day', day)} />
           <section className="workout-log">
-            <header className="workout-log-head"><div><h2>Workout log</h2><p>{history.length} of {workouts.length} sessions</p></div>{(query || status !== 'all' || selectedDay) && <Button variant="ghost" size="sm" onClick={() => setParams({ view: 'history', ...(month !== today.slice(0, 7) ? { month } : {}) })}>Clear filters</Button>}</header>
+            <SectionHeader className="workout-log-head" title={<h2>Workout log</h2>} description={`${history.length} of ${workouts.length} sessions`} actions={(query || status !== 'all' || selectedDay) ? <Button variant="ghost" size="sm" onClick={() => setParams({ view: 'history', ...(month !== today.slice(0, 7) ? { month } : {}) })}>Clear filters</Button> : undefined} />
             <div className="workout-log-filters">
               <SearchField className="workout-search" value={query} placeholder="Search workouts" aria-label="Search workout titles" onChange={(event) => setParam('q', event.target.value || undefined, true)} />
               <label className="workout-status-filter field-with-icon"><ListFilter size={15} aria-hidden="true" /><span className="sr-only">Filter by status</span><Select aria-label="Filter by status" value={status} onChange={(event) => setParam('status', event.target.value === 'all' ? undefined : event.target.value)}><option value="all">All statuses</option><option value="active">Active</option><option value="planned">Planned</option><option value="completed">Completed</option><option value="canceled">Canceled</option></Select></label>
@@ -174,7 +172,7 @@ export function WorkoutsPage() {
       ) : (
         <div className={`workout-exercises-view${selectedExercise ? ' has-selection' : ''}`}>
           <aside className="exercise-index">
-            <header><div><h2>Exercises</h2><p>{exerciseResults.length} with completed sets</p></div></header>
+            <SectionHeader className="exercise-index-header" title={<h2>Exercises</h2>} description={`${exerciseResults.length} with completed sets`} />
               <SearchField className="workout-search" value={query} placeholder="Search exercises" aria-label="Search exercises" onChange={(event) => setParam('q', event.target.value || undefined, true)} />
             <div className="exercise-index-list">{exerciseResults.map((exercise) => <ExerciseIndexRow key={exercise.id} exercise={exercise} selected={exercise.id === selectedExerciseId} onSelect={() => setParam('exercise', exercise.id)} />)}{!exerciseResults.length && <p className="workout-panel-empty">No completed, linked exercises match this search.</p>}</div>
           </aside>

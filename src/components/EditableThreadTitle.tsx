@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { renameThread } from '../db'
-import { Input } from 'fiber'
+import { Input, Tooltip } from 'fiber'
 
 // Inline-editable thread heading. Commits on Enter/blur (same commit-on-blur
 // idea as inspector/TaskDraft), reverts on Escape or an empty value.
@@ -27,21 +27,22 @@ export function EditableThreadTitle({ threadId, title }: { threadId: string; tit
 
   if (!editing) {
     return (
-      <h1
-        className="thread-title"
-        tabIndex={0}
-        role="button"
-        title="Rename thread"
-        onClick={startEditing}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === 'F2') {
-            event.preventDefault()
-            startEditing()
-          }
-        }}
-      >
-        {title}
-      </h1>
+      <Tooltip content="Rename thread">
+        <h1
+          className="thread-title"
+          tabIndex={0}
+          role="button"
+          onClick={startEditing}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === 'F2') {
+              event.preventDefault()
+              startEditing()
+            }
+          }}
+        >
+          {title}
+        </h1>
+      </Tooltip>
     )
   }
 

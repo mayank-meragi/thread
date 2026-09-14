@@ -4,7 +4,7 @@ import type { BlockTagRecord, MentionRecord, TagDefinitionRecord, TaskRecord, Ta
 import { formatDay, isoToday } from '../lib/dates'
 import { setTaskStatus } from '../lib/tasks'
 import { TaskStatusIcon } from './TaskStatusControl'
-import { Button, Checkbox } from 'fiber'
+import { Button, Checkbox, SectionHeader, Tooltip } from 'fiber'
 
 const EMPTY_SELECTION = new Set<string>()
 function NOOP_SELECT(): void {}
@@ -66,11 +66,11 @@ export function TaskBoard({
               if (taskId) void drop(taskId, column.id)
             }}
           >
-            <header>
-              <TaskStatusIcon status={column.id} size={13} />
-              <span>{column.label}</span>
-              <small>{columnTasks.length}</small>
-            </header>
+            <SectionHeader
+              className="task-board-column-header"
+              title={<><TaskStatusIcon status={column.id} size={13} /> {column.label}</>}
+              meta={columnTasks.length}
+            />
             <div className="task-board-column-body">
               {columnTasks.map((task) => (
                 <TaskCard
@@ -141,14 +141,14 @@ function TaskCard({
           <Checkbox checked={selected} onChange={(event) => onSelect(event.target.checked)} />
           <span />
         </label>}
-        {task.priority && <span className={`priority-dot priority-${task.priority}`} title={`${task.priority} priority`} />}
+        {task.priority && <Tooltip content={`${task.priority} priority`}><span className={`priority-dot priority-${task.priority}`} aria-label={`${task.priority} priority`} /></Tooltip>}
       </div>
       <Button variant="ghost" className="task-board-card-body" onClick={onOpen}>
         <span className="task-row-title">{task.text}</span>
         {task.description && <span className="task-row-description">{task.description}</span>}
         <span className="task-board-card-foot">
-          <span title={`Logged ${formatDay(task.day).full}`}><CalendarPlus size={11} /> {formatDay(task.day).short}</span>
-          {task.dueDate && <span className={overdue ? 'task-date-overdue' : ''} title={`Due ${formatDay(task.dueDate).full}`}><Clock3 size={11} /> {formatDay(task.dueDate).short}</span>}
+          <Tooltip content={`Logged ${formatDay(task.day).full}`}><span><CalendarPlus size={11} /> {formatDay(task.day).short}</span></Tooltip>
+          {task.dueDate && <Tooltip content={`Due ${formatDay(task.dueDate).full}`}><span className={overdue ? 'task-date-overdue' : ''}><Clock3 size={11} /> {formatDay(task.dueDate).short}</span></Tooltip>}
           {task.totalSubtasks > 0 && <span><ListTree size={11} /> {task.completedSubtasks}/{task.totalSubtasks}</span>}
           {appliedTags.slice(0, 2).map((tag) => <span key={tag.id}><Tag size={10} /> {tag.name}</span>)}
           {relatedThreads.slice(0, 2).map((mention) => <span key={mention.threadId}>#{mention.title}</span>)}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, RotateCcw, Trash2 } from 'lucide-react'
 import type { AIProvider } from '../lib/ai'
-import { Button, Checkbox, Input, Select } from 'fiber'
+import { Button, Checkbox, Input, SectionHeader, Select } from 'fiber'
 import {
   DEFAULT_MODELS,
   PROVIDER_IDS,
@@ -112,12 +112,11 @@ export function ModelCatalogTable() {
 
   return (
     <section className="settings-card">
-      <div className="settings-title">
-        <div>
-          <h2>Model catalog</h2>
-          <p>Models offered in the composer and the AI provider picker. Prices per 1M tokens feed the usage cost estimates.</p>
-        </div>
-      </div>
+      <SectionHeader
+        className="settings-title settings-card-header"
+        title={<h2>Model catalog</h2>}
+        description="Models offered in the composer and the AI provider picker. Prices per 1M tokens feed the usage cost estimates."
+      />
 
       <div className="models-table-wrap">
         <table className="models-table">

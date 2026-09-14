@@ -4,7 +4,7 @@ import type { BlockTagRecord, MentionRecord, TagDefinitionRecord, TaskRecord } f
 import { formatDay, isoToday, shiftDay } from '../lib/dates'
 import { deleteTask, setTaskDueDate, setTaskStatus } from '../lib/tasks'
 import { TaskStatusControl } from './TaskStatusControl'
-import { Button, Checkbox } from 'fiber'
+import { Button, Checkbox, Tooltip } from 'fiber'
 
 export type TaskDisplayMode = 'list' | 'compact'
 
@@ -110,10 +110,10 @@ export function TaskRow({
           <span className="task-row-title">{task.text}</span>
           {task.description && !isCompact && <span className="task-row-description">{task.description}</span>}
           <span className="task-row-foot">
-            {!isCompact && <span className="task-row-created" title={`Logged ${formatDay(task.day).full}`}><CalendarPlus size={11} /> {formatDay(task.day).short}</span>}
-            {task.dueDate && <span className={task.dueDate < new Date().toISOString().slice(0, 10) && task.status !== 'done' ? 'task-date-overdue' : ''} title={`Due ${formatDay(task.dueDate).full}`}><Clock3 size={11} /> {formatDay(task.dueDate).short}</span>}
+            {!isCompact && <Tooltip content={`Logged ${formatDay(task.day).full}`}><span className="task-row-created"><CalendarPlus size={11} /> {formatDay(task.day).short}</span></Tooltip>}
+            {task.dueDate && <Tooltip content={`Due ${formatDay(task.dueDate).full}`}><span className={task.dueDate < new Date().toISOString().slice(0, 10) && task.status !== 'done' ? 'task-date-overdue' : ''}><Clock3 size={11} /> {formatDay(task.dueDate).short}</span></Tooltip>}
             {task.priority && (isCompact
-              ? <span className={`priority-dot priority-${task.priority}`} title={`${task.priority} priority`} />
+              ? <Tooltip content={`${task.priority} priority`}><span className={`priority-dot priority-${task.priority}`} aria-label={`${task.priority} priority`} /></Tooltip>
               : <span className={`task-priority-label priority-${task.priority}`}>{task.priority}</span>)}
             {!isCompact && appliedTags.slice(0, 2).map((tag) => <span key={tag.id}><Tag size={10} /> {tag.name}</span>)}
             {!isCompact && relatedThreads.slice(0, 2).map((mention) => <span key={mention.threadId}>#{mention.title}</span>)}
