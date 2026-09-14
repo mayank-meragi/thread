@@ -10,7 +10,7 @@ import { TaskRow, type TaskDisplayMode } from '../components/TaskRow'
 import { TaskBoard } from '../components/TaskBoard'
 import { TaskFilterPopover, type TaskFilterKey } from '../components/TaskFilterPopover'
 import { Chip } from 'fiber'
-import { Button, Input, SearchField, SectionHeader, SegmentedControl, Select } from 'fiber'
+import { Button, Input, SearchField, SectionHeader, SegmentedControl, Select, Tabs } from 'fiber'
 import { isWorkoutRole, workoutRolesByBlockId } from '../lib/workouts/integration'
 import { cookRolesByBlockId, isCookRole } from '../lib/recipes/integration'
 
@@ -208,11 +208,18 @@ export function TasksPage() {
           <span>{currentView.label}</span><small>{viewCounts[view]}</small><ChevronDown size={14} />
         </Button>
       ) : (
-        <nav className="task-view-tabs" aria-label="Task status view">
-          {TASK_VIEWS.map((item) => <Button unstyled type="button" key={item.id} className={view === item.id ? 'active' : ''} onClick={() => updateParam('view', item.id, 'my-day')}>{item.label}</Button>)}
-        </nav>
+        <Tabs
+          className="task-view-tabs"
+          aria-label="Task status view"
+          idPrefix="tasks-tab"
+          panelId="tasks-view-panel"
+          value={view}
+          onValueChange={(value) => updateParam('view', value, 'my-day')}
+          options={TASK_VIEWS.map((item) => ({ value: item.id, label: item.label }))}
+        />
       )}
 
+      <div id="tasks-view-panel" role="tabpanel" aria-labelledby={`tasks-tab-${view}`}>
       <div className="task-controls-row">
         <SearchField className="task-search" value={query} onChange={(event) => updateParam('q', event.target.value, '')} placeholder="Search tasks" aria-label="Search tasks" />
         <TaskFilterPopover priority={priority} tag={tag} thread={thread} sort={sort} tagDefinitions={tagDefinitions} threadOptions={threadOptions} onChange={onFilterChange} activeCount={activeFilterCount} />
@@ -280,6 +287,8 @@ export function TasksPage() {
         </>
       )}
 
+      </div>
+
       {isMobile && <Button unstyled type="button" className="task-fab" aria-label="Add task" onClick={() => setMobileQuickAddOpen(true)}><Plus size={22} /></Button>}
 
       {isMobile && mobileQuickAddOpen && (
@@ -338,7 +347,7 @@ function QuickAdd({ autoFocus = false, onCreated }: { autoFocus?: boolean; onCre
 }
 
 function FilterSelect({ icon, label, value, options, onChange }: { icon?: React.ReactNode; label: string; value: string; options: [string, string][]; onChange: (value: string) => void }) {
-  return <label className="task-filter-select field-with-icon">{icon}<span className="sr-only">{label}</span><Select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([option, text]) => <option key={option} value={option}>{text}</option>)}</Select></label>
+  return <div className="task-filter-select field-with-icon">{icon}<Select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([option, text]) => <option key={option} value={option}>{text}</option>)}</Select></div>
 }
 
 export function TaskBranch(props: {

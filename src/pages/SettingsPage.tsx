@@ -25,7 +25,7 @@ import { commandRegistry } from '../lib/commands'
 import { revokeCapability, useTrustedCapabilities } from '../lib/threadscript/trustedCapabilities'
 import { MetadataSchemas } from '../components/MetadataSchemas'
 import { clearRssProxyConfig, generateRssProxyAccessKey, getRssProxyConfig, saveRssProxyConfig, testRssProxyConnection } from '../lib/rssProxy'
-import { Button, ButtonLink, Input, SectionHeader, Select, Textarea, ToggleButton } from 'fiber'
+import { ActionGroup, Button, ButtonLink, EmptyState, Field, FormLayout, Input, ListRow, SectionHeader, SegmentedControl, Select, Tabs, Textarea, RadioGroup } from 'fiber'
 import { refreshAllFeeds } from '../lib/rss'
 import { getRssSettings, RSS_REFRESH_INTERVALS, saveRssSettings, type RssRefreshInterval } from '../lib/rssSettings'
 import { formatAIUsageCost, groupAIUsage, summarizeAIUsage, type AIUsageFeature, type AIUsagePeriod } from '../lib/aiUsage'
@@ -348,56 +348,55 @@ export function SettingsPage() {
       <h1>Settings</h1>
       <p className="settings-intro">Shape how Thread looks, stores your work, and works with AI.</p>
 
-      <label className="settings-category-select">
-        <span>Category</span>
-        <Select value={activeCategory} onChange={(event) => chooseCategory(event.target.value as SettingsCategory)}>
-          {SETTINGS_CATEGORIES.map((category) => <option value={category.id} key={category.id}>{category.label}</option>)}
-        </Select>
-      </label>
-
       <div className="settings-layout">
-        <nav className="settings-nav" aria-label="Settings categories">
-          {SETTINGS_CATEGORIES.map(({ id, label, description, Icon }) => (
-            <Button unstyled type="button" className={activeCategory === id ? 'is-active' : ''} aria-current={activeCategory === id ? 'page' : undefined} onClick={() => chooseCategory(id)} key={id}>
-              <Icon size={17} />
-              <span><strong>{label}</strong><small>{description}</small></span>
-              {id === 'sync' && conflicts.length > 0 ? <b className="settings-nav-alert" aria-label={`${conflicts.length} unresolved sync conflicts`}>{conflicts.length}</b> : null}
-            </Button>
-          ))}
-        </nav>
+        <Tabs
+          className="settings-tabs"
+          aria-label="Settings categories"
+          value={activeCategory}
+          onValueChange={(value) => { if (isSettingsCategory(value)) chooseCategory(value) }}
+          idPrefix="settings-tab"
+          getPanelId={(value) => `settings-panel-${value}`}
+          options={SETTINGS_CATEGORIES.map(({ id, label, description, Icon }) => ({
+            value: id,
+            label: <><Icon size={17} aria-hidden="true" /><span><strong>{label}</strong><small>{description}</small></span>{id === 'sync' && conflicts.length > 0 ? <b className="settings-nav-alert" aria-label={`${conflicts.length} unresolved sync conflicts`}>{conflicts.length}</b> : null}</>,
+          }))}
+        />
 
         <div className="settings-content">
-          <section className="settings-category" hidden={activeCategory !== 'appearance'} aria-labelledby="settings-category-appearance">
+          <section className="settings-category" id="settings-panel-appearance" role="tabpanel" hidden={activeCategory !== 'appearance'} aria-labelledby="settings-tab-appearance">
             <SectionHeader className="settings-category-header" title={<h2 id="settings-category-appearance">Appearance</h2>} description="Choose how Thread looks on this device." />
-            <section className="settings-card theme-card">
-              <SectionHeader className="settings-title settings-card-header" title={<><Palette size={20} aria-hidden="true" /><h3>Theme</h3></>} description="Choose a familiar palette. Your theme stays on this device." />
-              <div className="theme-groups">
-                {(['Light', 'Dark'] as const).map((mode) => (
-                  <div className="theme-group" key={mode}>
-                    <div className="theme-group-label">{mode}</div>
-                    <div className="theme-options">
-                      {themes.filter((item) => item.mode === mode).map((item) => (
-                        <ToggleButton unstyled pressed={theme === item.id} type="button" className="theme-option" onClick={() => chooseTheme(item.id)} key={item.id}>
-                          <span className="theme-swatches" aria-hidden="true">{item.swatches.map((color) => <span key={color} style={{ background: color }} />)}</span>
-                          <span className="theme-option-name">{item.name}</span>
-                          <span className="theme-check">{theme === item.id && <Check size={14} />}</span>
-                        </ToggleButton>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <section className="settings-section theme-card">
+              <SectionHeader className="settings-section-header" title={<><Palette size={20} aria-hidden="true" /><h3>Theme</h3></>} description="Choose a familiar palette. Your theme stays on this device." />
+              <RadioGroup
+                className="theme-radio-group"
+                name="thread-theme"
+                label="Theme"
+                value={theme}
+                onValueChange={(value) => chooseTheme(value as ThemeId)}
+                orientation="horizontal"
+                options={themes.map((item) => ({
+                  value: item.id,
+                  label: <span className="theme-option">
+                    <span className="theme-option-mode">{item.mode}</span>
+                    <span className="theme-swatches" aria-hidden="true">{item.swatches.map((color) => <span key={color} style={{ background: color }} />)}</span>
+                    <span className="theme-option-name">{item.name}</span>
+                    <span className="theme-check">{theme === item.id && <Check size={14} />}</span>
+                  </span>,
+                }))}
+              />
             </section>
           </section>
 
-          <section className="settings-category" hidden={activeCategory !== 'rss'} aria-labelledby="settings-category-rss">
+          <section className="settings-category" id="settings-panel-rss" role="tabpanel" hidden={activeCategory !== 'rss'} aria-labelledby="settings-tab-rss">
             <SectionHeader className="settings-category-header" title={<h2 id="settings-category-rss">RSS feeds</h2>} description="Use your own Cloudflare Worker when a publisher blocks direct browser access." />
 
-            <section className="settings-card">
-              <SectionHeader className="settings-title settings-card-header" title={<><Rss size={20} aria-hidden="true" /><h2>RSS proxy</h2></>} description="Each Thread user deploys and controls their own stateless proxy. Public HTTP and HTTPS feeds are supported; private feeds with credentials are intentionally rejected." />
-              <label><span>Worker URL</span><Input type="url" value={rssProxyUrl} onChange={(event) => setRssProxyUrl(event.target.value)} placeholder="https://thread-rss-proxy.your-name.workers.dev" /></label>
-              <label><span>Worker access key</span><Input type={showRssProxyKey ? 'text' : 'password'} value={rssProxyKey} onChange={(event) => setRssProxyKey(event.target.value)} placeholder="Generate a key, then add the same secret to Wrangler" autoComplete="off" /></label>
-              <div className="settings-actions">
+            <section className="settings-section">
+              <SectionHeader className="settings-section-header" title={<><Rss size={20} aria-hidden="true" /><h2>RSS proxy</h2></>} description="Each Thread user deploys and controls their own stateless proxy. Public HTTP and HTTPS feeds are supported; private feeds with credentials are intentionally rejected." />
+              <FormLayout columns={2} density="compact">
+                <Field label="Worker URL"><Input type="url" value={rssProxyUrl} onChange={(event) => setRssProxyUrl(event.target.value)} placeholder="https://thread-rss-proxy.your-name.workers.dev" /></Field>
+                <Field label="Worker access key"><Input type={showRssProxyKey ? 'text' : 'password'} value={rssProxyKey} onChange={(event) => setRssProxyKey(event.target.value)} placeholder="Generate a key, then add the same secret to Wrangler" autoComplete="off" /></Field>
+              </FormLayout>
+              <ActionGroup className="settings-actions" density="compact">
                 <Button variant="outline" onClick={() => { setRssProxyKey(generateRssProxyAccessKey()); setShowRssProxyKey(true) }}><Rss size={15} /> Generate key</Button>
                 <Button variant="ghost" onClick={() => setShowRssProxyKey((current) => !current)}>{showRssProxyKey ? <EyeOff size={15} /> : <Eye size={15} />}{showRssProxyKey ? 'Hide key' : 'Show key'}</Button>
                 <Button onClick={() => void connectRssProxy()} disabled={rssProxyState === 'checking' || !rssProxyUrl.trim() || !rssProxyKey.trim()}>
@@ -405,25 +404,25 @@ export function SettingsPage() {
                   {rssProxyState === 'checking' ? 'Testing…' : rssProxyState === 'done' ? 'Connected' : existingRssProxy ? 'Reconnect' : 'Test and connect'}
                 </Button>
                 {existingRssProxy && <Button variant="ghost" onClick={() => { clearRssProxyConfig(); setRssProxyUrl(''); setRssProxyKey(''); setRssProxyError('') }}><Unplug size={15} /> Disconnect</Button>}
-              </div>
+              </ActionGroup>
               {rssProxyError && <p className="banner banner-error form-error">{rssProxyError}</p>}
               <div className="security-note"><ShieldCheck size={16} /><span>The key is stored only in this browser and sent only to your Worker. Never paste a Cloudflare API token here; Wrangler uses that token on your machine.</span></div>
             </section>
 
-            <section className="settings-card rss-refresh-card">
-              <SectionHeader className="settings-title settings-card-header" title={<><RefreshCw size={20} aria-hidden="true" /><h2>Refresh schedule</h2></>} description="Choose how often Thread checks subscribed feeds while the Feeds screen is open. Turning this off never deletes cached entries." />
-              <label><span>Automatic refresh</span><Select value={rssRefreshIntervalMs} onChange={(event) => changeRssRefreshInterval(event.target.value)}>{RSS_REFRESH_INTERVALS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></label>
-              <div className="settings-actions">
+            <section className="settings-section rss-refresh-card">
+              <SectionHeader className="settings-section-header" title={<><RefreshCw size={20} aria-hidden="true" /><h2>Refresh schedule</h2></>} description="Choose how often Thread checks subscribed feeds while the Feeds screen is open. Turning this off never deletes cached entries." />
+              <Field label="Automatic refresh"><Select value={rssRefreshIntervalMs} onChange={(event) => changeRssRefreshInterval(event.target.value)}>{RSS_REFRESH_INTERVALS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></Field>
+              <ActionGroup className="settings-actions" density="compact">
                 <Button variant="outline" onClick={() => void refreshRssFeedsNow()} disabled={rssManualState === 'refreshing' || rssFeeds.length === 0}>
                   {rssManualState === 'refreshing' ? <LoaderCircle className="spin" size={16} /> : <RefreshCw size={16} />}
                   {rssManualState === 'refreshing' ? 'Refreshing…' : 'Refresh all feeds now'}
                 </Button>
-              </div>
+              </ActionGroup>
               {rssManualMessage && <p className="settings-hint rss-refresh-status">{rssManualMessage}</p>}
             </section>
 
-            <section className="settings-card rss-proxy-instructions">
-              <SectionHeader className="settings-title settings-card-header" title={<><BookOpen size={20} aria-hidden="true" /><h2>Setup instructions</h2></>} description={<span>Run these commands from the Thread repository. Your Worker configuration lives in <code>workers/rss-proxy</code>.</span>} />
+            <section className="settings-section rss-proxy-instructions">
+              <SectionHeader className="settings-section-header" title={<><BookOpen size={20} aria-hidden="true" /><h2>Setup instructions</h2></>} description={<span>Run these commands from the Thread repository. Your Worker configuration lives in <code>workers/rss-proxy</code>.</span>} />
               <ol>
                 <li>Generate a key above and copy it somewhere safe.</li>
                 <li>Run <code>npm run rss-worker:login</code> once to authenticate Wrangler.</li>
@@ -435,12 +434,12 @@ export function SettingsPage() {
             </section>
           </section>
 
-          <section className="settings-category" hidden={activeCategory !== 'sync'} aria-labelledby="settings-category-sync">
+          <section className="settings-category" id="settings-panel-sync" role="tabpanel" hidden={activeCategory !== 'sync'} aria-labelledby="settings-tab-sync">
             <SectionHeader className="settings-category-header" title={<h2 id="settings-category-sync">Data &amp; sync</h2>} description="Manage local storage, backup, and multi-device sync." />
       {conflicts.length > 0 && (
-        <section className="settings-card conflicts-card">
+        <section className="settings-card settings-card-emphasis conflicts-card">
           <SectionHeader
-            className="settings-title settings-card-header"
+            className="settings-section-header"
             title={<><AlertTriangle size={20} aria-hidden="true" /><h2>Sync conflicts</h2></>}
             description="Most changes merge automatically. These spots were edited both here and in the data repository -- pick which side to keep."
           />
@@ -457,30 +456,23 @@ export function SettingsPage() {
                   return (
                     <div className="conflict-hunk" key={hunk.index}>
                       <div className="conflict-hunk-label">near “{hunk.blockLabel}”</div>
-                      <div className="conflict-hunk-sides">
-                        <ToggleButton
-                          variant="outline"
-                          pressed={choice === 'local'}
-                          disabled={resolving === conflict.id}
-                          onClick={() => setHunkChoice(conflict.id, hunk.index, 'local')}
-                        >
-                          <div className="conflict-hunk-side-title">This browser</div>
-                          <pre className="conflict-hunk-text">{hunk.local || '(removed)'}</pre>
-                        </ToggleButton>
-                        <ToggleButton
-                          variant="outline"
-                          pressed={choice === 'remote'}
-                          disabled={resolving === conflict.id}
-                          onClick={() => setHunkChoice(conflict.id, hunk.index, 'remote')}
-                        >
-                          <div className="conflict-hunk-side-title">Repository</div>
-                          <pre className="conflict-hunk-text">{hunk.remote || '(removed)'}</pre>
-                        </ToggleButton>
-                      </div>
+                      <RadioGroup
+                        className="conflict-hunk-sides"
+                        name={`conflict-${conflict.id}-${hunk.index}`}
+                        value={choice}
+                        onValueChange={(value) => setHunkChoice(conflict.id, hunk.index, value as 'local' | 'remote')}
+                        disabled={resolving === conflict.id}
+                        orientation="horizontal"
+                        aria-label={`Choose a copy for ${hunk.blockLabel}`}
+                        options={[
+                          { value: 'local', label: <><div className="conflict-hunk-side-title">This browser</div><pre className="conflict-hunk-text">{hunk.local || '(removed)'}</pre></> },
+                          { value: 'remote', label: <><div className="conflict-hunk-side-title">Repository</div><pre className="conflict-hunk-text">{hunk.remote || '(removed)'}</pre></> },
+                        ]}
+                      />
                     </div>
                   )
                 })}
-                <div className="settings-actions conflict-actions">
+                <ActionGroup className="settings-actions conflict-actions" density="compact">
                   <Button
                     variant="outline"
                     disabled={resolving === conflict.id}
@@ -501,20 +493,20 @@ export function SettingsPage() {
                   >
                     Resolve all
                   </Button>
-                </div>
+                </ActionGroup>
               </div>
             )
           })}
         </section>
       )}
 
-      <section className="settings-card" id="sync-settings">
-        <SectionHeader className="settings-title settings-card-header" title={<><GitBranch size={20} aria-hidden="true" /><h2 ref={syncHeadingRef} tabIndex={-1}>GitHub sync</h2></>} description="Thread works locally first. Connect a private repository for backup and multi-device sync." />
-        <div className="field-grid">
-          <label><span>Data repository</span><Input value={repo} onChange={(event) => setRepo(event.target.value)} placeholder="you/thread-data" /></label>
-          <label><span>Branch</span><Input value={branch} onChange={(event) => setBranch(event.target.value)} /></label>
-        </div>
-        <label><span>Fine-grained token</span><Input type="password" value={token} onChange={(event) => setToken(event.target.value)} placeholder="github_pat_…" /></label>
+      <section className="settings-card settings-card-emphasis" id="sync-settings">
+        <SectionHeader className="settings-section-header" title={<><GitBranch size={20} aria-hidden="true" /><h2 ref={syncHeadingRef} tabIndex={-1}>GitHub sync</h2></>} description="Thread works locally first. Connect a private repository for backup and multi-device sync." />
+        <FormLayout columns={2} density="compact">
+          <Field label="Data repository"><Input value={repo} onChange={(event) => setRepo(event.target.value)} placeholder="you/thread-data" /></Field>
+          <Field label="Branch"><Input value={branch} onChange={(event) => setBranch(event.target.value)} /></Field>
+          <Field className="settings-field-wide" label="Fine-grained token"><Input type="password" value={token} onChange={(event) => setToken(event.target.value)} placeholder="github_pat_…" /></Field>
+        </FormLayout>
         <div className="security-note"><ShieldCheck size={16} /><span>Stored only in this browser and sent only to api.github.com. Restrict it to the data repository with Contents read/write access.</span></div>
         {syncStatus && (
           <p className="settings-hint">
@@ -528,7 +520,7 @@ export function SettingsPage() {
           </p>
         )}
         {error && <p className="banner banner-error form-error">{error}</p>}
-        <div className="settings-actions">
+        <ActionGroup className="settings-actions" density="compact">
           <Button onClick={() => void connect()} disabled={state !== 'idle' || !repo || !token}>
             {state === 'checking' || state === 'syncing' ? <LoaderCircle className="spin" size={16} /> : state === 'done' ? <Check size={16} /> : <GitBranch size={16} />}
             {state === 'checking' ? 'Checking…' : state === 'syncing' ? 'Syncing…' : state === 'done' ? 'Connected' : existing ? 'Reconnect' : 'Connect and sync'}
@@ -541,66 +533,62 @@ export function SettingsPage() {
             </Button>
             <Button variant="ghost" onClick={() => { clearGitHubConfig(); setToken('') }}><Unplug size={15} /> Disconnect</Button>
           </>}
-        </div>
+        </ActionGroup>
       </section>
 
-      <section className="settings-card local-card">
-        <SectionHeader className="settings-card-header" title={<h2>Local database</h2>} description="IndexedDB is the working database. Notes open and save without a network connection." />
+      <section className="settings-section local-card">
+        <SectionHeader className="settings-section-header" title={<h2>Local database</h2>} description="IndexedDB is the working database. Notes open and save without a network connection." />
         <div className="database-stat"><strong>{pending}</strong><span>changes waiting to sync</span></div>
       </section>
 
           </section>
 
-          <section className="settings-category" hidden={activeCategory !== 'ai'} aria-labelledby="settings-category-ai">
+          <section className="settings-category" id="settings-panel-ai" role="tabpanel" hidden={activeCategory !== 'ai'} aria-labelledby="settings-tab-ai">
             <SectionHeader className="settings-category-header" title={<h2 id="settings-category-ai">AI &amp; personas</h2>} description="Connect a model provider and shape the assistants you work with." />
 
-      <section className="settings-card">
-        <SectionHeader className="settings-title settings-card-header" title={<><Bot size={20} aria-hidden="true" /><h2>AI provider</h2></>} description="Bring your own API key. Keep one key per provider; the active model below is what every persona and chat uses." />
-        <div className="field-grid">
-          <label>
-            <span>Provider</span>
+      <section className="settings-section">
+        <SectionHeader className="settings-section-header" title={<><Bot size={20} aria-hidden="true" /><h2>AI provider</h2></>} description="Bring your own API key. Keep one key per provider; the active model below is what every persona and chat uses." />
+        <FormLayout columns={2} density="compact">
+          <Field label="Provider">
             <Select value={aiProvider} onChange={(event) => changeAIProvider(event.target.value as AIProvider)}>
               <option value="anthropic">Anthropic</option>
               <option value="openai">OpenAI</option>
               <option value="google">Google (Gemini)</option>
             </Select>
-          </label>
-          <label>
-            <span>Model</span>
+          </Field>
+          <Field label="Model">
             <Select value={aiModel} onChange={(event) => changeAIModel(event.target.value)}>
               {modelsForProvider(aiProvider).map((option) => (
                 <option value={option.id} key={option.id}>{option.label}</option>
               ))}
             </Select>
-          </label>
-        </div>
-        <label>
-          <span>Thinking effort</span>
+          </Field>
+          <Field label="Thinking effort">
           <Select value={aiConfig?.effort ?? 'off'} onChange={(event) => changeAIEffort(event.target.value as ThinkingEffort)}>
             <option value="off">Off</option>
             <option value="low">Low</option>
             <option value="medium">Medium</option>
             <option value="high">High</option>
           </Select>
-        </label>
+          </Field>
+        </FormLayout>
         <div className="ai-key-rows">
           {(['anthropic', 'openai', 'google'] as AIProvider[]).map((provider) => {
             const saved = hasProviderKey(aiConfig, provider)
             return (
               <div className="ai-key-row" key={provider}>
-                <label>
-                  <span>{PROVIDER_LABELS[provider]} API key{saved ? ' · saved' : ''}</span>
+                <Field label={`${PROVIDER_LABELS[provider]} API key${saved ? ' · saved' : ''}`}>
                   <Input
                     type="password"
                     value={keyDrafts[provider] ?? ''}
                     onChange={(event) => setKeyDrafts((current) => ({ ...current, [provider]: event.target.value }))}
                     placeholder={saved ? '•••••••••• (stored)' : 'sk-…'}
                   />
-                </label>
-                <div className="ai-key-row-actions">
+                </Field>
+                <ActionGroup className="ai-key-row-actions" density="compact">
                   <Button variant="outline" size="sm" onClick={() => saveProviderKey(provider)} disabled={!(keyDrafts[provider]?.trim())}>Save</Button>
                   {saved ? <Button variant="ghost" size="sm" onClick={() => removeProviderKey(provider)}>Clear</Button> : null}
-                </div>
+                </ActionGroup>
               </div>
             )
           })}
@@ -608,22 +596,25 @@ export function SettingsPage() {
         <div className="security-note"><ShieldCheck size={16} /><span>Keys are stored only in this browser and each is sent only to its own provider, directly from this device.</span></div>
         <p className="settings-hint">Manage which models appear here and their token prices in <a href="#/settings?section=models">Models</a>.</p>
         {aiError && <p className="banner banner-error form-error">{aiError}</p>}
-        <div className="settings-actions">
+        <ActionGroup className="settings-actions" density="compact">
           <Button onClick={() => void connectAI()} disabled={aiState !== 'idle' || !effectiveActiveKey || !aiModel}>
             {aiState === 'checking' ? <LoaderCircle className="spin" size={16} /> : aiState === 'done' ? <Check size={16} /> : <Bot size={16} />}
             {aiState === 'checking' ? 'Checking…' : aiState === 'done' ? 'Connected' : hasAnyKey ? 'Test connection' : 'Connect'}
           </Button>
           {hasAnyKey && <Button variant="ghost" onClick={() => { clearAIConfig(); setKeyDrafts({}) }}><Unplug size={15} /> Disconnect all</Button>}
-        </div>
+        </ActionGroup>
       </section>
 
-      <section className="settings-card ai-usage-card">
-        <SectionHeader className="settings-title settings-card-header" title={<><BarChart3 size={20} aria-hidden="true" /><h2>AI usage</h2></>} description="Provider-reported tokens across synced devices. Dollar amounts are estimates, not invoice totals." />
-        <div className="ai-usage-period" role="group" aria-label="AI usage period">
-          {([['today', 'Today'], ['30-days', 'Last 30 days'], ['all-time', 'All time']] as const).map(([value, label]) => (
-            <ToggleButton unstyled pressed={usagePeriod === value} type="button" key={value} className={usagePeriod === value ? 'is-active' : ''} onClick={() => setUsagePeriod(value)}>{label}</ToggleButton>
-          ))}
-        </div>
+      <section className="settings-section ai-usage-card">
+        <SectionHeader className="settings-section-header" title={<><BarChart3 size={20} aria-hidden="true" /><h2>AI usage</h2></>} description="Provider-reported tokens across synced devices. Dollar amounts are estimates, not invoice totals." />
+        <SegmentedControl
+          className="ai-usage-period"
+          aria-label="AI usage period"
+          value={usagePeriod}
+          onValueChange={(value) => setUsagePeriod(value as AIUsagePeriod)}
+          density="compact"
+          options={[{ value: 'today', label: 'Today' }, { value: '30-days', label: 'Last 30 days' }, { value: 'all-time', label: 'All time' }]}
+        />
         {usageSummary.runCount === 0 ? (
           <p className="settings-empty">{usageRecords.length === 0 ? 'No AI usage recorded yet. Usage is tracked from this version onward.' : 'No AI usage was recorded during this period.'}</p>
         ) : (
@@ -658,8 +649,8 @@ export function SettingsPage() {
         )}
       </section>
 
-      <section className="settings-card">
-        <SectionHeader className="settings-title settings-card-header" title={<><Users size={20} aria-hidden="true" /><h2>Personas</h2></>} description="Each persona keeps its own notes and sessions, alongside your other threads." />
+      <section className="settings-section">
+        <SectionHeader className="settings-section-header" title={<><Users size={20} aria-hidden="true" /><h2>Personas</h2></>} description="Each persona keeps its own notes and sessions, alongside your other threads." />
         <div className="persona-settings-list">
           {personas.map((persona) => (
             <PersonaRow
@@ -675,78 +666,77 @@ export function SettingsPage() {
         {creatingPersona ? (
           <div className="persona-create-form">
             <div className="persona-ai-builder">
-              <label>
-                <span>Describe the persona you want</span>
+              <Field label="Describe the persona you want">
                 <Textarea
                   value={aiDescription}
                   onChange={(event) => setAIDescription(event.target.value)}
                   rows={2}
                   placeholder="A blunt fitness coach who checks in on my workouts and calls out excuses"
                 />
-              </label>
+              </Field>
               {aiBuildError && <p className="banner banner-error form-error">{aiBuildError}</p>}
-              <div className="settings-actions">
+              <ActionGroup className="settings-actions" density="compact">
                 <Button variant="outline" onClick={() => void buildPersonaWithAI()} disabled={aiBuilding || !aiDescription.trim()}>
                   {aiBuilding ? <LoaderCircle className="spin" size={16} /> : <Wand2 size={16} />}
                   {aiBuilding ? 'Generating…' : 'Generate with AI'}
                 </Button>
-              </div>
+              </ActionGroup>
             </div>
-            <div className="field-grid">
-              <label><span>Name</span><Input value={newPersonaName} onChange={(event) => setNewPersonaName(event.target.value)} placeholder="Career coach" /></label>
-              <label><span>Icon</span><IconPicker value={newPersonaIcon} onChange={setNewPersonaIcon} /></label>
-              <label className="persona-prompt-field"><span>System prompt</span><Textarea value={newPersonaPrompt} onChange={(event) => setNewPersonaPrompt(event.target.value)} rows={3} placeholder="You are a supportive career coach…" /></label>
-              <div className="settings-actions">
+            <FormLayout columns={2} density="compact">
+              <Field label="Name"><Input value={newPersonaName} onChange={(event) => setNewPersonaName(event.target.value)} placeholder="Career coach" /></Field>
+              <Field label="Icon" controlId="new-persona-icon"><IconPicker id="new-persona-icon" value={newPersonaIcon} onChange={setNewPersonaIcon} /></Field>
+              <Field className="persona-prompt-field" label="System prompt"><Textarea value={newPersonaPrompt} onChange={(event) => setNewPersonaPrompt(event.target.value)} rows={3} placeholder="You are a supportive career coach…" /></Field>
+              <ActionGroup className="settings-actions" density="compact">
                 <Button onClick={() => void addPersona()} disabled={!newPersonaName.trim()}><Plus size={16} /> Create persona</Button>
                 <Button variant="ghost" onClick={() => setCreatingPersona(false)}>Cancel</Button>
-              </div>
-            </div>
+              </ActionGroup>
+            </FormLayout>
           </div>
         ) : (
-          <div className="settings-actions">
+          <ActionGroup className="settings-actions" density="compact">
             <Button variant="outline" onClick={() => setCreatingPersona(true)}><Plus size={16} /> New persona</Button>
-          </div>
+          </ActionGroup>
         )}
       </section>
 
           </section>
 
-          <section className="settings-category" hidden={activeCategory !== 'models'} aria-labelledby="settings-category-models">
+          <section className="settings-category" id="settings-panel-models" role="tabpanel" hidden={activeCategory !== 'models'} aria-labelledby="settings-tab-models">
             <SectionHeader className="settings-category-header" title={<h2 id="settings-category-models">Models</h2>} description="The model catalog behind the composer picker and the AI provider card, plus token pricing for cost estimates." />
 
             <ModelCatalogTable />
 
           </section>
 
-          <section className="settings-category" hidden={activeCategory !== 'workspace'} aria-labelledby="settings-category-workspace">
+          <section className="settings-category" id="settings-panel-workspace" role="tabpanel" hidden={activeCategory !== 'workspace'} aria-labelledby="settings-tab-workspace">
             <SectionHeader className="settings-category-header" title={<h2 id="settings-category-workspace">Workspace</h2>} description="Define reusable structure for threads and their metadata." />
 
             <MetadataSchemas />
 
-      <section className="settings-card">
-        <SectionHeader className="settings-title settings-card-header" title={<><FileText size={20} aria-hidden="true" /><h2>Thread templates</h2></>} description={<span>Mark any thread <em>Use as template</em> in its header, then copy it onto another from the Omnibox (<kbd>⌘⇧P</kbd> → Apply template).</span>} />
-        <div className="settings-actions">
+      <section className="settings-section">
+        <SectionHeader className="settings-section-header" title={<><FileText size={20} aria-hidden="true" /><h2>Thread templates</h2></>} description={<span>Mark any thread <em>Use as template</em> in its header, then copy it onto another from the Omnibox (<kbd>⌘⇧P</kbd> → Apply template).</span>} />
+        <ActionGroup className="settings-actions" density="compact">
           <ButtonLink variant="outline" to="/templates">Manage templates</ButtonLink>
-        </div>
+        </ActionGroup>
       </section>
 
           </section>
 
-          <section className="settings-category" hidden={activeCategory !== 'security'} aria-labelledby="settings-category-security">
+          <section className="settings-category" id="settings-panel-security" role="tabpanel" hidden={activeCategory !== 'security'} aria-labelledby="settings-tab-security">
             <SectionHeader className="settings-category-header" title={<h2 id="settings-category-security">Security</h2>} description="Review permissions that Thread can reuse without asking." />
             <TrustedActionsCard />
           </section>
 
-          <section className="settings-category" hidden={activeCategory !== 'help'} aria-labelledby="settings-category-help">
+          <section className="settings-category" id="settings-panel-help" role="tabpanel" hidden={activeCategory !== 'help'} aria-labelledby="settings-tab-help">
             <SectionHeader className="settings-category-header" title={<h2 id="settings-category-help">Help</h2>} description="Learn the language and workflows available in Thread." />
 
-      <section className="settings-card">
-        <SectionHeader className="settings-title settings-card-header" title={<><BookOpen size={20} aria-hidden="true" /><h2>Documentation</h2></>} description="Reference guides for Thread’s features." />
-        <div className="settings-actions">
+      <section className="settings-section">
+        <SectionHeader className="settings-section-header" title={<><BookOpen size={20} aria-hidden="true" /><h2>Documentation</h2></>} description="Reference guides for Thread’s features." />
+        <ActionGroup className="settings-actions" density="compact">
           <ButtonLink variant="outline" to="/docs/query-language">Query language</ButtonLink>
           <ButtonLink variant="outline" to="/docs/recipe-syntax">Recipe syntax</ButtonLink>
           <ButtonLink variant="ghost" to="/docs">All docs</ButtonLink>
-        </div>
+        </ActionGroup>
       </section>
 
           </section>
@@ -760,26 +750,27 @@ export function SettingsPage() {
 function TrustedActionsCard() {
   const trusted = useTrustedCapabilities()
   return (
-    <section className="settings-card">
+    <section className="settings-card settings-card-emphasis">
       <SectionHeader
-        className="settings-title settings-card-header"
+        className="settings-section-header"
         title={<><ShieldCheck size={20} aria-hidden="true" /><h2>Trusted actions</h2></>}
         description={<span>Choosing <em>Always allow</em> on a proposal skips its confirmation next time. Only non-destructive actions can be trusted.</span>}
       />
       {trusted.length === 0 ? (
-        <p className="settings-empty">Nothing trusted yet.</p>
+        <EmptyState variant="inline" title="Nothing trusted yet." hint="Allow a non-destructive action when Thread asks, and it will appear here." />
       ) : (
         <div className="trusted-actions-list">
           {trusted.map((name) => {
             const summary = commandRegistry.get(name)?.summary
             return (
-              <div key={name} className="trusted-actions-row">
-                <div>
-                  <code>{name}</code>
-                  {summary ? <span>{summary}</span> : null}
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => revokeCapability(name)}>Revoke</Button>
-              </div>
+              <ListRow
+                key={name}
+                className="trusted-actions-row"
+                title={<code>{name}</code>}
+                description={summary}
+                density="compact"
+                trailing={<Button variant="ghost" size="sm" onClick={() => revokeCapability(name)}>Revoke</Button>}
+              />
             )
           })}
         </div>
@@ -812,28 +803,30 @@ function PersonaRow({
 
   if (!editing) {
     return (
-      <div className="persona-row">
-        <DynamicIcon name={persona.icon} size={16} />
-        <span className="persona-row-name">{persona.name}</span>
-        <div className="settings-actions">
+      <ListRow
+        className="persona-row"
+        leading={<DynamicIcon name={persona.icon} size={16} />}
+        title={persona.name}
+        density="compact"
+        trailing={<ActionGroup className="settings-actions" density="compact">
           <Button variant="ghost" size="sm" onClick={onEdit}>Edit</Button>
           {persona.id !== GENERAL_PERSONA_ID && (
             <Button variant="danger" size="sm" iconOnly aria-label="Delete persona" onClick={() => void archivePersona(persona.id)}><Trash2 size={15} /></Button>
           )}
-        </div>
-      </div>
+        </ActionGroup>}
+      />
     )
   }
 
   return (
-    <div className="persona-create-form field-grid">
-      <label><span>Name</span><Input value={name} onChange={(event) => setName(event.target.value)} /></label>
-      <label><span>Icon</span><IconPicker value={icon} onChange={setIcon} /></label>
-      <label className="persona-prompt-field"><span>System prompt</span><Textarea value={systemPrompt} onChange={(event) => setSystemPrompt(event.target.value)} rows={3} /></label>
-      <div className="settings-actions">
+    <FormLayout className="persona-create-form" columns={2} density="compact">
+      <Field label="Name"><Input value={name} onChange={(event) => setName(event.target.value)} /></Field>
+      <Field label="Icon" controlId={`${persona.id}-icon`}><IconPicker id={`${persona.id}-icon`} value={icon} onChange={setIcon} /></Field>
+      <Field className="persona-prompt-field" label="System prompt"><Textarea value={systemPrompt} onChange={(event) => setSystemPrompt(event.target.value)} rows={3} /></Field>
+      <ActionGroup className="settings-actions" density="compact">
         <Button onClick={() => void save()}>Save</Button>
         <Button variant="ghost" onClick={onCancelEdit}>Cancel</Button>
-      </div>
-    </div>
+      </ActionGroup>
+    </FormLayout>
   )
 }

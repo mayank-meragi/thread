@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { X } from 'lucide-react'
 import { RECIPE_CATEGORY_OPTIONS } from '../../lib/blockMetadata'
 import { importRecipeFromUrl, type RecipeImportDraft } from '../../lib/recipes/import'
 import { createRecipeThread, replaceRecipeMarkdown, updateRecipeProperties } from '../../lib/recipes/mutations'
-import { Button, Field, Input, Textarea } from 'fiber'
+import { Alert, Button, Dialog, Field, Input, Textarea, ToggleGroup } from 'fiber'
 
 interface ImportDialogProps {
   onClose: () => void
@@ -43,10 +42,6 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
     }
   }
 
-  const toggleCategory = (id: string) => {
-    setCategory((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
-  }
-
   const save = async () => {
     if (stage.kind !== 'review') return
     if (!title.trim()) { setError('Give the recipe a title.'); return }
@@ -72,13 +67,7 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
   }
 
   return (
-    <div className="layer-backdrop layer-backdrop-center recipes-import-backdrop">
-      <div className="dialog recipes-import-dialog">
-        <div className="recipes-import-head">
-          <strong>Import a recipe</strong>
-          <Button variant="ghost" size="sm" iconOnly aria-label="Close" onClick={onClose}><X size={16} /></Button>
-        </div>
-
+    <Dialog open onOpenChange={(nextOpen) => { if (!nextOpen) onClose() }} title="Import a recipe" className="recipes-import-dialog">
         {stage.kind === 'url' || stage.kind === 'fetching' ? (
           <>
             <Field label="Recipe URL">
@@ -91,7 +80,7 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
                 disabled={stage.kind === 'fetching'}
               />
             </Field>
-            {error && <p className="banner banner-error" role="alert">{error}</p>}
+            {error && <Alert variant="error">{error}</Alert>}
             <div className="recipes-import-actions">
               <Button variant="outline" onClick={onClose}>Cancel</Button>
               <Button disabled={!url.trim() || stage.kind === 'fetching'} onClick={() => void fetchDraft()}>
@@ -117,20 +106,15 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
             </div>
             <div className="field">
               <span className="field-label">Category</span>
-              <div className="recipes-import-categories">
-                {RECIPE_CATEGORY_OPTIONS.map((option) => (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    key={option.id}
-                    className={category.includes(option.id) ? 'active' : ''}
-                    onClick={() => toggleCategory(option.id)}
-                    disabled={stage.kind === 'saving'}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
+              <ToggleGroup
+                className="recipes-import-categories"
+                aria-label="Recipe categories"
+                options={RECIPE_CATEGORY_OPTIONS.map((option) => ({ value: option.id, label: option.label, disabled: stage.kind === 'saving' }))}
+                value={category}
+                multiple
+                density="compact"
+                onValueChange={(value) => setCategory(Array.isArray(value) ? value : [])}
+              />
             </div>
             <Field label="Recipe outline (edit freely)" hint="Review the tags, indentation, ingredient preparations, cookware and timer annotations before saving." controlId="recipe-import-outline">
               <Textarea
@@ -143,7 +127,7 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
                 rows={8}
               />
             </Field>
-            {error && <p className="banner banner-error" role="alert">{error}</p>}
+            {error && <Alert variant="error">{error}</Alert>}
             <div className="recipes-import-actions">
               <Button variant="outline" onClick={onClose} disabled={stage.kind === 'saving'}>Cancel</Button>
               <Button disabled={stage.kind === 'saving'} onClick={() => void save()}>
@@ -152,7 +136,6 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
             </div>
           </>
         )}
-      </div>
-    </div>
+    </Dialog>
   )
 }

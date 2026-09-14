@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { DynamicIcon, iconFor, PERSONA_ICON_NAMES } from '../lib/icons'
 
-export function IconPicker({ value, onChange }: { value: string; onChange: (icon: string) => void }) {
+export function IconPicker({ value, onChange, id }: { value: string; onChange: (icon: string) => void; id?: string }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -37,7 +37,7 @@ export function IconPicker({ value, onChange }: { value: string; onChange: (icon
 
   return (
     <div className="icon-picker" ref={wrapRef}>
-      <Button unstyled type="button" className="icon-picker-trigger" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
+      <Button id={id} unstyled type="button" className="icon-picker-trigger" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
         <DynamicIcon name={value} size={16} />
         <ChevronDown size={13} />
       </Button>

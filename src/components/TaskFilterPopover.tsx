@@ -1,5 +1,5 @@
-import { Button, Field, Select } from 'fiber'
-import { useEffect, useRef, useState } from 'react'
+import { Button, Field, Popover, Select } from 'fiber'
+import { useState } from 'react'
 import { ListFilter } from 'lucide-react'
 import type { TagDefinitionRecord } from '../db'
 
@@ -18,35 +18,25 @@ interface TaskFilterPopoverProps {
 
 export function TaskFilterPopover({ priority, tag, thread, sort, tagDefinitions, threadOptions, onChange, activeCount }: TaskFilterPopoverProps) {
   const [open, setOpen] = useState(false)
-  const wrapRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onOutside = (event: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpen(false)
-    }
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', onOutside)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onOutside)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
 
   return (
-    <div className="task-filter-popover" ref={wrapRef}>
-      <Button unstyled type="button" className="task-filter-trigger" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        <ListFilter size={14} />
-        <span>Filters</span>
-        {activeCount > 0 && <span className="task-filter-trigger-badge">{activeCount}</span>}
-      </Button>
-      {open && (
-        <>
-          <div className="task-filter-backdrop" onClick={() => setOpen(false)} />
-          <div className="menu-panel task-filter-panel" role="dialog" aria-label="Filter tasks" data-density="compact">
+    <div className="task-filter-popover">
+      <Popover
+        open={open}
+        onOpenChange={setOpen}
+        placement="bottom-start"
+        contentRole="dialog"
+        className="menu-panel task-filter-panel"
+        aria-label="Filter tasks"
+        data-density="compact"
+        trigger={
+          <Button unstyled type="button" className="task-filter-trigger">
+            <ListFilter size={14} />
+            <span>Filters</span>
+            {activeCount > 0 && <span className="task-filter-trigger-badge">{activeCount}</span>}
+          </Button>
+        }
+      >
             <Field label="Priority">
               <Select value={priority} onChange={(event) => onChange('priority', event.target.value)}>
                 <option value="all">Any priority</option>
@@ -79,9 +69,7 @@ export function TaskFilterPopover({ priority, tag, thread, sort, tagDefinitions,
                 <option value="updated">Recently updated</option>
               </Select>
             </Field>
-          </div>
-        </>
-      )}
+      </Popover>
     </div>
   )
 }

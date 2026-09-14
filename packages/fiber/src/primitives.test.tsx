@@ -2,21 +2,33 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { Button } from './Button'
 import { ActionGroup } from './ActionGroup'
+import { Alert } from './Alert'
+import { BackLink } from './BackLink'
+import { Breadcrumbs } from './Breadcrumbs'
 import { Checkbox } from './Checkbox'
 import { Chip, FilterChip, Token } from './Chip'
+import { Dialog } from './Dialog'
 import { EmptyState } from './EmptyState'
 import { Field } from './Field'
 import { FormLayout } from './FormLayout'
 import { Input } from './Input'
+import { Menu } from './Menu'
 import { MenuItem } from './MenuItem'
 import { ListRow } from './ListRow'
+import { Popover } from './Popover'
+import { Progress } from './Progress'
 import { RadioGroup } from './RadioGroup'
 import { SearchField } from './SearchField'
 import { SegmentedControl } from './SegmentedControl'
 import { SectionHeader } from './SectionHeader'
 import { Select } from './Select'
+import { Sheet } from './Sheet'
+import { Skeleton } from './Skeleton'
 import { Spinner } from './Spinner'
 import { Tabs } from './Tabs'
+import { ToggleGroup } from './ToggleGroup'
+import { Toast } from './Toast'
+import { Toolbar } from './Toolbar'
 import { Textarea } from './Textarea'
 import { Tooltip } from './Tooltip'
 
@@ -227,5 +239,37 @@ describe('Fiber primitive contracts', () => {
     expect(markup).toContain('section-header-meta')
     expect(markup).toContain('section-header-actions')
     expect(markup).toContain('<h3>Subtasks</h3>')
+  })
+
+  it('covers the navigation, layer, and feedback component contracts', () => {
+    const markup = renderToStaticMarkup(
+      <div>
+        <Toolbar label="Page actions"><Button>New</Button></Toolbar>
+        <ToggleGroup aria-label="Density" value="comfortable" options={[{ value: 'compact', label: 'Compact' }, { value: 'comfortable', label: 'Comfortable' }]} />
+        <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Settings', current: true }]} />
+        <BackLink href="/">Back to home</BackLink>
+        <Popover open trigger={<button type="button">More</button>}><span>Popover content</span></Popover>
+        <Menu open trigger={<button type="button">Actions</button>}><MenuItem>Rename</MenuItem></Menu>
+        <Dialog open title="Confirm change" description="Review the setting."><p>Body</p></Dialog>
+        <Sheet open side="start" title="Details"><p>Panel</p></Sheet>
+        <Alert variant="error" onDismiss={() => undefined}>Something failed.</Alert>
+        <Toast variant="success" durationMs={0} onDismiss={() => undefined}>Saved.</Toast>
+        <Progress value={40} showValue label="Completion" />
+        <Skeleton variant="block" />
+      </div>,
+    )
+
+    expect(markup).toContain('role="toolbar"')
+    expect(markup).toContain('role="radiogroup"')
+    expect(markup).toContain('aria-current="page"')
+    expect(markup).toContain('href="/"')
+    expect(markup).toContain('role="region"')
+    expect(markup).toContain('role="menu"')
+    expect(markup).toContain('role="dialog"')
+    expect(markup).toContain('class="sheet sheet-start"')
+    expect(markup).toContain('role="alert"')
+    expect(markup).toContain('class="toast toast-success"')
+    expect(markup).toContain('aria-valuenow="40"')
+    expect(markup).toContain('aria-hidden="true"')
   })
 })

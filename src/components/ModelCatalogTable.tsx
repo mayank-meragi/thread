@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, RotateCcw, Trash2 } from 'lucide-react'
 import type { AIProvider } from '../lib/ai'
-import { Button, Checkbox, Input, SectionHeader, Select } from 'fiber'
+import { ActionGroup, Button, Checkbox, Input, SectionHeader, Select } from 'fiber'
 import {
   DEFAULT_MODELS,
   PROVIDER_IDS,
@@ -111,9 +111,9 @@ export function ModelCatalogTable() {
   }
 
   return (
-    <section className="settings-card">
+    <section className="settings-section">
       <SectionHeader
-        className="settings-title settings-card-header"
+        className="settings-section-header"
         title={<h2>Model catalog</h2>}
         description="Models offered in the composer and the AI provider picker. Prices per 1M tokens feed the usage cost estimates."
       />
@@ -202,10 +202,10 @@ export function ModelCatalogTable() {
         </table>
       </div>
 
-      <div className="settings-actions">
+      <ActionGroup className="settings-actions" density="compact">
         <Button variant="outline" onClick={addRow}><Plus size={15} /> Add model</Button>
         <Button variant="ghost" onClick={restoreDefaults}><RotateCcw size={14} /> Reset to defaults</Button>
-      </div>
+      </ActionGroup>
       <p className="settings-hint">Blank prices fall back to any built-in rate (shown as a hint); with no rate the model's usage is left out of cost totals.</p>
     </section>
   )

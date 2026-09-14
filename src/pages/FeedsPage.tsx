@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type TouchEvent as ReactTouchEvent } from 'react'
-import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ExternalLink, FileUp, Folder, FolderPlus, MoreHorizontal, Pencil, Plus, RefreshCw, Rss, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ExternalLink, FileUp, Folder, FolderPlus, MoreHorizontal, Pencil, Plus, RefreshCw, Rss, Trash2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type FeedEntryRecord, type FeedFolderRecord, type FeedRecord } from '../db'
 import { feedGateway, feedUrlPrivacyWarning, markAllFeedEntriesRead, markAllFeedEntriesUnread, markFeedEntryRead, recordFeedError, refreshFeed, removeFeed, sanitizeFeedHtml, subscribeToFeed, createFeedFolder, renameFeedFolder, deleteFeedFolder, moveFeedToFolder } from '../lib/rss'
 import { importOpml, type OpmlImportResult } from '../lib/rssOpml'
 import { articleGateway } from '../lib/rssArticle'
 import { getRssSettings } from '../lib/rssSettings'
-import { ActionGroup, Button, Field, Input, MenuItem, Select, Tooltip } from 'fiber'
+import { Alert, Button, Dialog, Field, Input, ListRow, Menu, MenuItem, Select, Tabs, Toolbar, Tooltip } from 'fiber'
 
 type InboxFilter = 'all' | 'unread'
 type MobilePane = 'sources' | 'entries' | 'reader'
@@ -102,15 +102,6 @@ export function FeedsPage() {
     window.addEventListener('thread:rss-settings', update)
     return () => window.removeEventListener('thread:rss-settings', update)
   }, [])
-
-  useEffect(() => {
-    if (!dialog) return
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setDialog(null)
-    }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [dialog])
 
   const runRefresh = useCallback(async (feed: FeedRecord) => {
     setRefreshing((current) => new Set(current).add(feed.id))
@@ -438,6 +429,23 @@ export function FeedsPage() {
     goToRelativeEntry(dx < 0 ? 1 : -1)
   }, [goToRelativeEntry])
 
+  const renderFeedEntry = (entry: FeedEntryRecord) => {
+    const source = feeds.find((feed) => feed.id === entry.feedId)
+    return (
+      <ListRow
+        key={entry.id}
+        data-feed-entry-id={entry.id}
+        className={`feed-entry-row${selectedEntry?.id === entry.id ? ' is-active' : ''}${entry.readAt ? '' : ' is-unread'}`}
+        title={entry.title}
+        meta={<><span className="feed-entry-source">{source?.title ?? 'Feed'}</span><time className="feed-entry-time">{entryTime(entry.publishedAt ?? entry.fetchedAt)}</time></>}
+        leading={<span className="feed-entry-marker" aria-hidden="true" />}
+        selected={selectedEntry?.id === entry.id}
+        onActivate={() => void selectEntry(entry)}
+        density="compact"
+      />
+    )
+  }
+
   const renderFeedRow = (feed: FeedRecord) => (
     <div className="feed-source-row-wrap" key={feed.id}>
       <Tooltip content={feed.lastError ?? feed.title}>
@@ -445,30 +453,145 @@ export function FeedsPage() {
           <span className="feed-source-icon"><span className="feed-source-dot" /></span><span className="feed-source-name">{feed.title}</span>{feed.lastError && <span className="feed-source-error" aria-label="Feed has an error">!</span>}{(unreadByFeed.get(feed.id) ?? 0) > 0 && <b>{unreadByFeed.get(feed.id)}</b>}
         </Button>
       </Tooltip>
-      <Button unstyled type="button" className="feed-source-more" aria-label={`Actions for ${feed.title}`} onClick={() => setSourceMenuId(sourceMenuId === feed.id ? null : feed.id)}><MoreHorizontal size={15} /></Button>
-      {sourceMenuId === feed.id && <div className="feed-source-menu menu-panel"><MenuItem onClick={() => void runRefresh(feed)} disabled={refreshing.has(feed.id)}><RefreshCw size={14} /> Refresh</MenuItem><span className="feed-menu-label">Move to</span><MenuItem onClick={() => { void moveFeedToFolder(feed.id, undefined); setSourceMenuId(null) }}>Ungrouped</MenuItem>{folders.map((folder) => <MenuItem key={folder.id} onClick={() => { void moveFeedToFolder(feed.id, folder.id); setSourceMenuId(null) }}>{folder.name}</MenuItem>)}<MenuItem className="feed-menu-danger" onClick={() => { setSourceMenuId(null); if (window.confirm(`Remove “${feed.title}” and its cached entries?`)) void removeFeed(feed.id) }}><Trash2 size={14} /> Remove subscription</MenuItem></div>}
+      <Menu
+        open={sourceMenuId === feed.id}
+        onOpenChange={(nextOpen) => setSourceMenuId(nextOpen ? feed.id : null)}
+        placement="bottom-end"
+        className="feed-source-menu"
+        trigger={<Button unstyled type="button" className="feed-source-more" aria-label={`Actions for ${feed.title}`}><MoreHorizontal size={15} /></Button>}
+      >
+        <MenuItem onClick={() => void runRefresh(feed)} disabled={refreshing.has(feed.id)}><RefreshCw size={14} /> Refresh</MenuItem>
+        <span role="presentation" className="feed-menu-label">Move to</span>
+        <MenuItem onClick={() => { void moveFeedToFolder(feed.id, undefined); setSourceMenuId(null) }}>Ungrouped</MenuItem>
+        {folders.map((folder) => <MenuItem key={folder.id} onClick={() => { void moveFeedToFolder(feed.id, folder.id); setSourceMenuId(null) }}>{folder.name}</MenuItem>)}
+        <MenuItem className="feed-menu-danger" onClick={() => { setSourceMenuId(null); if (window.confirm(`Remove “${feed.title}” and its cached entries?`)) void removeFeed(feed.id) }}><Trash2 size={14} /> Remove subscription</MenuItem>
+      </Menu>
     </div>
   )
 
   return (
     <article className="feeds-page" aria-keyshortcuts="J K F O M R">
-      <header className="feeds-topbar"><div className="feeds-topbar-title"><Rss size={16} /><strong>Feeds</strong><span className="feeds-shortcuts">J/K navigate · F full article · O open · M read · R refresh</span></div><ActionGroup className="feeds-topbar-actions" density="compact"><Button variant="outline"  onClick={() => void refreshAll()} disabled={refreshing.size > 0 || feeds.length === 0}><RefreshCw size={15} className={refreshing.size > 0 ? 'feeds-spin' : undefined} /> <span>Refresh</span></Button><Button variant="outline"  onClick={openImport}><FileUp size={15} /> <span>Import</span></Button><Button variant="solid"  onClick={openSubscribe}><Plus size={15} /> <span>Add feed</span></Button></ActionGroup></header>
+      <header className="feeds-topbar"><div className="feeds-topbar-title"><Rss size={16} /><strong>Feeds</strong><span className="feeds-shortcuts">J/K navigate · F full article · O open · M read · R refresh</span></div><Toolbar className="feeds-topbar-actions" label="Feed actions" density="compact"><Button variant="outline"  onClick={() => void refreshAll()} disabled={refreshing.size > 0 || feeds.length === 0}><RefreshCw size={15} className={refreshing.size > 0 ? 'feeds-spin' : undefined} /> <span>Refresh</span></Button><Button variant="outline"  onClick={openImport}><FileUp size={15} /> <span>Import</span></Button><Button variant="solid"  onClick={openSubscribe}><Plus size={15} /> <span>Add feed</span></Button></Toolbar></header>
 
       <div className="feeds-workspace" data-mobile-pane={mobilePane}>
-        <aside className="feeds-sources" aria-label="Subscriptions"><div className="feeds-panel-head"><span>Subscriptions</span><div><span className="feeds-panel-count">{feeds.length}</span><Tooltip content={foldersCollapsed ? 'Expand all folders' : 'Collapse all folders'}><Button unstyled type="button" className="feed-panel-action" aria-label={foldersCollapsed ? 'Expand all folders' : 'Collapse all folders'} onClick={toggleAllFolders} disabled={folders.length === 0}>{foldersCollapsed ? <ChevronsUpDown size={15} /> : <ChevronsDownUp size={15} />}</Button></Tooltip><Button unstyled type="button" className="feed-panel-action" aria-label="Create folder" onClick={() => openFolderDialog('create')}><FolderPlus size={15} /></Button></div></div><div className="feeds-source-scroll"><Button unstyled type="button" className={`feed-source-row${selectedSource.kind === 'all' ? ' is-active' : ''}`} onClick={() => selectSource({ kind: 'all' })}><span className="feed-source-icon"><Rss size={15} /></span><span className="feed-source-name">All feeds</span>{totalUnread > 0 && <b>{totalUnread}</b>}</Button>{folders.map((folder) => { const collapsed = collapsedFolderIds.has(folder.id); return <div className="feed-source-group" key={folder.id}><div className="feed-folder-row-wrap" onContextMenu={(event) => { event.preventDefault(); setSourceMenuId(sourceMenuId === `folder:${folder.id}` ? null : `folder:${folder.id}`) }}><Button unstyled type="button" className="feed-folder-toggle" aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${folder.name}`} aria-expanded={!collapsed} onClick={(event) => { event.stopPropagation(); toggleFolder(folder.id) }}>{collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}</Button><Button unstyled type="button" className={`feed-source-row feed-folder-row${selectedSource.kind === 'folder' && selectedSource.id === folder.id ? ' is-active' : ''}`} onClick={() => selectSource({ kind: 'folder', id: folder.id })}><span className="feed-source-icon"><Folder size={14} /></span><span className="feed-source-name">{folder.name}</span>{(folderUnread.get(folder.id) ?? 0) > 0 && <b>{folderUnread.get(folder.id)}</b>}</Button><Button unstyled type="button" className="feed-source-more" aria-label={`Actions for ${folder.name}`} onClick={() => setSourceMenuId(sourceMenuId === `folder:${folder.id}` ? null : `folder:${folder.id}`)}><MoreHorizontal size={15} /></Button>{sourceMenuId === `folder:${folder.id}` && <div className="feed-source-menu menu-panel"><MenuItem onClick={() => { void markFolderRead(folder.id); setSourceMenuId(null) }}><Check size={14} /> Mark all read</MenuItem><MenuItem onClick={() => { void refreshFolder(folder.id); setSourceMenuId(null) }}><RefreshCw size={14} /> Refresh feeds</MenuItem><MenuItem onClick={() => openFolderDialog('rename', folder)}><Pencil size={14} /> Rename</MenuItem><MenuItem className="feed-menu-danger" onClick={() => openFolderDelete(folder)}><Trash2 size={14} /> Delete folder</MenuItem></div>}</div>{!collapsed && feeds.filter((feed) => feed.folderId === folder.id).map(renderFeedRow)}</div> })}{feeds.some((feed) => !feed.folderId) && <div className="feed-source-group feed-ungrouped"><div className="feed-group-label">Ungrouped</div>{feeds.filter((feed) => !feed.folderId).map(renderFeedRow)}</div>}{feeds.length === 0 && <div className="feeds-empty-source"><p>No subscriptions yet.</p><Button unstyled type="button" onClick={openSubscribe}>Add your first feed</Button></div>}</div></aside>
+        <aside className="feeds-sources" aria-label="Subscriptions">
+          <div className="feeds-panel-head"><span>Subscriptions</span><div><span className="feeds-panel-count">{feeds.length}</span><Tooltip content={foldersCollapsed ? 'Expand all folders' : 'Collapse all folders'}><Button unstyled type="button" className="feed-panel-action" aria-label={foldersCollapsed ? 'Expand all folders' : 'Collapse all folders'} onClick={toggleAllFolders} disabled={folders.length === 0}>{foldersCollapsed ? <ChevronsUpDown size={15} /> : <ChevronsDownUp size={15} />}</Button></Tooltip><Button unstyled type="button" className="feed-panel-action" aria-label="Create folder" onClick={() => openFolderDialog('create')}><FolderPlus size={15} /></Button></div></div>
+          <div className="feeds-source-scroll">
+            <Button unstyled type="button" className={`feed-source-row${selectedSource.kind === 'all' ? ' is-active' : ''}`} onClick={() => selectSource({ kind: 'all' })}><span className="feed-source-icon"><Rss size={15} /></span><span className="feed-source-name">All feeds</span>{totalUnread > 0 && <b>{totalUnread}</b>}</Button>
+            {folders.map((folder) => {
+              const collapsed = collapsedFolderIds.has(folder.id)
+              return (
+                <div className="feed-source-group" key={folder.id}>
+                  <div className="feed-folder-row-wrap" onContextMenu={(event) => { event.preventDefault(); setSourceMenuId(sourceMenuId === `folder:${folder.id}` ? null : `folder:${folder.id}`) }}>
+                    <Button unstyled type="button" className="feed-folder-toggle" aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${folder.name}`} aria-expanded={!collapsed} onClick={(event) => { event.stopPropagation(); toggleFolder(folder.id) }}>{collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}</Button>
+                    <Button unstyled type="button" className={`feed-source-row feed-folder-row${selectedSource.kind === 'folder' && selectedSource.id === folder.id ? ' is-active' : ''}`} onClick={() => selectSource({ kind: 'folder', id: folder.id })}><span className="feed-source-icon"><Folder size={14} /></span><span className="feed-source-name">{folder.name}</span>{(folderUnread.get(folder.id) ?? 0) > 0 && <b>{folderUnread.get(folder.id)}</b>}</Button>
+                    <Menu
+                      open={sourceMenuId === `folder:${folder.id}`}
+                      onOpenChange={(nextOpen) => setSourceMenuId(nextOpen ? `folder:${folder.id}` : null)}
+                      placement="bottom-end"
+                      className="feed-source-menu"
+                      trigger={<Button unstyled type="button" className="feed-source-more" aria-label={`Actions for ${folder.name}`}><MoreHorizontal size={15} /></Button>}
+                    >
+                      <MenuItem onClick={() => { void markFolderRead(folder.id); setSourceMenuId(null) }}><Check size={14} /> Mark all read</MenuItem>
+                      <MenuItem onClick={() => { void refreshFolder(folder.id); setSourceMenuId(null) }}><RefreshCw size={14} /> Refresh feeds</MenuItem>
+                      <MenuItem onClick={() => openFolderDialog('rename', folder)}><Pencil size={14} /> Rename</MenuItem>
+                      <MenuItem className="feed-menu-danger" onClick={() => openFolderDelete(folder)}><Trash2 size={14} /> Delete folder</MenuItem>
+                    </Menu>
+                  </div>
+                  {!collapsed && feeds.filter((feed) => feed.folderId === folder.id).map(renderFeedRow)}
+                </div>
+              )
+            })}
+            {feeds.some((feed) => !feed.folderId) && <div className="feed-source-group feed-ungrouped"><div className="feed-group-label">Ungrouped</div>{feeds.filter((feed) => !feed.folderId).map(renderFeedRow)}</div>}
+            {feeds.length === 0 && <div className="feeds-empty-source"><p>No subscriptions yet.</p><Button unstyled type="button" onClick={openSubscribe}>Add your first feed</Button></div>}
+          </div>
+        </aside>
 
-        <section className="feeds-inbox" aria-label="Feed inbox"><div className="feeds-inbox-head"><Button unstyled type="button" className="feed-mobile-back" onClick={() => setMobilePane('sources')}><ArrowLeft size={15} /> Sources</Button><div className="feeds-tabs" role="tablist"><Button unstyled type="button" role="tab" aria-selected={filter === 'all'} className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>All <span>{entries.length}</span></Button><Button unstyled type="button" role="tab" aria-selected={filter === 'unread'} className={filter === 'unread' ? 'is-active' : ''} onClick={() => setFilter('unread')}>Unread <span>{entries.filter((entry) => !entry.readAt).length}</span></Button></div><div className="feeds-bulk-actions"><Button unstyled type="button" className="feeds-mark-all" onClick={() => void markCurrentSource(true)} disabled={!entries.some((entry) => !entry.readAt)}><Check size={14} /> Mark all read</Button><Button unstyled type="button" className="feeds-mark-all" onClick={() => void markCurrentSource(false)} disabled={!entries.some((entry) => entry.readAt)}>Mark all unread</Button></div></div><div className="feeds-entry-list">{groupedEntries.map((group) => <div className="feed-entry-group" key={group.label}><div className="feed-entry-group-label">{group.label}</div>{group.entries.map((entry) => { const source = feeds.find((feed) => feed.id === entry.feedId); return <Button unstyled type="button" data-feed-entry-id={entry.id} className={`feed-entry-row${selectedEntry?.id === entry.id ? ' is-active' : ''}${entry.readAt ? '' : ' is-unread'}`} onClick={() => void selectEntry(entry)} key={entry.id}><span className="feed-entry-copy"><strong>{entry.title}</strong><span className="feed-entry-sub"><span className="feed-entry-source">{source?.title ?? 'Feed'}</span><time className="feed-entry-time">{entryTime(entry.publishedAt ?? entry.fetchedAt)}</time></span></span></Button> })}</div>)}{visibleEntries.length === 0 && <div className="feeds-empty-list"><Rss size={25} /><strong>{feeds.length === 0 ? 'Your reading list starts here.' : filter === 'unread' ? 'You are caught up.' : 'No entries cached yet.'}</strong><p>{feeds.length === 0 ? 'Add a feed to bring a little more signal into your day.' : 'Refresh a subscription to check for new entries.'}</p></div>}</div></section>
+        <section className="feeds-inbox" aria-label="Feed inbox">
+          <div className="feeds-inbox-head">
+            <Button unstyled type="button" className="feed-mobile-back" onClick={() => setMobilePane('sources')}><ArrowLeft size={15} /> Sources</Button>
+            <Tabs
+              className="feeds-tabs"
+              aria-label="Feed filter"
+              value={filter}
+              onValueChange={(value) => setFilter(value as InboxFilter)}
+              panelId="feeds-entry-panel"
+              idPrefix="feeds-tab"
+              options={[{ value: 'all', label: <><span>All</span><span>{entries.length}</span></> }, { value: 'unread', label: <><span>Unread</span><span>{entries.filter((entry) => !entry.readAt).length}</span></> }]}
+            />
+            <div className="feeds-bulk-actions"><Button unstyled type="button" className="feeds-mark-all" onClick={() => void markCurrentSource(true)} disabled={!entries.some((entry) => !entry.readAt)}><Check size={14} /> Mark all read</Button><Button unstyled type="button" className="feeds-mark-all" onClick={() => void markCurrentSource(false)} disabled={!entries.some((entry) => entry.readAt)}>Mark all unread</Button></div>
+          </div>
+          <div className="feeds-entry-list" id="feeds-entry-panel" role="tabpanel" aria-labelledby={`feeds-tab-${filter}`}>
+            {groupedEntries.map((group) => <div className="feed-entry-group" key={group.label}><div className="feed-entry-group-label">{group.label}</div>{group.entries.map(renderFeedEntry)}</div>)}
+            {visibleEntries.length === 0 && <div className="feeds-empty-list"><Rss size={25} /><strong>{feeds.length === 0 ? 'Your reading list starts here.' : filter === 'unread' ? 'You are caught up.' : 'No entries cached yet.'}</strong><p>{feeds.length === 0 ? 'Add a feed to bring a little more signal into your day.' : 'Refresh a subscription to check for new entries.'}</p></div>}
+          </div>
+        </section>
 
         <section className="feed-reader" aria-label="Article detail" onTouchStart={onReaderTouchStart} onTouchEnd={onReaderTouchEnd}><div className="feed-reader-head"><Button unstyled type="button" className="feed-mobile-back" onClick={() => setMobilePane('entries')}><ArrowLeft size={15} /> Entries</Button><span>{selectedFeed?.title ?? selectedFolder?.name ?? (selectedSource.kind === 'all' ? 'All feeds' : 'Feed')}</span>{selectedEntry && <div className="feed-reader-head-actions">{selectedEntry.url && <a className="icon-button" href={selectedEntry.url} target="_blank" rel="noreferrer" aria-label="Open original article"><ExternalLink size={15} /></a>}<Button variant="ghost" size="sm" iconOnly  aria-label={selectedEntry.readAt ? 'Mark unread' : 'Mark read'} onClick={() => void markFeedEntryRead(selectedEntry.id, !selectedEntry.readAt)}>{selectedEntry.readAt ? <span className="feed-read-indicator" aria-hidden="true" /> : <Check size={16} />}</Button></div>}</div>{selectedEntry ? <div className="feed-reader-scroll">{visibleEntries.length > 1 && <p className="feed-swipe-hint">Swipe to move between articles</p>}<div className="feed-reader-body"><h2>{selectedEntry.title}</h2><div className="feed-reader-meta">{readerMeta(selectedEntry)}</div>{selectedEntry.articleError && <p className="feed-article-error" role="alert">{selectedEntry.articleError}</p>}{selectedEntry.articleHtml ? <><div className="feed-article-badge">Full article{selectedEntry.articleFetchedAt ? ` · fetched ${relativeDate(selectedEntry.articleFetchedAt).toLowerCase()}` : ''}</div><div className="feed-reader-content" dangerouslySetInnerHTML={{ __html: selectedEntry.articleHtml }} /></> : selectedEntry.summaryHtml ? <div className="feed-reader-content" dangerouslySetInnerHTML={{ __html: sanitizeFeedHtml(selectedEntry.summaryHtml, selectedEntry.url ?? selectedFeed?.siteUrl) }} /> : <p className="feed-reader-empty">This entry has no summary. Fetch the full article or open the original article to continue reading.</p>}{selectedEntry.url && <div className="feed-reader-actions"><Button variant="ghost" className="feed-fetch-article" onClick={() => void fetchFullArticle(selectedEntry)} disabled={fullArticleLoadingId === selectedEntry.id}>{fullArticleLoadingId === selectedEntry.id ? 'Fetching article…' : selectedEntry.articleHtml ? 'Refresh full article' : 'Get full article'} <kbd>F</kbd></Button><a className="feed-original-link" href={selectedEntry.url} target="_blank" rel="noreferrer">Open original article <ExternalLink size={14} /></a></div>}</div></div> : <div className="feed-reader-empty-state"><Rss size={28} /><strong>Select an entry to read.</strong><p>Your selected feed’s summaries will appear here.</p></div>}</section>
       </div>
 
-      {dialog === 'subscribe' && <div className="layer-backdrop layer-backdrop-center feeds-dialog-backdrop"><form className="dialog feed-dialog" onSubmit={(event) => void submitSubscription(event)}><div className="feed-dialog-head"><div><Rss size={16} /><strong>Subscribe to a feed</strong></div><Button variant="ghost" size="sm" iconOnly  aria-label="Close" onClick={() => setDialog(null)}><X size={16} /></Button></div><Field label="Feed URL" error={feedUrlWarning}><Input autoFocus type="url" value={feedUrl} onChange={(event) => { setFeedUrl(event.target.value); setFeedUrlWarning(feedUrlPrivacyWarning(event.target.value)) }} placeholder="https://example.com/feed.xml" required /></Field>{folders.length > 0 && <Field label="Folder" controlId="feed-folder"><Select id="feed-folder" value={subscribeFolderId ?? ''} onChange={(event) => setSubscribeFolderId(event.target.value || undefined)}><option value="">Ungrouped</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</Select></Field>}{subscribeState === 'error' && <p className="banner banner-error" role="alert">{subscribeError}</p>}<div className="feed-dialog-actions"><Button variant="outline"  onClick={() => setDialog(null)}>Cancel</Button><Button variant="solid" type="submit"  disabled={subscribeState === 'loading'}>{subscribeState === 'loading' ? 'Checking…' : 'Subscribe'}</Button></div></form></div>}
+      {dialog === 'subscribe' && (
+        <Dialog
+          open
+          onOpenChange={(nextOpen) => { if (!nextOpen) setDialog(null) }}
+          title={<span className="feed-dialog-title"><Rss size={16} /><span>Subscribe to a feed</span></span>}
+          className="feed-dialog"
+        >
+          <form className="feed-dialog-form" onSubmit={(event) => void submitSubscription(event)}>
+            <Field label="Feed URL" error={feedUrlWarning}><Input autoFocus type="url" value={feedUrl} onChange={(event) => { setFeedUrl(event.target.value); setFeedUrlWarning(feedUrlPrivacyWarning(event.target.value)) }} placeholder="https://example.com/feed.xml" required /></Field>
+            {folders.length > 0 && <Field label="Folder" controlId="feed-folder"><Select id="feed-folder" value={subscribeFolderId ?? ''} onChange={(event) => setSubscribeFolderId(event.target.value || undefined)}><option value="">Ungrouped</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</Select></Field>}
+            {subscribeState === 'error' && <Alert variant="error">{subscribeError}</Alert>}
+            <div className="feed-dialog-actions"><Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button><Button variant="solid" type="submit" disabled={subscribeState === 'loading'}>{subscribeState === 'loading' ? 'Checking…' : 'Subscribe'}</Button></div>
+          </form>
+        </Dialog>
+      )}
 
-      {dialog === 'import' && <div className="layer-backdrop layer-backdrop-center feeds-dialog-backdrop"><div className="dialog feed-dialog"><div className="feed-dialog-head"><div><FileUp size={16} /><strong>Import OPML</strong></div><Button variant="ghost" size="sm" iconOnly  aria-label="Close" onClick={() => setDialog(null)}><X size={16} /></Button></div><p className="feed-dialog-copy">Import subscriptions from an OPML file. Existing feeds are skipped and folders are preserved as one-level paths.</p><input ref={importInputRef} type="file" accept=".opml,application/xml,text/xml" hidden onChange={(event) => { void handleImportFile(event.target.files?.[0]); event.currentTarget.value = '' }} /><Button variant="outline" className=" feed-file-button" onClick={() => importInputRef.current?.click()} disabled={importState === 'loading'}><FileUp size={15} /> {importState === 'loading' ? 'Importing…' : 'Choose .opml file'}</Button>{importState === 'error' && <p className="banner banner-error" role="alert">{importError}</p>}{importResult && <div className="feed-import-summary" aria-live="polite"><strong>Import complete</strong><span>{importResult.imported.length} imported · {importResult.skipped.length} skipped · {importResult.failed.length} failed</span>{importResult.failed.length > 0 && <ul>{importResult.failed.slice(0, 8).map((item, index) => <li key={`${item.url}-${index}`}>{item.url}: {item.reason}</li>)}</ul>}</div>}<div className="feed-dialog-actions"><Button variant="outline"  onClick={() => setDialog(null)}>Close</Button></div></div></div>}
+      {dialog === 'import' && (
+        <Dialog
+          open
+          onOpenChange={(nextOpen) => { if (!nextOpen) setDialog(null) }}
+          title={<span className="feed-dialog-title"><FileUp size={16} /><span>Import OPML</span></span>}
+          className="feed-dialog"
+        >
+          <div className="feed-dialog-form">
+            <p className="feed-dialog-copy">Import subscriptions from an OPML file. Existing feeds are skipped and folders are preserved as one-level paths.</p>
+            <input ref={importInputRef} type="file" accept=".opml,application/xml,text/xml" hidden onChange={(event) => { void handleImportFile(event.target.files?.[0]); event.currentTarget.value = '' }} />
+            <Button variant="outline" className="feed-file-button" onClick={() => importInputRef.current?.click()} disabled={importState === 'loading'}><FileUp size={15} /> {importState === 'loading' ? 'Importing…' : 'Choose .opml file'}</Button>
+            {importState === 'error' && <Alert variant="error">{importError}</Alert>}
+            {importResult && <div className="feed-import-summary" aria-live="polite"><strong>Import complete</strong><span>{importResult.imported.length} imported · {importResult.skipped.length} skipped · {importResult.failed.length} failed</span>{importResult.failed.length > 0 && <ul>{importResult.failed.slice(0, 8).map((item, index) => <li key={`${item.url}-${index}`}>{item.url}: {item.reason}</li>)}</ul>}</div>}
+            <div className="feed-dialog-actions"><Button variant="outline" onClick={() => setDialog(null)}>Close</Button></div>
+          </div>
+        </Dialog>
+      )}
 
-      {dialog === 'folder' && <div className="layer-backdrop layer-backdrop-center feeds-dialog-backdrop"><form className="dialog feed-dialog" onSubmit={(event) => void submitFolder(event)}><div className="feed-dialog-head"><div><Folder size={16} /><strong>{folderDialogMode === 'create' ? 'Create folder' : 'Rename folder'}</strong></div><Button variant="ghost" size="sm" iconOnly  aria-label="Close" onClick={() => setDialog(null)}><X size={16} /></Button></div><Field label="Folder name"><Input autoFocus value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="e.g. Design" required /></Field>{folderError && <p className="banner banner-error" role="alert">{folderError}</p>}<div className="feed-dialog-actions"><Button variant="outline"  onClick={() => setDialog(null)}>Cancel</Button><Button variant="solid" type="submit" >{folderDialogMode === 'create' ? 'Create folder' : 'Save name'}</Button></div></form></div>}
+      {dialog === 'folder' && (
+        <Dialog
+          open
+          onOpenChange={(nextOpen) => { if (!nextOpen) setDialog(null) }}
+          title={<span className="feed-dialog-title"><Folder size={16} /><span>{folderDialogMode === 'create' ? 'Create folder' : 'Rename folder'}</span></span>}
+          className="feed-dialog"
+        >
+          <form className="feed-dialog-form" onSubmit={(event) => void submitFolder(event)}>
+            <Field label="Folder name"><Input autoFocus value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="e.g. Design" required /></Field>
+            {folderError && <Alert variant="error">{folderError}</Alert>}
+            <div className="feed-dialog-actions"><Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button><Button variant="solid" type="submit">{folderDialogMode === 'create' ? 'Create folder' : 'Save name'}</Button></div>
+          </form>
+        </Dialog>
+      )}
 
-      {dialog === 'folder-delete' && folderDeleteTarget && <div className="layer-backdrop layer-backdrop-center feeds-dialog-backdrop"><div className="dialog feed-dialog"><div className="feed-dialog-head"><div><Trash2 size={16} /><strong>Delete {folderDeleteTarget.name}?</strong></div><Button variant="ghost" size="sm" iconOnly  aria-label="Close" onClick={() => setDialog(null)}><X size={16} /></Button></div><p className="feed-dialog-copy">Choose whether to keep the subscriptions in this folder.</p><div className="feed-delete-actions"><Button variant="outline"  onClick={() => void finishFolderDelete('ungroup')}>Move feeds to Ungrouped</Button><Button variant="danger"  onClick={() => void finishFolderDelete('delete')}>Delete subscriptions</Button></div></div></div>}
+      {dialog === 'folder-delete' && folderDeleteTarget && (
+        <Dialog
+          open
+          onOpenChange={(nextOpen) => { if (!nextOpen) setDialog(null) }}
+          title={<span className="feed-dialog-title"><Trash2 size={16} /><span>Delete {folderDeleteTarget.name}?</span></span>}
+          className="feed-dialog"
+        >
+          <div className="feed-dialog-form">
+            <p className="feed-dialog-copy">Choose whether to keep the subscriptions in this folder.</p>
+            <div className="feed-delete-actions"><Button variant="outline" onClick={() => void finishFolderDelete('ungroup')}>Move feeds to Ungrouped</Button><Button variant="danger" onClick={() => void finishFolderDelete('delete')}>Delete subscriptions</Button></div>
+          </div>
+        </Dialog>
+      )}
     </article>
   )
 }

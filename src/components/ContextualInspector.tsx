@@ -22,7 +22,7 @@ import {
 import { kindLabel } from '../lib/blockMetadata'
 import { formatDay } from '../lib/dates'
 import { closeInspector, getInspectorTarget, INSPECTOR_TARGET_EVENT, type InspectorTarget } from '../lib/inspectorTarget'
-import { Button, Field, Input, SectionHeader, Select, ToggleButton, Tooltip } from 'fiber'
+import { ActionGroup, Button, Field, Input, SectionHeader, Select, ToggleButton, Tooltip } from 'fiber'
 import { NewPropertyForm, PropertyField } from './inspector/PropertyField'
 import { TaskDraft } from './inspector/TaskDraft'
 import { WorkoutInspectorSections } from './inspector/WorkoutInspectorSections'
@@ -208,9 +208,9 @@ export function ContextualInspector() {
             <TaskDraft key={`description:${task.id}:${task.description}`} label="Description" value={task.description ?? ''} multiline placeholder="Add the context needed to finish this…" onSave={(value) => run(() => setTaskDescription(task.id, value))} />
 
             <div className="task-detail-grid">
-              <label><span>Start</span><Input type="date" value={task.startDate ?? ''} onChange={(event) => void run(() => setTaskStartDate(task.id, event.target.value || undefined))} /></label>
-              <label><span>Due</span><Input type="date" value={task.dueDate ?? ''} onChange={(event) => void run(() => setTaskDueDate(task.id, event.target.value || undefined))} /></label>
-              <label><span>Priority</span><Select value={task.priority ?? ''} onChange={(event) => void run(() => setTaskPriority(task.id, event.target.value as TaskPriority || undefined))}><option value="">None</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></Select></label>
+              <Field label="Start"><Input type="date" value={task.startDate ?? ''} onChange={(event) => void run(() => setTaskStartDate(task.id, event.target.value || undefined))} /></Field>
+              <Field label="Due"><Input type="date" value={task.dueDate ?? ''} onChange={(event) => void run(() => setTaskDueDate(task.id, event.target.value || undefined))} /></Field>
+              <Field label="Priority"><Select value={task.priority ?? ''} onChange={(event) => void run(() => setTaskPriority(task.id, event.target.value as TaskPriority || undefined))}><option value="">None</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></Select></Field>
               <EstimateField taskId={task.id} minutes={task.estimatedMinutes} run={run} />
             </div>
             {task.dueDate && task.startDate && task.dueDate < task.startDate && (
@@ -315,7 +315,7 @@ export function ContextualInspector() {
 
           <section className="inspector-advanced">
             <div className="inspector-advanced-title">Advanced</div>
-            {task && <div className="inspector-advanced-row">
+            {task && <ActionGroup className="inspector-advanced-row" density="compact">
               <Button variant="ghost" size="sm" onClick={() => void run(() => moveTask(task.id, 'up'))}><ArrowUp size={14} /> Up</Button>
               <Button variant="ghost" size="sm" onClick={() => void run(() => moveTask(task.id, 'down'))}><ArrowDown size={14} /> Down</Button>
               <Button variant="ghost" size="sm" onClick={() => void run(() => changeTaskIndent(task.id, 'indent'))}><ArrowRight size={14} /> Indent</Button>
@@ -325,13 +325,13 @@ export function ContextualInspector() {
                 if (!window.confirm('Delete this task and all of its nested blocks?')) return
                 void run(async () => { await deleteTask(task.id); closeInspector() })
               }}><Trash2 size={13} /> Delete task</Button>
-            </div>}
-            {!task && blockId && <div className="inspector-advanced-row">
+            </ActionGroup>}
+            {!task && blockId && <ActionGroup className="inspector-advanced-row" density="compact">
               <Button variant="danger" size="sm" onClick={() => {
                 if (!window.confirm('Delete this block and all of its nested blocks?')) return
                 void run(async () => { await deleteBlock(blockId); closeInspector() })
               }}><Trash2 size={13} /> Delete block</Button>
-            </div>}
+            </ActionGroup>}
           </section>
 
           {error && <p className="banner banner-error inspector-error" role="alert">{error}</p>}

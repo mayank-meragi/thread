@@ -11,7 +11,7 @@ import {
   type TagDefinitionRecord,
 } from '../../db'
 import { PROPERTY_TYPES } from './propertyTypes'
-import { Button, Input, Select, Textarea, ToggleButton } from 'fiber'
+import { Button, Field, Input, Select, Textarea, ToggleButton } from 'fiber'
 
 // A property field edits either a block's property or a thread's property; the
 // control and validation are identical, only the mutation differs.
@@ -132,10 +132,9 @@ export function PropertyField({
 
   return (
     <div className="inspector-property">
-      <label>
-        <span>{definition.name}{schema && <small className="property-schema-source">#{schema.tag.name}{schema.required ? ' · required' : ''}</small>}</span>
+      <Field label={<>{definition.name}{schema && <small className="property-schema-source">#{schema.tag.name}{schema.required ? ' · required' : ''}</small>}</>}>
         <PropertyControl target={target} definition={definition} value={value} onError={onError} />
-      </label>
+      </Field>
       {(onRemove || value !== undefined) && <Button variant="danger" size="sm" iconOnly className="tap-target-sm property-remove" aria-label={`Remove ${definition.name}`} onClick={clear}><Trash2 size={13} /></Button>}
     </div>
   )

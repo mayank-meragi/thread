@@ -14,7 +14,7 @@ import {
 } from '../db'
 import { DEFAULT_TAG_COLOR } from '../lib/tagColors'
 import { isWorkoutSystemTag } from '../lib/workouts/systemTags'
-import { Button, Checkbox, Input, SectionHeader, Select } from 'fiber'
+import { Button, Checkbox, Field, Input, SectionHeader, Select } from 'fiber'
 
 const FIELD_TYPES: Array<{ value: PropertyType; label: string }> = [
   { value: 'text', label: 'Text' },
@@ -39,9 +39,9 @@ export function MetadataSchemas() {
   }
 
   return (
-    <section className="settings-card schema-settings-card">
+    <section className="settings-section schema-settings-card">
       <SectionHeader
-        className="settings-title schema-card-header"
+        className="settings-section-header schema-card-header"
         title={<><Sparkles size={20} aria-hidden="true" /><h2>Metadata schemas</h2></>}
         description="Turn a tag into a reusable set of fields. Applying it to any block adds the schema and its defaults."
       />
@@ -119,7 +119,7 @@ function SchemaEditor({ tag, definitions, onError }: { tag: TagDefinitionRecord;
       <div className="schema-editor-body">
         <div className="schema-name-row">
           <input type="color" value={color} onChange={(event) => setColor(event.target.value)} aria-label={`${tag.name} color`} />
-          <label><span>Schema name</span><Input value={name} disabled={isSystem} onChange={(event) => setName(event.target.value)} /></label>
+          <Field label="Schema name"><Input value={name} disabled={isSystem} onChange={(event) => setName(event.target.value)} /></Field>
         </div>
         <div className="schema-column-head"><span>Field</span><span>Required</span><span>Default</span></div>
         <div className="schema-fields">
@@ -127,12 +127,12 @@ function SchemaEditor({ tag, definitions, onError }: { tag: TagDefinitionRecord;
             const active = propertyIds.includes(definition.id)
             return (
               <div className={active ? 'schema-field active' : 'schema-field'} key={definition.id}>
-                <label className="schema-field-toggle">
-                  <Checkbox checked={active} onChange={() => toggleField(definition.id)} />
-                  <span>{active && <Check size={11} />}</span>
+                <div className="schema-field-toggle">
+                  <Checkbox checked={active} onChange={() => toggleField(definition.id)} aria-label={`Use ${definition.name}`} />
+                  <span aria-hidden="true">{active && <Check size={11} />}</span>
                   <b>{definition.name}</b><small>{definition.type.replace('_', ' ')}</small>
-                </label>
-                <label className="schema-required"><Checkbox checked={required.includes(definition.id)} disabled={!active} onChange={(event) => setRequired((items) => event.target.checked ? [...items, definition.id] : items.filter((item) => item !== definition.id))} /><span>Required</span></label>
+                </div>
+                <div className="schema-required"><Checkbox checked={required.includes(definition.id)} disabled={!active} onChange={(event) => setRequired((items) => event.target.checked ? [...items, definition.id] : items.filter((item) => item !== definition.id))} aria-label={`Require ${definition.name}`} /><span>Required</span></div>
                 <DefaultField definition={definition} disabled={!active} value={defaults[definition.id]} onChange={(value) => setDefaults((items) => {
                   const next = { ...items }
                   if (value === undefined) delete next[definition.id]

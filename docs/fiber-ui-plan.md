@@ -60,6 +60,41 @@ the control while each surface keeps its own sizing and layout rules.
 
 ## Phase 4 status — component migration in progress
 
+### Settings pilot — first end-to-end pass
+
+`SettingsPage` is the first complete page migration. Category navigation now
+uses `Tabs` with stable tab/panel relationships and responsive overflow;
+ordinary settings sections use `FormLayout` + `Field`; theme and conflict
+choices use semantic `RadioGroup`; usage periods use `SegmentedControl`; and
+related actions, trusted permissions, personas, and empty states use
+`ActionGroup`, `ListRow`, and `EmptyState`. Routine cards were flattened into
+quiet sections while conflicts, GitHub credentials, and trusted actions keep
+stronger emphasis. Native color input, custom icon-picker behavior, and
+specialized data tables remain documented exceptions.
+
+The next Fiber component group is now implemented in the library and covered by
+static contract tests:
+
+- `Toolbar` for responsive action priority and overflow.
+- `ToggleGroup` plus `Breadcrumbs`/`BackLink` for remaining navigation and
+  mutually exclusive control patterns.
+- `Popover` and a behavior-owning `Menu` for shared positioning, dismissal,
+  Escape handling, and focus return.
+- `Dialog` and `Sheet` for focus-managed modal and edge-panel behavior.
+- `Alert` for structured inline status and error messaging.
+- `Toast` for transient async feedback and polite announcements.
+- `Progress` for measurable work and `Skeleton` for predictable loading
+  layouts.
+
+Existing page-level banner, layer, progress, and loading markup can now migrate
+to these primitives incrementally without creating one-off substitutes.
+
+The same control pass also removed generic raw labels from the shopping-list
+date range, workout status filter, task view navigation, contextual task
+inspector fields, property fields, and persona editing. Remaining raw labels
+are limited to specialized workout measurement grids, task-row selection
+geometry, and the editor/command input surfaces.
+
 ### Migration order
 
 Thread will replace legacy patterns one Fiber component at a time. The active
@@ -94,8 +129,9 @@ shared tablist, with stable tab-to-panel IDs and one keyboard focus stop while
 their existing responsive presentation remains intact.
 
 `ActionGroup` now supplies shared spacing and wrapping for related commands.
-Feeds, Recipes, Meal Plan, and Today compose it in their headers while keeping
-button emphasis and page-specific responsive rules local.
+Meal Plan and Today compose it in their headers while keeping button emphasis
+and page-specific responsive rules local. The Feeds and Recipes headers now use
+`Toolbar`, which better reflects their page-level command strips.
 
 `SectionHeader` now owns compact section hierarchy and optional metadata or
 actions. Settings, task groups and board columns, workout insight panels,
@@ -104,8 +140,14 @@ alignment contract while retaining their existing content and spacing.
 
 `ListRow` is now available for dense, scannable content with leading/status,
 description, metadata, selection, and trailing-action slots. The Workouts,
-Today tasks, and workout overview rows use it while preserving their existing
-responsive layout and link behavior.
+Today tasks, workout overview rows, and the Feeds inbox use it while preserving
+their existing responsive layout and link behavior. Feeds also uses Fiber
+`Tabs`, `Menu`, `Dialog`, and `Alert` for its inbox filters, source actions, and
+subscription/folder flows; the article reader remains specialized markup.
+
+The Recipes page now uses Fiber `Toolbar`, `EmptyState`, `Alert`, and `Skeleton`
+for its page shell and state handling. Its image-backed recipe cards remain
+specialized content rather than being forced into a generic row pattern.
 
 `Tooltip` now provides short, accessible context on hover and keyboard focus.
 The Fiber gallery demonstrates its placement contract, while icon actions,

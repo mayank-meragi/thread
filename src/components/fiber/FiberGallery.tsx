@@ -2,11 +2,15 @@ import { useState } from 'react'
 import { Check, CircleDot, FlaskConical, Plus, Sparkles, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import {
+  Alert,
   ActionGroup,
+  BackLink,
+  Breadcrumbs,
   Button,
   ButtonLink,
   Checkbox,
   Chip,
+  Dialog,
   EmptyState,
   FilterChip,
   Field,
@@ -14,12 +18,17 @@ import {
   IconButton,
   Input,
   ListRow,
+  Menu,
   MenuItem,
+  Popover,
+  Progress,
   RadioGroup,
   SearchField,
   SegmentedControl,
   Select,
   SectionHeader,
+  Sheet,
+  Skeleton,
   Spinner,
   Status,
   Tabs,
@@ -28,6 +37,9 @@ import {
   Token,
   Tooltip,
   ToggleButton,
+  ToggleGroup,
+  Toast,
+  Toolbar,
   type ButtonVariant,
 } from 'fiber'
 
@@ -45,7 +57,11 @@ const COMPONENTS = [
   { id: 'search-field', label: 'SearchField', group: 'Forms', description: 'A focused search recipe that keeps icon, shortcut, and clear affordances in one control.' },
   { id: 'form-layout', label: 'FormLayout', group: 'Forms', description: 'A responsive field grid that applies one rhythm across settings and inspectors.' },
   { id: 'segmented-control', label: 'SegmentedControl', group: 'Navigation', description: 'Mutually exclusive choices with native radio semantics and predictable arrow-key movement.' },
+  { id: 'toggle-group', label: 'ToggleGroup', group: 'Navigation', description: 'Single- or multi-select toggles with roving focus and explicit checked state.' },
   { id: 'tabs', label: 'Tabs', group: 'Navigation', description: 'Panel navigation with one selected tab, one focus stop, and explicit tab-to-panel relationships.' },
+  { id: 'toolbar', label: 'Toolbar', group: 'Actions', description: 'A responsive alignment rail for action priority, filters, and view controls.' },
+  { id: 'breadcrumbs', label: 'Breadcrumbs', group: 'Navigation', description: 'A compact page hierarchy with a reliable current-page marker.' },
+  { id: 'back-link', label: 'BackLink', group: 'Navigation', description: 'A low-emphasis return link with a consistent leading affordance.' },
   { id: 'action-group', label: 'ActionGroup', group: 'Actions', description: 'A single spacing contract for related commands without hiding their priority or meaning.' },
   { id: 'list-row', label: 'ListRow', group: 'Rows', description: 'A dense row recipe for scannable titles, metadata, status, and trailing actions.' },
   { id: 'tooltip', label: 'Tooltip', group: 'Feedback', description: 'Quiet hover and focus context for icon actions and abbreviated metadata.' },
@@ -54,8 +70,16 @@ const COMPONENTS = [
   { id: 'icon-button', label: 'IconButton', group: 'Compact action', description: 'An icon-only action with a consistent hit target and an explicit accessible label.' },
   { id: 'toggle-button', label: 'ToggleButton', group: 'Stateful action', description: 'A pressed-state button for view modes, filters, and persistent choices.' },
   { id: 'menu-item', label: 'MenuItem', group: 'Menus', description: 'A menu action with shared density, focus treatment, and disabled behavior.' },
+  { id: 'popover', label: 'Popover', group: 'Layers', description: 'A positioned surface with outside-click, Escape, and focus-return behavior.' },
+  { id: 'menu', label: 'Menu', group: 'Layers', description: 'A keyboard-navigable action menu built on the shared popover contract.' },
+  { id: 'dialog', label: 'Dialog', group: 'Layers', description: 'A focus-managed modal with structured header, body, footer, and dismissal.' },
+  { id: 'sheet', label: 'Sheet', group: 'Layers', description: 'An edge-anchored panel that shares modal focus behavior and adapts on mobile.' },
   { id: 'chip', label: 'Chip', group: 'Labels and filters', description: 'A semantic label for tags, statuses, and lightweight filtering.' },
   { id: 'spinner', label: 'Spinner', group: 'Feedback', description: 'An announced loading indicator that works inline or in a quiet status surface.' },
+  { id: 'alert', label: 'Alert', group: 'Feedback', description: 'Persistent status messaging with tone-specific live-region semantics.' },
+  { id: 'toast', label: 'Toast', group: 'Feedback', description: 'Transient async feedback with polite announcements and optional auto-dismiss.' },
+  { id: 'progress', label: 'Progress', group: 'Feedback', description: 'Measurable or indeterminate progress with a stable progressbar contract.' },
+  { id: 'skeleton', label: 'Skeleton', group: 'Feedback', description: 'A restrained loading placeholder for layouts whose final geometry is predictable.' },
   { id: 'empty-state', label: 'EmptyState', group: 'Empty moments', description: 'A calm invitation for views that have not received their first item yet.' },
 ] as const
 
@@ -74,7 +98,14 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
   const [radioChoice, setRadioChoice] = useState('focused')
   const [searchValue, setSearchValue] = useState('')
   const [segmentChoice, setSegmentChoice] = useState('today')
+  const [toggleChoice, setToggleChoice] = useState('today')
   const [tabChoice, setTabChoice] = useState('overview')
+  const [popoverOpen, setPopoverOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [alertVisible, setAlertVisible] = useState(true)
+  const [toastVisible, setToastVisible] = useState(true)
 
   const requestedComponent = searchParams.get('component')
   const selectedId: ComponentId = isComponentId(requestedComponent) ? requestedComponent : 'button'
@@ -255,6 +286,21 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
             <p className="fiber-detail-note">SegmentedControl owns one selected value, exposes radio semantics, and moves between enabled choices with the arrow keys.</p>
           </div>
         )
+      case 'toggle-group':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Single-select toggles</span>
+              <ToggleGroup
+                aria-label="Review scope"
+                value={toggleChoice}
+                onValueChange={(value) => { if (typeof value === 'string') setToggleChoice(value) }}
+                options={[{ value: 'today', label: 'Today' }, { value: 'week', label: 'This week' }, { value: 'all', label: 'All time' }]}
+              />
+            </div>
+            <p className="fiber-detail-note">ToggleGroup supports both single-select radio semantics and multi-select checkbox semantics while keeping arrow-key movement predictable.</p>
+          </div>
+        )
       case 'tabs':
         return (
           <div className="fiber-detail-content">
@@ -268,6 +314,40 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
               />
             </div>
             <p className="fiber-detail-note">Tabs reserve arrow-key movement for related panels and expose the active tab through aria-selected.</p>
+          </div>
+        )
+      case 'toolbar':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Action rail</span>
+              <Toolbar label="Review actions" density="compact">
+                <SearchField placeholder="Filter items" />
+                <SegmentedControl aria-label="Scope" value="today" options={[{ value: 'today', label: 'Today' }, { value: 'week', label: 'This week' }]} />
+                <ActionGroup density="compact"><Button variant="solid">New item</Button><Button variant="ghost">More</Button></ActionGroup>
+              </Toolbar>
+            </div>
+            <p className="fiber-detail-note">Toolbar is the shared alignment rail; ActionGroup remains the boundary for related commands with a clear priority.</p>
+          </div>
+        )
+      case 'breadcrumbs':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Page hierarchy</span>
+              <Breadcrumbs items={[{ label: 'Workspace', href: '#' }, { label: 'Projects', href: '#' }, { label: 'Fiber UI', current: true }]} />
+            </div>
+            <p className="fiber-detail-note">Breadcrumbs keeps the current page explicit for both sighted users and assistive technology.</p>
+          </div>
+        )
+      case 'back-link':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Return navigation</span>
+              <BackLink href="#">Back to projects</BackLink>
+            </div>
+            <p className="fiber-detail-note">BackLink is intentionally quiet: use it for return navigation, while ButtonLink carries an action or destination with more visual weight.</p>
           </div>
         )
       case 'action-group':
@@ -367,6 +447,69 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
             <p className="fiber-detail-note">MenuItem composes the shared button behavior with the 44px menu hit area and active/disabled states.</p>
           </div>
         )
+      case 'popover':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Positioned detail</span>
+              <Popover
+                open={popoverOpen}
+                onOpenChange={setPopoverOpen}
+                trigger={<Button variant="outline">{popoverOpen ? 'Hide details' : 'Show details'}</Button>}
+              >
+                <div className="fiber-popover-demo"><strong>Current view</strong><span>Review items due this week.</span></div>
+              </Popover>
+            </div>
+            <p className="fiber-detail-note">Popover owns outside-click dismissal, Escape handling, and focus return while leaving its content composition open.</p>
+          </div>
+        )
+      case 'menu':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Action menu</span>
+              <Menu open={menuOpen} onOpenChange={setMenuOpen} trigger={<Button variant="outline">{menuOpen ? 'Close menu' : 'Open menu'}</Button>}>
+                <MenuItem onClick={() => setMenuChoice('Open thread')}>Open thread</MenuItem>
+                <MenuItem onClick={() => setMenuChoice('Duplicate')}>Duplicate</MenuItem>
+                <MenuItem disabled>Archive</MenuItem>
+              </Menu>
+              <span className="fiber-state-note">Last choice: {menuChoice}</span>
+            </div>
+            <p className="fiber-detail-note">Menu adds arrow-key navigation and closes after activation on top of the shared Popover contract.</p>
+          </div>
+        )
+      case 'dialog':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Focus-managed modal</span>
+              <Button onClick={() => setDialogOpen(true)}>Open dialog</Button>
+              <Dialog
+                open={dialogOpen}
+                onOpenChange={setDialogOpen}
+                title="Save this view?"
+                description="Your filters will be available the next time you open this workspace."
+                footer={<ActionGroup density="compact"><Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancel</Button><Button onClick={() => setDialogOpen(false)}>Save view</Button></ActionGroup>}
+              >
+                <p className="fiber-detail-note">The dialog traps focus, closes with Escape, and restores focus to its trigger.</p>
+              </Dialog>
+            </div>
+            <p className="fiber-detail-note">Dialog provides structured title, description, body, footer, initial focus, backdrop dismissal, and focus return.</p>
+          </div>
+        )
+      case 'sheet':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Edge panel</span>
+              <Button variant="outline" onClick={() => setSheetOpen(true)}>Open sheet</Button>
+              <Sheet open={sheetOpen} onOpenChange={setSheetOpen} title="View details" description="A wider surface for contextual information." footer={<Button onClick={() => setSheetOpen(false)}>Done</Button>}>
+                <div className="fiber-detail-content"><Skeleton variant="text" lines={3} width="80%" /><p>Sheets adapt to an end panel on desktop and a bottom sheet when the layout calls for it.</p></div>
+              </Sheet>
+            </div>
+            <p className="fiber-detail-note">Sheet shares Dialog's focus and dismissal behavior while supporting start, end, and bottom placement.</p>
+          </div>
+        )
       case 'chip':
         return (
           <div className="fiber-detail-content">
@@ -393,6 +536,47 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
               <div className="fiber-spinner-row"><Spinner size={18} /><Spinner size={24} label="Syncing workspace" /></div>
             </div>
             <p className="fiber-detail-note">Spinner announces itself as a status and works at multiple sizes without changing surrounding layout.</p>
+          </div>
+        )
+      case 'alert':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Persistent feedback</span>
+              {alertVisible ? <Alert variant="success" title="Saved locally" onDismiss={() => setAlertVisible(false)}>Your changes are ready to sync.</Alert> : <Button variant="ghost" size="sm" onClick={() => setAlertVisible(true)}>Restore alert</Button>}
+            </div>
+            <p className="fiber-detail-note">Alert chooses polite or assertive live-region behavior from its tone and supports optional actions or dismissal.</p>
+          </div>
+        )
+      case 'toast':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Transient feedback</span>
+              {toastVisible ? <Toast variant="info" durationMs={0} onDismiss={() => setToastVisible(false)}>Sync queued for the next connection.</Toast> : <Button variant="ghost" size="sm" onClick={() => setToastVisible(true)}>Show toast</Button>}
+            </div>
+            <p className="fiber-detail-note">Toast is a leaf notification surface with polite announcements, an optional timeout, action slot, and explicit dismissal.</p>
+          </div>
+        )
+      case 'progress':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Measured and indeterminate</span>
+              <Progress value={64} label="Importing notes" showValue />
+              <Progress label="Preparing workspace" size="sm" />
+            </div>
+            <p className="fiber-detail-note">Progress exposes value, bounds, and a readable value text when work is measurable, while undefined value selects the indeterminate treatment.</p>
+          </div>
+        )
+      case 'skeleton':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Predictable loading layout</span>
+              <div className="fiber-skeleton-demo"><Skeleton variant="circle" /><Skeleton variant="text" lines={3} width="70%" /><Skeleton variant="block" width="100%" /></div>
+            </div>
+            <p className="fiber-detail-note">Skeleton stays reserved for content whose final geometry is known, keeping loading states calm and preventing layout jumps.</p>
           </div>
         )
       case 'tooltip':

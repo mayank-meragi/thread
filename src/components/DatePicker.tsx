@@ -1,5 +1,5 @@
-import { Button, IconButton } from 'fiber'
-import { useEffect, useRef, useState } from 'react'
+import { Button, IconButton, Popover } from 'fiber'
+import { useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { isoToday } from '../lib/dates'
 
@@ -34,7 +34,6 @@ function buildGrid(monthIso: string): (string | null)[] {
 export function DatePicker({ selected, onSelect }: DatePickerProps) {
   const [open, setOpen] = useState(false)
   const [viewMonth, setViewMonth] = useState(() => monthStart(selected))
-  const wrapRef = useRef<HTMLDivElement>(null)
 
   // Reset the visible month to the selection each time the popover opens.
   const [wasOpen, setWasOpen] = useState(open)
@@ -43,33 +42,21 @@ export function DatePicker({ selected, onSelect }: DatePickerProps) {
     if (open) setViewMonth(monthStart(selected))
   }
 
-  useEffect(() => {
-    if (!open) return
-    const onOutside = (event: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpen(false)
-    }
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', onOutside)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onOutside)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
-
   const today = isoToday()
   const cells = buildGrid(viewMonth)
   const monthLabel = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date(`${viewMonth}T12:00:00`))
 
   return (
-    <div className="date-picker" ref={wrapRef}>
-      <IconButton unstyled aria-label="Pick a date" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        <CalendarDays size={16} />
-      </IconButton>
-      {open && (
-        <div className="menu-panel date-picker-panel" role="dialog" aria-label="Choose a date">
+    <div className="date-picker">
+      <Popover
+        open={open}
+        onOpenChange={setOpen}
+        placement="bottom-end"
+        contentRole="dialog"
+        className="menu-panel date-picker-panel"
+        aria-label="Choose a date"
+        trigger={<IconButton unstyled aria-label="Pick a date"><CalendarDays size={16} /></IconButton>}
+      >
           <div className="date-picker-nav">
             <IconButton unstyled aria-label="Previous month" onClick={() => setViewMonth((month) => shiftMonth(month, -1))}>
               <ChevronLeft size={14} />
@@ -109,8 +96,7 @@ export function DatePicker({ selected, onSelect }: DatePickerProps) {
               )
             })}
           </div>
-        </div>
-      )}
+      </Popover>
     </div>
   )
 }

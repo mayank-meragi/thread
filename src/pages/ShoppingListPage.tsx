@@ -5,7 +5,7 @@ import { ArrowLeft, ShoppingCart } from 'lucide-react'
 import { formatQuantity } from '../lib/recipes/cooklangTokens'
 import { formatShortDate, isoToday, shiftDay } from '../lib/dates'
 import { getShoppingList } from '../lib/recipes/selectors'
-import { Checkbox, Input } from 'fiber'
+import { Checkbox, EmptyState, Field, FormLayout, Input } from 'fiber'
 
 export function ShoppingListPage() {
   const [params, setParams] = useSearchParams()
@@ -39,18 +39,20 @@ export function ShoppingListPage() {
         <div><h1>Shopping list</h1><p>Every ingredient from your planned meals, combined.</p></div>
       </header>
 
-      <div className="shopping-list-range">
-        <label>From <Input type="date" value={startDay} onChange={(event) => setRange('start', event.target.value)} /></label>
-        <label>To <Input type="date" value={endDay} onChange={(event) => setRange('end', event.target.value)} /></label>
-        <span>{formatShortDate(startDay)} – {formatShortDate(endDay)}</span>
-      </div>
+      <FormLayout className="shopping-list-range" columns={2} density="compact">
+        <Field label="From"><Input type="date" value={startDay} onChange={(event) => setRange('start', event.target.value)} /></Field>
+        <Field label="To"><Input type="date" value={endDay} onChange={(event) => setRange('end', event.target.value)} /></Field>
+        <span className="shopping-list-range-summary">{formatShortDate(startDay)} – {formatShortDate(endDay)}</span>
+      </FormLayout>
 
       {sorted.length === 0 ? (
-        <div className="shopping-list-empty">
-          <ShoppingCart size={24} aria-hidden="true" />
-          <h2>Nothing planned yet</h2>
-          <p>Plan a meal in this range and its ingredients will show up here.</p>
-        </div>
+        <EmptyState
+          className="shopping-list-empty"
+          variant="page"
+          icon={<ShoppingCart size={24} aria-hidden="true" />}
+          title="Nothing planned yet"
+          hint="Plan a meal in this range and its ingredients will show up here."
+        />
       ) : (
         <ul className="shopping-list">
           {sorted.map((item) => (

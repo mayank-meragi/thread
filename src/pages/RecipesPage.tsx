@@ -6,7 +6,7 @@ import { ImportDialog } from '../components/recipes/ImportDialog'
 import { createRecipeThread } from '../lib/recipes/mutations'
 import { listRecipes } from '../lib/recipes/selectors'
 import type { RecipeView } from '../lib/recipes/types'
-import { ActionGroup, Button, ButtonLink, Input, SearchField } from 'fiber'
+import { Alert, Button, ButtonLink, EmptyState, Input, SearchField, Skeleton, Toolbar } from 'fiber'
 
 function RecipeCard({ recipe }: { recipe: RecipeView }) {
   const servings = recipe.properties.get('recipe-servings')
@@ -62,13 +62,13 @@ export function RecipesPage() {
     }
   }
 
-  if (recipes === undefined) return <div className="page-loading">Loading recipes…</div>
+  if (recipes === undefined) return <div className="page-loading recipes-loading" role="status" aria-live="polite"><Skeleton variant="block" width="min(1180px, 100%)" height={180} /><span className="sr-only">Loading recipes…</span></div>
 
   return (
     <article className="recipes-page">
       <header className="recipes-hero">
         <div><h1>Recipes</h1><p>Your personal recipe box.</p></div>
-        <ActionGroup className="recipes-hero-actions" align="end">
+        <Toolbar className="recipes-hero-actions" aria-label="Recipe actions" density="compact">
           <ButtonLink to="/docs/recipe-syntax" variant="outline" className="recipes-import-open">
             <BookOpen size={15} aria-hidden="true" /> Syntax guide
           </ButtonLink>
@@ -88,9 +88,9 @@ export function RecipesPage() {
             <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="New recipe name" aria-label="New recipe name" />
             <Button type="submit" disabled={busy || !title.trim()}><Plus size={16} aria-hidden="true" /> New recipe</Button>
           </form>
-        </ActionGroup>
+        </Toolbar>
       </header>
-      {error && <p className="add-exercise-error" role="alert">{error}</p>}
+      {error && <Alert variant="error" className="recipes-page-error">{error}</Alert>}
       {importOpen && (
         <ImportDialog
           onClose={() => setImportOpen(false)}
@@ -99,15 +99,19 @@ export function RecipesPage() {
       )}
 
       {recipes.length === 0 ? (
-        <div className="recipes-empty">
-          <ChefHat size={24} aria-hidden="true" />
-          <h2>Start your recipe box</h2>
-          <p>
+        <EmptyState
+          className="recipes-empty"
+          variant="page"
+          icon={<ChefHat size={24} aria-hidden="true" />}
+          title="Start your recipe box"
+          hint={
+            <>
             Write your first recipe as steps with <code>@ingredient{'{'}qty%unit{'}'}</code> annotations, and the
             ingredient list builds itself. See the <Link to="/docs/recipe-syntax">syntax guide</Link> for
             cookware (<code>^pan{'{'}{'}'}</code>) and timers (<code>~{'{'}5%minutes{'}'}</code>) too.
-          </p>
-        </div>
+            </>
+          }
+        />
       ) : (
         <>
           <SearchField className="workout-search recipes-search" value={query} placeholder="Search recipes" aria-label="Search recipes" onChange={(event) => setQuery(event.target.value)} />
