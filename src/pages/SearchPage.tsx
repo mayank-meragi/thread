@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Search } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
 import { db } from '../db'
 import { formatDay } from '../lib/dates'
 import { searchDays } from '../lib/search'
-import { Input } from 'fiber'
+import { SearchField } from 'fiber'
 
 export function SearchPage() {
   const [query, setQuery] = useState('')
@@ -22,11 +21,15 @@ export function SearchPage() {
     <article className="utility-page">
       <div className="eyebrow">Everything you have written</div>
       <h1>Search</h1>
-      <label className="search-box">
-        <Search size={18} />
-        <Input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search blocks and threads" />
-        <kbd>⌘ K</kbd>
-      </label>
+      <SearchField
+        className="search-box"
+        autoFocus
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Search blocks and threads"
+        aria-label="Search blocks and threads"
+        shortcut="⌘ K"
+      />
 
       {!normalized && <>
         <h2>Recent threads</h2>

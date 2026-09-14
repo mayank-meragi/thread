@@ -1,4 +1,4 @@
-import { ToggleButton } from 'fiber'
+import { SegmentedControl } from 'fiber'
 import { useMemo, useState } from 'react'
 import { Activity, Award, Clock3, Flame, TrendingUp } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -168,9 +168,7 @@ export function ExerciseDetail({ exercise }: { exercise: ExerciseProgress }) {
       </header>
       {metric ? (
         <>
-          <div className="exercise-metric-tabs" aria-label="Progress metric">
-            {available.map((item) => <ToggleButton unstyled pressed={item === metric} type="button" className={item === metric ? 'active' : ''} key={item} onClick={() => setRequestedMetric(item)}>{METRIC_LABELS[item]}</ToggleButton>)}
-          </div>
+          <SegmentedControl className="exercise-metric-tabs" density="compact" aria-label="Progress metric" value={metric} onValueChange={(value) => setRequestedMetric(value as StrengthMetric)} options={available.map((item) => ({ value: item, label: METRIC_LABELS[item] }))} />
           <div className="workout-chart exercise-progress-chart" role="img" aria-label={`${METRIC_LABELS[metric]} progression for ${exercise.title}`}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data} margin={{ top: 12, right: 14, bottom: 0, left: -8 }} accessibilityLayer>

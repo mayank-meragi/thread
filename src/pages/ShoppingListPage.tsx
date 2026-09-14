@@ -5,7 +5,7 @@ import { ArrowLeft, ShoppingCart } from 'lucide-react'
 import { formatQuantity } from '../lib/recipes/cooklangTokens'
 import { formatShortDate, isoToday, shiftDay } from '../lib/dates'
 import { getShoppingList } from '../lib/recipes/selectors'
-import { Input } from 'fiber'
+import { Checkbox, Input } from 'fiber'
 
 export function ShoppingListPage() {
   const [params, setParams] = useSearchParams()
@@ -55,12 +55,17 @@ export function ShoppingListPage() {
         <ul className="shopping-list">
           {sorted.map((item) => (
             <li key={item.name} className={checked.has(item.name) ? 'checked' : ''}>
-              <label>
-                <input type="checkbox" checked={checked.has(item.name)} onChange={() => toggle(item.name)} />
-                {item.quantity !== undefined && <span className="shopping-list-quantity">{formatQuantity(item.quantity)}{item.unit ? ` ${item.unit}` : ''}</span>}
-                <span className="shopping-list-name">{item.name}</span>
-                {item.quantity === undefined && item.plannedCount > 1 && <span className="shopping-list-count">×{item.plannedCount}</span>}
-              </label>
+              <Checkbox
+                checked={checked.has(item.name)}
+                onChange={() => toggle(item.name)}
+                label={
+                  <>
+                    {item.quantity !== undefined && <span className="shopping-list-quantity">{formatQuantity(item.quantity)}{item.unit ? ` ${item.unit}` : ''}</span>}
+                    <span className="shopping-list-name">{item.name}</span>
+                    {item.quantity === undefined && item.plannedCount > 1 && <span className="shopping-list-count">×{item.plannedCount}</span>}
+                  </>
+                }
+              />
             </li>
           ))}
         </ul>

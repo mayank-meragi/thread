@@ -6,7 +6,7 @@ import { daysBetween, formatDay, isoToday, shiftDay } from '../lib/dates'
 import { planMeal, removeMealPlan } from '../lib/recipes/mutations'
 import { getMealPlanRange, listRecipes } from '../lib/recipes/selectors'
 import type { MealPlanView, MealType } from '../lib/recipes/types'
-import { Button, ButtonLink } from 'fiber'
+import { ActionGroup, Button, ButtonLink, Select } from 'fiber'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 const MEAL_LABEL: Record<MealType, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' }
@@ -33,12 +33,12 @@ function AddMealForm({ day, recipes }: { day: string; recipes: Array<{ id: strin
 
   return (
     <form className="meal-plan-add-form" onSubmit={(event) => { event.preventDefault(); void submit() }}>
-      <select value={recipeId} onChange={(event) => setRecipeId(event.target.value)} disabled={busy}>
+      <Select value={recipeId} onChange={(event) => setRecipeId(event.target.value)} disabled={busy} aria-label="Recipe">
         {recipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.title}</option>)}
-      </select>
-      <select value={mealType} onChange={(event) => setMealType(event.target.value as MealType)} disabled={busy}>
+      </Select>
+      <Select value={mealType} onChange={(event) => setMealType(event.target.value as MealType)} disabled={busy} aria-label="Meal type">
         {MEAL_TYPES.map((type) => <option key={type} value={type}>{MEAL_LABEL[type]}</option>)}
-      </select>
+      </Select>
       <Button type="submit" variant="ghost" size="sm" disabled={busy}>Add</Button>
       <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
     </form>
@@ -100,13 +100,13 @@ export function MealPlanPage() {
     <article className="meal-plan-page">
       <header className="meal-plan-hero">
         <div><h1>Meal plan</h1><p>{formatDay(startDay).short} – {formatDay(endDay).short}</p></div>
-        <div className="meal-plan-hero-actions">
+        <ActionGroup className="meal-plan-hero-actions">
           <nav className="meal-plan-nav" aria-label="Week">
             <Button variant="ghost" size="sm" iconOnly onClick={() => shiftWeek(-1)} aria-label="Previous week"><ChevronLeft size={16} aria-hidden="true" /></Button>
             <Button variant="ghost" size="sm" iconOnly onClick={() => shiftWeek(1)} aria-label="Next week"><ChevronRight size={16} aria-hidden="true" /></Button>
           </nav>
           <ButtonLink variant="outline" to={`/shopping-list?start=${startDay}&end=${endDay}`}><ShoppingCart size={15} aria-hidden="true" /> Shopping list</ButtonLink>
-        </div>
+        </ActionGroup>
       </header>
 
       {recipeOptions.length === 0 ? (

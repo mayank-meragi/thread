@@ -25,7 +25,7 @@ import { commandRegistry } from '../lib/commands'
 import { revokeCapability, useTrustedCapabilities } from '../lib/threadscript/trustedCapabilities'
 import { MetadataSchemas } from '../components/MetadataSchemas'
 import { clearRssProxyConfig, generateRssProxyAccessKey, getRssProxyConfig, saveRssProxyConfig, testRssProxyConnection } from '../lib/rssProxy'
-import { Button, ButtonLink, Input, ToggleButton } from 'fiber'
+import { Button, ButtonLink, Input, Select, Textarea, ToggleButton } from 'fiber'
 import { refreshAllFeeds } from '../lib/rss'
 import { getRssSettings, RSS_REFRESH_INTERVALS, saveRssSettings, type RssRefreshInterval } from '../lib/rssSettings'
 import { formatAIUsageCost, groupAIUsage, summarizeAIUsage, type AIUsageFeature, type AIUsagePeriod } from '../lib/aiUsage'
@@ -350,9 +350,9 @@ export function SettingsPage() {
 
       <label className="settings-category-select">
         <span>Category</span>
-        <select value={activeCategory} onChange={(event) => chooseCategory(event.target.value as SettingsCategory)}>
+        <Select value={activeCategory} onChange={(event) => chooseCategory(event.target.value as SettingsCategory)}>
           {SETTINGS_CATEGORIES.map((category) => <option value={category.id} key={category.id}>{category.label}</option>)}
-        </select>
+        </Select>
       </label>
 
       <div className="settings-layout">
@@ -412,7 +412,7 @@ export function SettingsPage() {
 
             <section className="settings-card rss-refresh-card">
               <div className="settings-title"><RefreshCw size={20} /><div><h2>Refresh schedule</h2><p>Choose how often Thread checks subscribed feeds while the Feeds screen is open. Turning this off never deletes cached entries.</p></div></div>
-              <label><span>Automatic refresh</span><select value={rssRefreshIntervalMs} onChange={(event) => changeRssRefreshInterval(event.target.value)}>{RSS_REFRESH_INTERVALS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+              <label><span>Automatic refresh</span><Select value={rssRefreshIntervalMs} onChange={(event) => changeRssRefreshInterval(event.target.value)}>{RSS_REFRESH_INTERVALS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></label>
               <div className="settings-actions">
                 <Button variant="outline" onClick={() => void refreshRssFeedsNow()} disabled={rssManualState === 'refreshing' || rssFeeds.length === 0}>
                   {rssManualState === 'refreshing' ? <LoaderCircle className="spin" size={16} /> : <RefreshCw size={16} />}
@@ -561,29 +561,29 @@ export function SettingsPage() {
         <div className="field-grid">
           <label>
             <span>Provider</span>
-            <select value={aiProvider} onChange={(event) => changeAIProvider(event.target.value as AIProvider)}>
+            <Select value={aiProvider} onChange={(event) => changeAIProvider(event.target.value as AIProvider)}>
               <option value="anthropic">Anthropic</option>
               <option value="openai">OpenAI</option>
               <option value="google">Google (Gemini)</option>
-            </select>
+            </Select>
           </label>
           <label>
             <span>Model</span>
-            <select value={aiModel} onChange={(event) => changeAIModel(event.target.value)}>
+            <Select value={aiModel} onChange={(event) => changeAIModel(event.target.value)}>
               {modelsForProvider(aiProvider).map((option) => (
                 <option value={option.id} key={option.id}>{option.label}</option>
               ))}
-            </select>
+            </Select>
           </label>
         </div>
         <label>
           <span>Thinking effort</span>
-          <select value={aiConfig?.effort ?? 'off'} onChange={(event) => changeAIEffort(event.target.value as ThinkingEffort)}>
+          <Select value={aiConfig?.effort ?? 'off'} onChange={(event) => changeAIEffort(event.target.value as ThinkingEffort)}>
             <option value="off">Off</option>
             <option value="low">Low</option>
             <option value="medium">Medium</option>
             <option value="high">High</option>
-          </select>
+          </Select>
         </label>
         <div className="ai-key-rows">
           {(['anthropic', 'openai', 'google'] as AIProvider[]).map((provider) => {
@@ -679,7 +679,7 @@ export function SettingsPage() {
             <div className="persona-ai-builder">
               <label>
                 <span>Describe the persona you want</span>
-                <textarea
+                <Textarea
                   value={aiDescription}
                   onChange={(event) => setAIDescription(event.target.value)}
                   rows={2}
@@ -697,7 +697,7 @@ export function SettingsPage() {
             <div className="field-grid">
               <label><span>Name</span><Input value={newPersonaName} onChange={(event) => setNewPersonaName(event.target.value)} placeholder="Career coach" /></label>
               <label><span>Icon</span><IconPicker value={newPersonaIcon} onChange={setNewPersonaIcon} /></label>
-              <label className="persona-prompt-field"><span>System prompt</span><textarea value={newPersonaPrompt} onChange={(event) => setNewPersonaPrompt(event.target.value)} rows={3} placeholder="You are a supportive career coach…" /></label>
+              <label className="persona-prompt-field"><span>System prompt</span><Textarea value={newPersonaPrompt} onChange={(event) => setNewPersonaPrompt(event.target.value)} rows={3} placeholder="You are a supportive career coach…" /></label>
               <div className="settings-actions">
                 <Button onClick={() => void addPersona()} disabled={!newPersonaName.trim()}><Plus size={16} /> Create persona</Button>
                 <Button variant="ghost" onClick={() => setCreatingPersona(false)}>Cancel</Button>
@@ -833,7 +833,7 @@ function PersonaRow({
     <div className="persona-create-form field-grid">
       <label><span>Name</span><Input value={name} onChange={(event) => setName(event.target.value)} /></label>
       <label><span>Icon</span><IconPicker value={icon} onChange={setIcon} /></label>
-      <label className="persona-prompt-field"><span>System prompt</span><textarea value={systemPrompt} onChange={(event) => setSystemPrompt(event.target.value)} rows={3} /></label>
+      <label className="persona-prompt-field"><span>System prompt</span><Textarea value={systemPrompt} onChange={(event) => setSystemPrompt(event.target.value)} rows={3} /></label>
       <div className="settings-actions">
         <Button onClick={() => void save()}>Save</Button>
         <Button variant="ghost" onClick={onCancelEdit}>Cancel</Button>

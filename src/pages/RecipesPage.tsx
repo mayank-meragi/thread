@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate } from 'react-router-dom'
-import { BookOpen, CalendarDays, ChefHat, Download, Plus, Search } from 'lucide-react'
+import { BookOpen, CalendarDays, ChefHat, Download, Plus } from 'lucide-react'
 import { ImportDialog } from '../components/recipes/ImportDialog'
 import { createRecipeThread } from '../lib/recipes/mutations'
 import { listRecipes } from '../lib/recipes/selectors'
 import type { RecipeView } from '../lib/recipes/types'
-import { Button, ButtonLink, Input } from 'fiber'
+import { ActionGroup, Button, ButtonLink, Input, SearchField } from 'fiber'
 
 function RecipeCard({ recipe }: { recipe: RecipeView }) {
   const servings = recipe.properties.get('recipe-servings')
@@ -68,7 +68,7 @@ export function RecipesPage() {
     <article className="recipes-page">
       <header className="recipes-hero">
         <div><h1>Recipes</h1><p>Your personal recipe box.</p></div>
-        <div className="recipes-hero-actions">
+        <ActionGroup className="recipes-hero-actions" align="end">
           <ButtonLink to="/docs/recipe-syntax" variant="outline" className="recipes-import-open">
             <BookOpen size={15} aria-hidden="true" /> Syntax guide
           </ButtonLink>
@@ -88,7 +88,7 @@ export function RecipesPage() {
             <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="New recipe name" aria-label="New recipe name" />
             <Button type="submit" disabled={busy || !title.trim()}><Plus size={16} aria-hidden="true" /> New recipe</Button>
           </form>
-        </div>
+        </ActionGroup>
       </header>
       {error && <p className="add-exercise-error" role="alert">{error}</p>}
       {importOpen && (
@@ -110,7 +110,7 @@ export function RecipesPage() {
         </div>
       ) : (
         <>
-          <label className="workout-search recipes-search"><Search size={15} aria-hidden="true" /><span className="sr-only">Search recipes</span><Input value={query} placeholder="Search recipes" onChange={(event) => setQuery(event.target.value)} /></label>
+          <SearchField className="workout-search recipes-search" value={query} placeholder="Search recipes" aria-label="Search recipes" onChange={(event) => setQuery(event.target.value)} />
           <div className="recipes-grid">{filtered.map((recipe) => <RecipeCard key={recipe.thread.id} recipe={recipe} />)}</div>
         </>
       )}

@@ -22,7 +22,7 @@ import {
 import { kindLabel } from '../lib/blockMetadata'
 import { formatDay } from '../lib/dates'
 import { closeInspector, getInspectorTarget, INSPECTOR_TARGET_EVENT, type InspectorTarget } from '../lib/inspectorTarget'
-import { Button, Field, Input, ToggleButton } from 'fiber'
+import { Button, Field, Input, Select, ToggleButton } from 'fiber'
 import { NewPropertyForm, PropertyField } from './inspector/PropertyField'
 import { TaskDraft } from './inspector/TaskDraft'
 import { WorkoutInspectorSections } from './inspector/WorkoutInspectorSections'
@@ -210,7 +210,7 @@ export function ContextualInspector() {
             <div className="task-detail-grid">
               <label><span>Start</span><Input type="date" value={task.startDate ?? ''} onChange={(event) => void run(() => setTaskStartDate(task.id, event.target.value || undefined))} /></label>
               <label><span>Due</span><Input type="date" value={task.dueDate ?? ''} onChange={(event) => void run(() => setTaskDueDate(task.id, event.target.value || undefined))} /></label>
-              <label><span>Priority</span><select value={task.priority ?? ''} onChange={(event) => void run(() => setTaskPriority(task.id, event.target.value as TaskPriority || undefined))}><option value="">None</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+              <label><span>Priority</span><Select value={task.priority ?? ''} onChange={(event) => void run(() => setTaskPriority(task.id, event.target.value as TaskPriority || undefined))}><option value="">None</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></Select></label>
               <EstimateField taskId={task.id} minutes={task.estimatedMinutes} run={run} />
             </div>
             {task.dueDate && task.startDate && task.dueDate < task.startDate && (

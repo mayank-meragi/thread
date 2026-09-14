@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, RotateCcw, Trash2 } from 'lucide-react'
 import type { AIProvider } from '../lib/ai'
-import { Button, Input } from 'fiber'
+import { Button, Checkbox, Input, Select } from 'fiber'
 import {
   DEFAULT_MODELS,
   PROVIDER_IDS,
@@ -139,11 +139,11 @@ export function ModelCatalogTable() {
               return (
                 <tr key={row.uid}>
                   <td>
-                    <select value={row.provider} onChange={(event) => patchRow(row.uid, { provider: event.target.value as AIProvider })}>
+                    <Select value={row.provider} onChange={(event) => patchRow(row.uid, { provider: event.target.value as AIProvider })}>
                       {PROVIDER_IDS.map((provider) => (
                         <option value={provider} key={provider}>{PROVIDER_LABELS[provider]}</option>
                       ))}
-                    </select>
+                    </Select>
                   </td>
                   <td>
                     <Input
@@ -163,8 +163,7 @@ export function ModelCatalogTable() {
                     {duplicate && <span className="models-cell-note">Duplicate ID</span>}
                   </td>
                   <td className="models-col-center">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={row.reasoning}
                       aria-label="Supports thinking effort"
                       onChange={(event) => patchRow(row.uid, { reasoning: event.target.checked })}

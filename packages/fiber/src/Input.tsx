@@ -8,7 +8,7 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 /** Text input primitive that composes with Field's id, hint, and error wiring. */
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { className, id, invalid, required, 'aria-describedby': ariaDescribedBy, 'aria-invalid': ariaInvalid, ...rest },
+  { className, id, invalid, required, readOnly, 'aria-describedby': ariaDescribedBy, 'aria-invalid': ariaInvalid, ...rest },
   ref,
 ) {
   const field = useFieldContext()
@@ -19,10 +19,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     <input
       ref={ref}
       id={id ?? field?.controlId}
-      className={['field-control', className].filter(Boolean).join(' ')}
+      className={['field-control', readOnly ? 'field-control-readonly' : '', className].filter(Boolean).join(' ')}
       required={required ?? field?.required}
+      readOnly={readOnly}
       aria-describedby={describedBy}
       aria-invalid={resolvedInvalid ? true : ariaInvalid}
+      aria-readonly={readOnly || undefined}
       {...rest}
     />
   )

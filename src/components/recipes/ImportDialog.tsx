@@ -3,7 +3,7 @@ import { X } from 'lucide-react'
 import { RECIPE_CATEGORY_OPTIONS } from '../../lib/blockMetadata'
 import { importRecipeFromUrl, type RecipeImportDraft } from '../../lib/recipes/import'
 import { createRecipeThread, replaceRecipeMarkdown, updateRecipeProperties } from '../../lib/recipes/mutations'
-import { Button, Field, Input } from 'fiber'
+import { Button, Field, Input, Textarea } from 'fiber'
 
 interface ImportDialogProps {
   onClose: () => void
@@ -133,7 +133,7 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
               </div>
             </div>
             <Field label="Recipe outline (edit freely)" hint="Review the tags, indentation, ingredient preparations, cookware and timer annotations before saving." controlId="recipe-import-outline">
-              <textarea
+              <Textarea
                 className="field-control recipes-import-steps"
                 id="recipe-import-outline"
                 aria-describedby="recipe-import-outline-hint"

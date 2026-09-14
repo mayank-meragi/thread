@@ -72,7 +72,7 @@ export async function mountTaskExtras(item: HTMLElement, id: string, day: string
     row = document.createElement('div')
     row.className = 'task-metadata-row'
     row.contentEditable = 'false'
-    row.innerHTML = '<label><span>Status</span><select class="task-status-input" aria-label="Task status"><option value="not_started">Not started</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option><option value="done">Done</option><option value="canceled">Canceled</option></select></label><label><span>Due</span><input class="task-due-input" type="date" aria-label="Task due date"></label><label><span>Priority</span><select class="task-priority-input" aria-label="Task priority"><option value="">Add priority</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>'
+    row.innerHTML = '<label><span>Status</span><span class="field-select-wrap"><select class="task-status-input field-control field-select" aria-label="Task status"><option value="not_started">Not started</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option><option value="done">Done</option><option value="canceled">Canceled</option></select></span></label><label><span>Due</span><input class="task-due-input field-control" type="date" aria-label="Task due date"></label><label><span>Priority</span><span class="field-select-wrap"><select class="task-priority-input field-control field-select" aria-label="Task priority"><option value="">Add priority</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></span></label>'
     children.append(row)
   }
 

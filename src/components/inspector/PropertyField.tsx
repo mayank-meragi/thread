@@ -11,7 +11,7 @@ import {
   type TagDefinitionRecord,
 } from '../../db'
 import { PROPERTY_TYPES } from './propertyTypes'
-import { Button, Input, ToggleButton } from 'fiber'
+import { Button, Input, Select, Textarea, ToggleButton } from 'fiber'
 
 // A property field edits either a block's property or a thread's property; the
 // control and validation are identical, only the mutation differs.
@@ -61,13 +61,13 @@ export function PropertyControl({
     return <ToggleButton variant="outline" size="sm" pressed={value === true} className={value === true ? 'property-boolean active' : 'property-boolean'} onClick={() => void save(value !== true)}><span>{value === true && <Check size={12} />}</span>{value === true ? 'Yes' : 'No'}</ToggleButton>
   }
   if ((definition.type === 'select' || definition.type === 'status') && definition.options?.length) {
-    return <select value={typeof value === 'string' ? value : ''} onChange={(event) => void save(event.target.value)}>
+    return <Select value={typeof value === 'string' ? value : ''} onChange={(event) => void save(event.target.value)}>
       <option value="">Not set</option>
       {definition.options.map((option) => <option value={option.id} key={option.id}>{option.label}</option>)}
-    </select>
+    </Select>
   }
   if (definition.type === 'rich_text' && !compact) {
-    return <textarea value={draft} rows={3} placeholder="Add context…" onChange={(event) => setDraft(event.target.value)} onBlur={() => void save(draft)} />
+    return <Textarea value={draft} rows={3} placeholder="Add context…" onChange={(event) => setDraft(event.target.value)} onBlur={() => void save(draft)} />
   }
   if (definition.type === 'multi_select' && definition.options?.length) {
     const selected = new Set(Array.isArray(value) ? value : [])
@@ -152,9 +152,9 @@ export function NewPropertyForm({ onDone, onError }: { onDone: (created?: Proper
       void createPropertyDefinition({ name, type }).then((created) => onDone(created)).catch((caught) => onError(caught instanceof Error ? caught.message : String(caught)))
     }}>
       <Input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Property name" aria-label="Property name" />
-      <select value={type} onChange={(event) => setType(event.target.value as PropertyType)} aria-label="Property type">
+      <Select value={type} onChange={(event) => setType(event.target.value as PropertyType)} aria-label="Property type">
         {PROPERTY_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-      </select>
+      </Select>
       <Button type="submit" disabled={!name.trim()}>Create</Button>
       <Button variant="ghost" onClick={() => onDone()}>Cancel</Button>
     </form>

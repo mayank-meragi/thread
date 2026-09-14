@@ -4,7 +4,7 @@ import type { BlockTagRecord, MentionRecord, TagDefinitionRecord, TaskRecord } f
 import { formatDay, isoToday, shiftDay } from '../lib/dates'
 import { deleteTask, setTaskDueDate, setTaskStatus } from '../lib/tasks'
 import { TaskStatusControl } from './TaskStatusControl'
-import { Button } from 'fiber'
+import { Button, Checkbox } from 'fiber'
 
 export type TaskDisplayMode = 'list' | 'compact'
 
@@ -99,7 +99,7 @@ export function TaskRow({
         onPointerCancel={endDrag}
       >
         <label className="task-select-control">
-          <input type="checkbox" checked={selected} onChange={(event) => onSelect(event.target.checked)} />
+          <Checkbox checked={selected} onChange={(event) => onSelect(event.target.checked)} />
           <span />
         </label>
         <Button unstyled type="button" className="task-tree-toggle" disabled={!hasChildren} aria-label={expanded ? 'Collapse subtasks' : 'Expand subtasks'} aria-expanded={hasChildren ? expanded : undefined} onClick={onToggleExpanded}>

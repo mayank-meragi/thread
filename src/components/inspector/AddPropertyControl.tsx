@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { createPropertyDefinition, type PropertyDefinitionRecord, type PropertyType } from '../../db'
 import { PROPERTY_TYPES } from './propertyTypes'
-import { Button, Input, MenuItem } from 'fiber'
+import { Button, Input, MenuItem, Select } from 'fiber'
 
 const MAX_ROWS = 8
 
@@ -134,6 +134,7 @@ export function AddPropertyControl({
           {showCreate && (
             <div
               className={`menu-item add-property-create${highlighted === matches.length ? ' active' : ''}`}
+              data-density="compact"
               onMouseEnter={() => setHighlighted(matches.length)}
             >
               <Button
@@ -145,14 +146,14 @@ export function AddPropertyControl({
               >
                 <Plus size={14} /> Create “{trimmed}”
               </Button>
-              <select
+              <Select
                 aria-label="New property type"
                 value={type}
                 onMouseDown={(event) => event.stopPropagation()}
                 onChange={(event) => setType(event.target.value as PropertyType)}
               >
                 {PROPERTY_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-              </select>
+              </Select>
             </div>
           )}
           {!showCreate && matches.length === 0 && exactAssigned && (

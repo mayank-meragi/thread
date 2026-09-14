@@ -8,7 +8,7 @@ import { MarkdownEditor } from '../components/MarkdownEditor'
 import { TodayCooking } from '../components/TodayCooking'
 import { TodayTasks } from '../components/TodayTasks'
 import { DatePicker } from '../components/DatePicker'
-import { Button } from 'fiber'
+import { ActionGroup, Button } from 'fiber'
 
 const INITIAL_DAYS = 14
 const LOAD_BATCH = 14
@@ -203,12 +203,12 @@ export function TodayPage() {
     <article className="journal-page" ref={journalPageRef}>
       <header className="day-toolbar">
         <div className="day-toolbar-label">{isViewingToday ? 'Today' : label.weekday}, {label.full}</div>
-        <div className="day-actions" aria-label="Change day">
+        <ActionGroup className="day-actions" aria-label="Change day" density="compact">
           <DatePicker selected={activeDate} onSelect={(date) => jumpTo(date, 'smooth')} />
           {!isViewingToday && (
             <Button variant="outline" size="sm" className="today-button" onClick={() => jumpTo(today, 'smooth')}>Today</Button>
           )}
-        </div>
+        </ActionGroup>
       </header>
 
       <div className="day-sections">

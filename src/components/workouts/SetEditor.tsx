@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Check } from 'lucide-react'
 import type { PropertyValue } from '../../db'
 import { updateSet, type SetPropertyInput } from '../../lib/workouts/mutations'
-import { Button, Input } from 'fiber'
+import { Button, Input, Select } from 'fiber'
 
 const LOAD_UNITS = ['kg', 'lb'] as const
 const DISTANCE_UNITS = ['m', 'km', 'mi'] as const
@@ -101,17 +101,17 @@ export function SetEditor({
         ))}
         <label className="set-editor-field">
           <span>Load unit</span>
-          <select value={form.loadUnit} onChange={(event) => update('loadUnit', event.target.value)}>
+          <Select value={form.loadUnit} onChange={(event) => update('loadUnit', event.target.value)}>
             <option value="">—</option>
             {LOAD_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
-          </select>
+          </Select>
         </label>
         <label className="set-editor-field">
           <span>Distance unit</span>
-          <select value={form.distanceUnit} onChange={(event) => update('distanceUnit', event.target.value)}>
+          <Select value={form.distanceUnit} onChange={(event) => update('distanceUnit', event.target.value)}>
             <option value="">—</option>
             {DISTANCE_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
-          </select>
+          </Select>
         </label>
       </div>
       {error && <p className="set-editor-error" role="alert">{error}</p>}

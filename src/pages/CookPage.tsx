@@ -13,7 +13,7 @@ import {
 } from '../lib/recipes/lifecycle'
 import { getCookSession } from '../lib/recipes/selectors'
 import type { CookStepView } from '../lib/recipes/types'
-import { Button } from 'fiber'
+import { Button, Checkbox } from 'fiber'
 
 // A task's stored text keeps the structural tag (`#[cook-step] foo`); accept
 // the legacy unbracketed form too because older task records may contain it.
@@ -106,15 +106,16 @@ export function CookPage() {
           <ul className="cook-ingredient-checklist">
             {session.ingredients.map((ingredient) => (
               <li key={ingredient.task.id} className={ingredient.task.status === 'done' ? 'gathered' : ''}>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={ingredient.task.status === 'done'}
-                    onChange={(event) => void toggleCookIngredient(ingredient.task.id, event.target.checked)}
-                  />
-                  {ingredient.quantity !== undefined ? <span className="cook-ingredient-quantity">{ingredient.quantity}{ingredient.unit ? ` ${ingredient.unit}` : ''}</span> : null}
-                  <span>{stripStructuralPrefix(ingredient.task.text, 'cook-ingredient')}</span>
-                </label>
+                <Checkbox
+                  checked={ingredient.task.status === 'done'}
+                  onChange={(event) => void toggleCookIngredient(ingredient.task.id, event.target.checked)}
+                  label={
+                    <>
+                      {ingredient.quantity !== undefined ? <span className="cook-ingredient-quantity">{ingredient.quantity}{ingredient.unit ? ` ${ingredient.unit}` : ''}</span> : null}
+                      <span>{stripStructuralPrefix(ingredient.task.text, 'cook-ingredient')}</span>
+                    </>
+                  }
+                />
               </li>
             ))}
           </ul>

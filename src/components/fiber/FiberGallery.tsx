@@ -2,15 +2,28 @@ import { useState } from 'react'
 import { Check, CircleDot, FlaskConical, Plus, Sparkles, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import {
+  ActionGroup,
   Button,
   ButtonLink,
+  Checkbox,
   Chip,
   EmptyState,
+  FilterChip,
   Field,
+  FormLayout,
   IconButton,
   Input,
   MenuItem,
+  RadioGroup,
+  SearchField,
+  SegmentedControl,
+  Select,
   Spinner,
+  Status,
+  Tabs,
+  Tag,
+  Textarea,
+  Token,
   ToggleButton,
   type ButtonVariant,
 } from 'fiber'
@@ -21,11 +34,20 @@ const CHIP_ACCENTS = ['thread', 'task', 'idea', 'question', 'decision', 'danger'
 const COMPONENTS = [
   { id: 'button', label: 'Button', group: 'Actions', description: 'The shared action primitive for commands, forms, and primary moments.' },
   { id: 'field', label: 'Field', group: 'Forms', description: 'A labeled control shell that wires hints, errors, and required state together.' },
-  { id: 'input', label: 'Input', group: 'Forms', description: 'A 44px text control that inherits Fiber focus, disabled, and validation behavior.' },
+  { id: 'input', label: 'Input', group: 'Forms', description: 'A density-aware text control that inherits Fiber focus, disabled, and validation behavior.' },
+  { id: 'select', label: 'Select', group: 'Forms', description: 'A native choice control with the same Field wiring and compact visual treatment.' },
+  { id: 'textarea', label: 'Textarea', group: 'Forms', description: 'A multi-line control for context and notes without a separate feature recipe.' },
+  { id: 'checkbox', label: 'Checkbox', group: 'Forms', description: 'A clear binary choice with a full-label hit area and optional supporting copy.' },
+  { id: 'radio-group', label: 'RadioGroup', group: 'Forms', description: 'A native single-choice group that keeps arrow-key behavior predictable.' },
+  { id: 'search-field', label: 'SearchField', group: 'Forms', description: 'A focused search recipe that keeps icon, shortcut, and clear affordances in one control.' },
+  { id: 'form-layout', label: 'FormLayout', group: 'Forms', description: 'A responsive field grid that applies one rhythm across settings and inspectors.' },
+  { id: 'segmented-control', label: 'SegmentedControl', group: 'Navigation', description: 'Mutually exclusive choices with native radio semantics and predictable arrow-key movement.' },
+  { id: 'tabs', label: 'Tabs', group: 'Navigation', description: 'Panel navigation with one selected tab, one focus stop, and explicit tab-to-panel relationships.' },
+  { id: 'action-group', label: 'ActionGroup', group: 'Actions', description: 'A single spacing contract for related commands without hiding their priority or meaning.' },
   { id: 'button-link', label: 'ButtonLink', group: 'Navigation', description: 'Router-aware navigation that carries the same visual language as a button.' },
   { id: 'icon-button', label: 'IconButton', group: 'Compact action', description: 'An icon-only action with a consistent hit target and an explicit accessible label.' },
   { id: 'toggle-button', label: 'ToggleButton', group: 'Stateful action', description: 'A pressed-state button for view modes, filters, and persistent choices.' },
-  { id: 'menu-item', label: 'MenuItem', group: 'Menus', description: 'A menu action with shared sizing, focus treatment, and disabled behavior.' },
+  { id: 'menu-item', label: 'MenuItem', group: 'Menus', description: 'A menu action with shared density, focus treatment, and disabled behavior.' },
   { id: 'chip', label: 'Chip', group: 'Labels and filters', description: 'A semantic label for tags, statuses, and lightweight filtering.' },
   { id: 'spinner', label: 'Spinner', group: 'Feedback', description: 'An announced loading indicator that works inline or in a quiet status surface.' },
   { id: 'empty-state', label: 'EmptyState', group: 'Empty moments', description: 'A calm invitation for views that have not received their first item yet.' },
@@ -42,6 +64,11 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
   const [pressed, setPressed] = useState(true)
   const [menuChoice, setMenuChoice] = useState('Open thread')
   const [chipRemoved, setChipRemoved] = useState(false)
+  const [tokenRemoved, setTokenRemoved] = useState(false)
+  const [radioChoice, setRadioChoice] = useState('focused')
+  const [searchValue, setSearchValue] = useState('')
+  const [segmentChoice, setSegmentChoice] = useState('today')
+  const [tabChoice, setTabChoice] = useState('overview')
 
   const requestedComponent = searchParams.get('component')
   const selectedId: ComponentId = isComponentId(requestedComponent) ? requestedComponent : 'button'
@@ -92,8 +119,8 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
                 <Field label="Feed URL" error="Enter a complete URL, including https://" controlId="fiber-feed-url">
                   <Input defaultValue="thread.local" />
                 </Field>
-                <Field label="Read-only workspace" hint="This field is unavailable in the current mode." controlId="fiber-read-only">
-                  <Input defaultValue="Personal" disabled />
+                <Field label="Read-only workspace" hint="This value is managed elsewhere." controlId="fiber-read-only">
+                  <Input defaultValue="Personal" readOnly />
                 </Field>
               </div>
             </div>
@@ -115,6 +142,140 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
               </div>
             </div>
             <p className="fiber-detail-note">Use Input for a single-line value. It carries Fiber's 44px target, focus ring, disabled opacity, and invalid border.</p>
+          </div>
+        )
+      case 'select':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Native choice</span>
+              <Field label="Workspace mode" hint="Choose how this workspace opens." controlId="fiber-select-mode">
+                <Select defaultValue="review">
+                  <option value="review">Review</option>
+                  <option value="focus">Focus</option>
+                  <option value="quiet">Quiet</option>
+                </Select>
+              </Field>
+            </div>
+            <p className="fiber-detail-note">Select keeps native keyboard and screen-reader behavior while inheriting Fiber's compact surface and focus ring.</p>
+          </div>
+        )
+      case 'textarea':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Multi-line context</span>
+              <Field label="Context" hint="Keep this short and useful." controlId="fiber-textarea-context">
+                <Textarea defaultValue="Capture the decision and the next action." rows={3} />
+              </Field>
+            </div>
+            <p className="fiber-detail-note">Textarea shares label, hint, error, density, and validation behavior with Input.</p>
+          </div>
+        )
+      case 'checkbox':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Binary choices</span>
+              <div className="fiber-check-demo">
+                <Checkbox label="Pin to sidebar" description="Keep this workspace one click away." defaultChecked />
+                <Checkbox label="Send a reminder" description="Notify me when the review is due." />
+                <Checkbox label="Unavailable option" disabled />
+              </div>
+            </div>
+            <p className="fiber-detail-note">The label and supporting copy stay together, while the input remains a native checkbox for predictable keyboard behavior.</p>
+          </div>
+        )
+      case 'radio-group':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Single choice</span>
+              <RadioGroup
+                label="Editor density"
+                hint="You can change this later in Settings."
+                name="fiber-density"
+                value={radioChoice}
+                onValueChange={setRadioChoice}
+                orientation="horizontal"
+                options={[
+                  { value: 'compact', label: 'Compact' },
+                  { value: 'focused', label: 'Focused' },
+                  { value: 'comfortable', label: 'Comfortable' },
+                ]}
+              />
+            </div>
+            <p className="fiber-detail-note">RadioGroup uses native radios so arrow keys move through one named set without custom roving-focus code.</p>
+          </div>
+        )
+      case 'search-field':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Dense list filter</span>
+              <SearchField value={searchValue} onChange={(event) => setSearchValue(event.target.value)} clearable onClear={() => setSearchValue('')} shortcut="⌘K" />
+            </div>
+            <p className="fiber-detail-note">Search keeps the icon and shortcut inside the control, so a toolbar does not need another wrapper or explanatory label.</p>
+          </div>
+        )
+      case 'form-layout':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Responsive field rhythm</span>
+              <FormLayout columns={2} density="compact">
+                <Field label="First name" controlId="fiber-first-name"><Input defaultValue="Mayank" /></Field>
+                <Field label="Last name" controlId="fiber-last-name"><Input defaultValue="Kushal" /></Field>
+                <Field label="Workspace" controlId="fiber-workspace"><Select defaultValue="personal"><option value="personal">Personal</option><option value="team">Team</option></Select></Field>
+                <Field label="Notes" controlId="fiber-notes"><Input placeholder="Optional" /></Field>
+              </FormLayout>
+            </div>
+            <p className="fiber-detail-note">FormLayout is a grid, not a card system: fields align when space allows and collapse to one column before they become cramped.</p>
+          </div>
+        )
+      case 'segmented-control':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Mutually exclusive choices</span>
+              <SegmentedControl
+                density="compact"
+                aria-label="Review scope"
+                value={segmentChoice}
+                onValueChange={setSegmentChoice}
+                options={[{ value: 'today', label: 'Today' }, { value: 'week', label: 'This week' }, { value: 'all', label: 'All time' }]}
+              />
+            </div>
+            <p className="fiber-detail-note">SegmentedControl owns one selected value, exposes radio semantics, and moves between enabled choices with the arrow keys.</p>
+          </div>
+        )
+      case 'tabs':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Panel navigation</span>
+              <Tabs
+                aria-label="Workspace view"
+                value={tabChoice}
+                onValueChange={setTabChoice}
+                options={[{ value: 'overview', label: 'Overview' }, { value: 'activity', label: 'Activity' }, { value: 'settings', label: 'Settings' }]}
+              />
+            </div>
+            <p className="fiber-detail-note">Tabs reserve arrow-key movement for related panels and expose the active tab through aria-selected.</p>
+          </div>
+        )
+      case 'action-group':
+        return (
+          <div className="fiber-detail-content">
+            <div className="fiber-demo-block">
+              <span className="fiber-demo-label">Related commands</span>
+              <ActionGroup density="compact">
+                <Button variant="solid">Save changes</Button>
+                <Button variant="outline">Preview</Button>
+                <Button variant="ghost">Cancel</Button>
+              </ActionGroup>
+            </div>
+            <p className="fiber-detail-note">ActionGroup owns rhythm and wrapping; each action still carries its own emphasis, label, and native behavior.</p>
           </div>
         )
       case 'button-link':
@@ -163,9 +324,9 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
             <div className="fiber-demo-block">
               <span className="fiber-demo-label">Menu behavior</span>
               <div className="menu-panel fiber-menu-demo" role="menu" aria-label="Fiber menu example">
-                <MenuItem onClick={() => setMenuChoice('Open thread')} className={menuChoice === 'Open thread' ? 'active' : undefined}><span>Open thread</span>{menuChoice === 'Open thread' && <Check size={13} />}</MenuItem>
-                <MenuItem onClick={() => setMenuChoice('Duplicate')} className={menuChoice === 'Duplicate' ? 'active' : undefined}><span>Duplicate</span>{menuChoice === 'Duplicate' && <Check size={13} />}</MenuItem>
-                <MenuItem disabled><span>Archive</span><small>Unavailable</small></MenuItem>
+                <MenuItem leading={<CircleDot size={13} />} trailing={menuChoice === 'Open thread' ? <Check size={13} /> : undefined} onClick={() => setMenuChoice('Open thread')} className={menuChoice === 'Open thread' ? 'active' : undefined}>Open thread</MenuItem>
+                <MenuItem leading={<CircleDot size={13} />} trailing={menuChoice === 'Duplicate' ? <Check size={13} /> : undefined} onClick={() => setMenuChoice('Duplicate')} className={menuChoice === 'Duplicate' ? 'active' : undefined}>Duplicate</MenuItem>
+                <MenuItem description="Unavailable" disabled>Archive</MenuItem>
               </div>
               <span className="fiber-state-note">Selected: {menuChoice}</span>
             </div>
@@ -176,7 +337,9 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
         return (
           <div className="fiber-detail-content">
             <div className="fiber-demo-block">
-              <span className="fiber-demo-label">Semantic accents</span>
+              <span className="fiber-demo-label">Semantic labels</span>
+              <div className="fiber-chip-row"><Tag accent="thread">Tag</Tag><Status accent="task">Status</Status><FilterChip accent="thread" pressed>Filter</FilterChip>{tokenRemoved ? <Button variant="ghost" size="sm" onClick={() => setTokenRemoved(false)}>Restore token</Button> : <Token accent="neutral" onRemove={() => setTokenRemoved(true)}>Token</Token>}</div>
+              <span className="fiber-demo-label">Accent tokens</span>
               <div className="fiber-chip-row">{CHIP_ACCENTS.map((accent) => <Chip key={accent} accent={accent}>{accent}</Chip>)}</div>
             </div>
             <div className="fiber-demo-block">
@@ -185,7 +348,7 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
                 {chipRemoved ? <Button variant="ghost" size="sm" onClick={() => setChipRemoved(false)}>Restore removable chip</Button> : <Chip interactive accent="thread" icon={<Sparkles size={12} />} onRemove={() => setChipRemoved(true)}>Removable</Chip>}
               </div>
             </div>
-            <p className="fiber-detail-note">Accent tokens make labels scannable without creating one-off badge styles for each feature.</p>
+            <p className="fiber-detail-note">Semantic APIs keep tags, statuses, filters, and removable values clear while sharing one restrained visual language.</p>
           </div>
         )
       case 'spinner':
@@ -202,7 +365,7 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
         return (
           <div className="fiber-detail-content">
             <div className="fiber-demo-block fiber-empty-demo">
-              <EmptyState icon={<FlaskConical size={24} />} title="Nothing here yet" hint="Add a first item to give this view a little signal." />
+              <EmptyState variant="panel" icon={<FlaskConical size={24} />} title="Nothing here yet" hint="Add a first item to give this view a little signal." action={<Button size="sm">Add item</Button>} />
             </div>
             <p className="fiber-detail-note">EmptyState turns a blank surface into a clear next step with optional iconography and guidance.</p>
           </div>
@@ -212,25 +375,7 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
 
   return (
     <section className="settings-category fiber-gallery" hidden={hidden} aria-labelledby="settings-category-fiber">
-      <header className="settings-category-header fiber-gallery-header">
-        <div className="fiber-gallery-mark"><FlaskConical size={20} /></div>
-        <div>
-          <h2 id="settings-category-fiber">Fiber UI library</h2>
-          <p>A living catalog of Thread’s shared components, states, and interaction patterns.</p>
-        </div>
-      </header>
-
-      <section className="fiber-hero">
-        <div>
-          <span className="fiber-kicker">The Thread interface layer</span>
-          <h3>Small pieces. One clear language.</h3>
-          <p>Fiber keeps actions, feedback, and controls recognizable wherever work happens.</p>
-        </div>
-        <div className="fiber-hero-actions">
-          <Button variant="accent" onClick={() => selectComponent('button')}><Sparkles size={15} /> Start with Button</Button>
-          <ButtonLink variant="ghost" to="?component=button-link">Inspect ButtonLink</ButtonLink>
-        </div>
-      </section>
+      <h1 id="settings-category-fiber" className="sr-only">Fiber UI library</h1>
 
       <div className="fiber-browser">
         <aside className="fiber-component-nav" aria-label="Fiber components">
@@ -250,7 +395,6 @@ export function FiberGallery({ hidden }: { hidden: boolean }) {
               </Button>
             ))}
           </nav>
-          <p className="fiber-component-nav-note">Select a primitive to inspect its states and intended use.</p>
         </aside>
 
         <article className="fiber-detail" aria-labelledby="fiber-detail-title">

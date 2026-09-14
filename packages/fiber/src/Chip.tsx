@@ -1,8 +1,8 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { Button } from './Button'
 
-type ChipAccent = 'thread' | 'task' | 'idea' | 'question' | 'decision' | 'danger' | 'neutral'
+export type ChipAccent = 'thread' | 'task' | 'idea' | 'question' | 'decision' | 'danger' | 'neutral'
 
 interface ChipBaseProps {
   accent?: ChipAccent
@@ -41,24 +41,22 @@ export function Chip(props: ChipProps) {
     .join(' ')
 
   if (props.interactive) {
+    if (props.onRemove) {
+      return (
+        <span className={['chip', accentClass[accent], 'chip-token', className].filter(Boolean).join(' ')}>
+          {icon}
+          <span>{children}</span>
+          <Button unstyled type="button" className="chip-remove" aria-label="Remove" {...props.buttonProps} onClick={props.onRemove}>
+            <X size={11} aria-hidden="true" />
+          </Button>
+        </span>
+      )
+    }
+
     return (
       <Button unstyled type="button" className={classes} {...props.buttonProps}>
         {icon}
         <span>{children}</span>
-        {props.onRemove ? (
-          <span
-            className="chip-remove"
-            role="button"
-            tabIndex={-1}
-            aria-label="Remove"
-            onClick={(event) => {
-              event.stopPropagation()
-              props.onRemove?.()
-            }}
-          >
-            <X size={11} aria-hidden="true" />
-          </span>
-        ) : null}
       </Button>
     )
   }
@@ -67,6 +65,51 @@ export function Chip(props: ChipProps) {
     <span className={classes}>
       {icon}
       <span>{children}</span>
+    </span>
+  )
+}
+
+export type TagProps = ChipBaseProps
+export function Tag(props: TagProps) {
+  return <Chip {...props} interactive={false} />
+}
+
+export type StatusProps = ChipBaseProps
+export function Status(props: StatusProps) {
+  return <Chip {...props} interactive={false} />
+}
+
+export interface FilterChipProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'>, ChipBaseProps {
+  pressed?: boolean
+}
+export function FilterChip({ pressed = false, icon, children, accent = 'neutral', className, ...rest }: FilterChipProps) {
+  return (
+    <Button
+      unstyled
+      type="button"
+      className={['chip', accentClass[accent], 'chip-filter', className].filter(Boolean).join(' ')}
+      aria-pressed={pressed}
+      data-pressed={pressed || undefined}
+      {...rest}
+    >
+      {icon}
+      <span>{children}</span>
+    </Button>
+  )
+}
+
+export interface TokenProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'children'>, ChipBaseProps {
+  onRemove: () => void
+  removeLabel?: string
+}
+export function Token({ onRemove, removeLabel = 'Remove', icon, children, accent = 'neutral', className, ...rest }: TokenProps) {
+  return (
+    <span className={['chip', accentClass[accent], 'chip-token', className].filter(Boolean).join(' ')} {...rest}>
+      {icon}
+      <span>{children}</span>
+      <Button unstyled type="button" className="chip-remove" aria-label={removeLabel} onClick={onRemove}>
+        <X size={11} aria-hidden="true" />
+      </Button>
     </span>
   )
 }

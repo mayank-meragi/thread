@@ -2,7 +2,7 @@
 @import 'dockview-react/dist/styles/dockview.css';
 
 :root {
-  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-ui);
   color: var(--ink);
   background: var(--canvas);
   font-synthesis: none;
@@ -45,6 +45,35 @@
   --shadow: 0 16px 50px rgba(31, 35, 40, .08);
   --shadow-soft: 0 8px 30px rgba(31, 35, 40, .06);
 
+  /* Semantic surfaces — feature CSS should use these aliases instead of
+     reaching for a theme's raw color names. */
+  --surface-canvas: var(--canvas);
+  --surface-base: var(--paper);
+  --surface-inset: var(--control);
+  --surface-floating: var(--paper-raised);
+  --border-subtle: var(--line-soft);
+  --border-default: var(--line);
+  --border-strong: var(--divider-strong);
+
+  /* Semantic state colors — one accent for selection/focus, semantic colors
+     only where they carry meaning. */
+  --state-focus: var(--thread);
+  --state-focus-ring: var(--focus-ring);
+  --state-selected: var(--thread);
+  --state-selected-surface: var(--thread-soft);
+  --state-success: var(--task);
+  --state-success-surface: var(--task-soft);
+  --state-warning: var(--warning);
+  --state-warning-surface: var(--warning-soft);
+  --state-danger: var(--danger);
+  --state-danger-surface: var(--danger-soft);
+
+  /* Elevation is intentionally sparse: floating layers are the only surfaces
+     that should normally cast a shadow. */
+  --elevation-none: none;
+  --elevation-floating: var(--shadow-2);
+  --elevation-modal: var(--shadow-3);
+
   /* Typography roles */
   --font-display: 'Newsreader', serif;
   --font-ui: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
@@ -53,6 +82,27 @@
   --text-sm: 13px;
   --text-md: 14px;
   --text-body: 16px;
+
+  /* Density contract. Components consume the active aliases; a parent can
+     switch density for an entire surface with data-density. */
+  --density-name: default;
+  --control-height-compact: 32px;
+  --control-height-default: 44px;
+  --control-height-comfortable: 48px;
+  --control-height: var(--control-height-default);
+  --control-hit-target: 44px;
+  --control-padding-inline-compact: 8px;
+  --control-padding-inline-default: 11px;
+  --control-padding-inline-comfortable: 14px;
+  --control-padding-inline: var(--control-padding-inline-default);
+  --control-padding-block-compact: 4px;
+  --control-padding-block-default: 8px;
+  --control-padding-block-comfortable: 10px;
+  --control-padding-block: var(--control-padding-block-default);
+  --component-gap-compact: 4px;
+  --component-gap-default: 8px;
+  --component-gap-comfortable: 12px;
+  --component-gap: var(--component-gap-default);
 
   /* Spacing scale */
   --space-1: 2px;
@@ -85,6 +135,14 @@
   --scrim: rgba(18, 24, 32, .2);
   --scrim-strong: rgba(18, 24, 32, .26);
   --focus-ring-width: 2px;
+}
+
+/* The default theme is explicit so the font contract is theme-owned even when
+   the selected theme is GitHub Light. */
+:root[data-theme='github-light'] {
+  --font-display: 'Newsreader', serif;
+  --font-ui: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
 }
 
 :root[data-theme='solarized-light'] {
@@ -132,6 +190,9 @@
   --shadow-1: var(--shadow-soft);
   --shadow-2: 0 18px 48px rgba(88, 74, 45, .22);
   --shadow-3: 0 26px 80px rgba(88, 74, 45, .24);
+  --font-display: 'Newsreader', serif;
+  --font-ui: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
 }
 
 :root[data-theme='dracula'] {
@@ -178,6 +239,9 @@
   --shadow-1: var(--shadow-soft);
   --shadow-2: 0 18px 48px rgba(0, 0, 0, .34);
   --shadow-3: 0 26px 80px rgba(0, 0, 0, .38);
+  --font-display: 'Newsreader', serif;
+  --font-ui: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
 }
 
 :root[data-theme='nord'] {
@@ -225,6 +289,9 @@
   --shadow-1: var(--shadow-soft);
   --shadow-2: 0 18px 48px rgba(0, 0, 0, .32);
   --shadow-3: 0 26px 80px rgba(0, 0, 0, .36);
+  --font-display: 'Newsreader', serif;
+  --font-ui: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
 }
 
 :root[data-theme='catppuccin-mocha'] {
@@ -268,4 +335,25 @@
   --shadow-1: var(--shadow-soft);
   --shadow-2: 0 18px 48px rgba(0, 0, 0, .38);
   --shadow-3: 0 26px 80px rgba(0, 0, 0, .42);
+  --font-display: 'Newsreader', serif;
+  --font-ui: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+/* Density is inherited. Apply it to a page or a local work surface rather
+   than teaching every feature a separate spacing vocabulary. */
+:root[data-density='compact'], [data-density='compact'] {
+  --density-name: compact;
+  --control-height: var(--control-height-compact);
+  --control-padding-inline: var(--control-padding-inline-compact);
+  --control-padding-block: var(--control-padding-block-compact);
+  --component-gap: var(--component-gap-compact);
+}
+
+:root[data-density='comfortable'], [data-density='comfortable'] {
+  --density-name: comfortable;
+  --control-height: var(--control-height-comfortable);
+  --control-padding-inline: var(--control-padding-inline-comfortable);
+  --control-padding-block: var(--control-padding-block-comfortable);
+  --component-gap: var(--component-gap-comfortable);
 }

@@ -1,4 +1,4 @@
-import { Button, Input } from 'fiber'
+import { Button, SearchField } from 'fiber'
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { DynamicIcon, iconFor, PERSONA_ICON_NAMES } from '../lib/icons'
@@ -43,11 +43,12 @@ export function IconPicker({ value, onChange }: { value: string; onChange: (icon
       </Button>
       {open && (
         <div className="menu-panel icon-picker-panel" role="dialog" aria-label="Choose an icon">
-          <Input
+          <SearchField
             autoFocus
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search icons…"
+            aria-label="Search icons"
           />
           <div className="icon-picker-grid">
             {filtered.map((name) => {

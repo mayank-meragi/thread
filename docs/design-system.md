@@ -14,13 +14,14 @@ Read it before adding a new theme, a new popover/modal/banner, or new small type
    state) that don't vary per theme.
 2. **`base.css`** — global element resets (box-sizing, `sr-only`, focus-visible, forced-colors).
 3. **`packages/fiber/src/styles.css`** — shared CSS classes (`.menu-panel`, `.dialog`/`.sheet`, `.field`, `.banner`,
-   `.btn`, `.chip`, `.empty-state`, `.spin`) that bespoke widgets compose onto.
+   `.btn`, `.chip`, `.segmented-control`, `.empty-state`, `.spin`) that bespoke widgets compose onto.
 4. **`features.css`** — everything page/component-specific. A feature rule that composes a primitive
    keeps only its own positioning/sizing overrides; it should not re-declare border, radius,
    background, or shadow that the primitive already provides.
 
 `packages/fiber/src/` holds the React primitives: `Button`, `ButtonLink`, `IconButton`,
-`ToggleButton`, `MenuItem`, `Field`, `Input`, `Chip`, `EmptyState`, and `Spinner`.
+`ToggleButton`, `SegmentedControl`, `MenuItem`, `Field`, `Input`, `Select`, `Textarea`,
+`Checkbox`, `RadioGroup`, `SearchField`, `FormLayout`, `Chip`, `EmptyState`, and `Spinner`.
 All React-rendered buttons use `Button`; specialized controls such as tabs, calendar cells, and
 interactive rows pass `unstyled` to retain their semantic feature styling while sharing the native
 button defaults. Editor integrations that render outside React use `createButtonElement()` from the
@@ -29,6 +30,9 @@ same module.
 The living gallery is available on Fiber's standalone page (`/thread/fiber.html` in development);
 use it to review each component's supported variants and interaction states before introducing a
 new one-off control.
+
+The Phase 1 component contracts, density rules, semantic surfaces, and current
+exceptions are recorded in [`fiber-ui-contracts.md`](fiber-ui-contracts.md).
 
 ## Adding a theme
 
@@ -103,10 +107,16 @@ below against the new palette before shipping it.
   down for bottom sheets, not sideways for edge panels).
 - **`.field` / `.field-control`** — input/select/textarea recipe with `:focus-visible`, `.field-error`,
   and `.field-hint` states.
-- **`Field` + `Input`** — the React form pairing for labeled single-line controls. `Field` owns the
-  label, generated control ID, required marker, and hint/error relationship; `Input` consumes that
-  context and preserves the shared control states. Textareas, selects, and native toggles remain
-  native until their dedicated Fiber primitives are introduced.
+- **`Field` + controls** — the React form pairing for labeled controls. `Field` owns the label,
+  generated control ID, required marker, and hint/error relationship; `Input`, `Select`, and
+  `Textarea` consume that context and preserve the shared control states. `Checkbox` and
+  `RadioGroup` keep native selection behavior while providing a complete Fiber composition.
+- **`SegmentedControl`** — the mutually exclusive choice recipe. Use it for compact ranges, modes,
+  or metrics; use `ToggleButton` for independent pressed state.
+- **`Tabs`** — the panel-navigation recipe. Give it stable tab/panel IDs and keep
+  one selected tab in the keyboard sequence.
+- **`ActionGroup`** — the layout-only recipe for related commands. It supplies
+  rhythm and wrapping while each child keeps its own emphasis.
 - **`.banner` (`.banner-info`/`.banner-warning`/`.banner-error`/`.banner-success`)** — replaces
   `.form-error`, `.inspector-error`, `.chat-message-error`.
 

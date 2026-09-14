@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlignJustify, ChevronDown, Check, Kanban, List, Plus, Search } from 'lucide-react'
+import { AlignJustify, ChevronDown, Check, Kanban, List, Plus } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
 import { db, type BlockTagRecord, type MentionRecord, type TagDefinitionRecord, type TaskPriority, type TaskRecord, type TaskStatus } from '../db'
@@ -10,7 +10,7 @@ import { TaskRow, type TaskDisplayMode } from '../components/TaskRow'
 import { TaskBoard } from '../components/TaskBoard'
 import { TaskFilterPopover, type TaskFilterKey } from '../components/TaskFilterPopover'
 import { Chip } from 'fiber'
-import { Button, Input, ToggleButton } from 'fiber'
+import { Button, Input, SearchField, SegmentedControl, Select } from 'fiber'
 import { isWorkoutRole, workoutRolesByBlockId } from '../lib/workouts/integration'
 import { cookRolesByBlockId, isCookRole } from '../lib/recipes/integration'
 
@@ -214,14 +214,21 @@ export function TasksPage() {
       )}
 
       <div className="task-controls-row">
-        <label className="task-search"><Search size={15} /><Input value={query} onChange={(event) => updateParam('q', event.target.value, '')} placeholder="Search tasks" /></label>
+        <SearchField className="task-search" value={query} onChange={(event) => updateParam('q', event.target.value, '')} placeholder="Search tasks" aria-label="Search tasks" />
         <TaskFilterPopover priority={priority} tag={tag} thread={thread} sort={sort} tagDefinitions={tagDefinitions} threadOptions={threadOptions} onChange={onFilterChange} activeCount={activeFilterCount} />
         {mode !== 'board' && <FilterSelect label="Group by" value={groupBy} onChange={(value) => updateParam('group', value, 'schedule')} options={GROUP_OPTIONS} />}
-        <div className="task-mode-toggle" role="group" aria-label="Display mode">
-          <ToggleButton unstyled pressed={mode === 'list'} aria-label="List view" onClick={() => updateParam('mode', 'list', isMobile ? 'compact' : 'list')}><List size={14} /></ToggleButton>
-          <ToggleButton unstyled pressed={mode === 'compact'} aria-label="Compact view" onClick={() => updateParam('mode', 'compact', isMobile ? 'compact' : 'list')}><AlignJustify size={14} /></ToggleButton>
-          <ToggleButton unstyled pressed={mode === 'board'} aria-label="Board view" onClick={() => updateParam('mode', 'board', isMobile ? 'compact' : 'list')}><Kanban size={14} /></ToggleButton>
-        </div>
+        <SegmentedControl
+          className="task-mode-toggle"
+          density="compact"
+          aria-label="Display mode"
+          value={mode}
+          onValueChange={(value) => updateParam('mode', value as TaskDisplayMode, isMobile ? 'compact' : 'list')}
+          options={[
+            { value: 'list', label: <><List size={14} aria-hidden="true" /><span className="sr-only">List view</span></> },
+            { value: 'compact', label: <><AlignJustify size={14} aria-hidden="true" /><span className="sr-only">Compact view</span></> },
+            { value: 'board', label: <><Kanban size={14} aria-hidden="true" /><span className="sr-only">Board view</span></> },
+          ]}
+        />
       </div>
 
       {(hasActiveFilters) && <div className="task-filter-chips" aria-label="Active filters">
@@ -323,13 +330,13 @@ function QuickAdd({ autoFocus = false, onCreated }: { autoFocus?: boolean; onCre
     <Plus size={18} />
     <Input autoFocus={autoFocus} className="task-quick-title" value={text} onChange={(event) => setText(event.target.value)} placeholder="Add a task to today’s journal" aria-label="New task title" />
     <Input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} aria-label="New task due date" />
-    <select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority | '')} aria-label="New task priority"><option value="">Priority</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+    <Select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority | '')} aria-label="New task priority"><option value="">Priority</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></Select>
     <Button type="submit" disabled={!text.trim() || busy}>{busy ? 'Adding…' : 'Add task'}</Button>
   </form>
 }
 
 function FilterSelect({ icon, label, value, options, onChange }: { icon?: React.ReactNode; label: string; value: string; options: [string, string][]; onChange: (value: string) => void }) {
-  return <label className="task-filter-select">{icon}<span className="sr-only">{label}</span><select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([option, text]) => <option key={option} value={option}>{text}</option>)}</select><ChevronDown size={12} /></label>
+  return <label className="task-filter-select">{icon}<span className="sr-only">{label}</span><Select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([option, text]) => <option key={option} value={option}>{text}</option>)}</Select></label>
 }
 
 export function TaskBranch(props: {
@@ -356,7 +363,7 @@ export function TaskBranch(props: {
 
 function BulkBar({ ids, onClear }: { ids: string[]; onClear: () => void }) {
   const [date, setDate] = useState('')
-  return <div className="task-bulk-bar"><strong>{ids.length} selected</strong><Button size="sm" onClick={() => void bulkSetTaskStatus(ids, 'done').then(onClear)}>Complete</Button><Button variant="outline" size="sm" onClick={() => void bulkSetTaskStatus(ids, 'in_progress').then(onClear)}>Start</Button><select aria-label="Set selected priority" defaultValue="" onChange={(event) => { if (event.target.value) void bulkSetTaskPriority(ids, event.target.value as TaskPriority).then(onClear) }}><option value="">Set priority</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><Input type="date" aria-label="Set selected due date" value={date} onChange={(event) => { setDate(event.target.value); if (event.target.value) void bulkSetTaskDueDate(ids, event.target.value).then(onClear) }} /><Button variant="ghost" size="sm" onClick={onClear}>Clear</Button></div>
+  return <div className="task-bulk-bar"><strong>{ids.length} selected</strong><Button size="sm" onClick={() => void bulkSetTaskStatus(ids, 'done').then(onClear)}>Complete</Button><Button variant="outline" size="sm" onClick={() => void bulkSetTaskStatus(ids, 'in_progress').then(onClear)}>Start</Button><Select aria-label="Set selected priority" defaultValue="" onChange={(event) => { if (event.target.value) void bulkSetTaskPriority(ids, event.target.value as TaskPriority).then(onClear) }}><option value="">Set priority</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></Select><Input type="date" aria-label="Set selected due date" value={date} onChange={(event) => { setDate(event.target.value); if (event.target.value) void bulkSetTaskDueDate(ids, event.target.value).then(onClear) }} /><Button variant="ghost" size="sm" onClick={onClear}>Clear</Button></div>
 }
 
 function scheduleGroups(roots: TaskRecord[], today: string) {

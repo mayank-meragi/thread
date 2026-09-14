@@ -14,7 +14,7 @@ import {
 } from '../db'
 import { DEFAULT_TAG_COLOR } from '../lib/tagColors'
 import { isWorkoutSystemTag } from '../lib/workouts/systemTags'
-import { Button, Input } from 'fiber'
+import { Button, Checkbox, Input, Select } from 'fiber'
 
 const FIELD_TYPES: Array<{ value: PropertyType; label: string }> = [
   { value: 'text', label: 'Text' },
@@ -70,9 +70,9 @@ export function MetadataSchemas() {
           void run(async () => { await createPropertyDefinition({ name, type: newFieldType }); setNewField('') })
         }}>
           <Input value={newField} onChange={(event) => setNewField(event.target.value)} placeholder="New field name" aria-label="New field name" />
-          <select value={newFieldType} onChange={(event) => setNewFieldType(event.target.value as PropertyType)} aria-label="New field type">
+          <Select value={newFieldType} onChange={(event) => setNewFieldType(event.target.value as PropertyType)} aria-label="New field type">
             {FIELD_TYPES.map((type) => <option value={type.value} key={type.value}>{type.label}</option>)}
-          </select>
+          </Select>
           <Button type="submit" variant="ghost" disabled={!newField.trim()}><Plus size={14} /> Add field</Button>
         </form>
       </div>
@@ -127,11 +127,11 @@ function SchemaEditor({ tag, definitions, onError }: { tag: TagDefinitionRecord;
             return (
               <div className={active ? 'schema-field active' : 'schema-field'} key={definition.id}>
                 <label className="schema-field-toggle">
-                  <input type="checkbox" checked={active} onChange={() => toggleField(definition.id)} />
+                  <Checkbox checked={active} onChange={() => toggleField(definition.id)} />
                   <span>{active && <Check size={11} />}</span>
                   <b>{definition.name}</b><small>{definition.type.replace('_', ' ')}</small>
                 </label>
-                <label className="schema-required"><input type="checkbox" checked={required.includes(definition.id)} disabled={!active} onChange={(event) => setRequired((items) => event.target.checked ? [...items, definition.id] : items.filter((item) => item !== definition.id))} /><span>Required</span></label>
+                <label className="schema-required"><Checkbox checked={required.includes(definition.id)} disabled={!active} onChange={(event) => setRequired((items) => event.target.checked ? [...items, definition.id] : items.filter((item) => item !== definition.id))} /><span>Required</span></label>
                 <DefaultField definition={definition} disabled={!active} value={defaults[definition.id]} onChange={(value) => setDefaults((items) => {
                   const next = { ...items }
                   if (value === undefined) delete next[definition.id]
@@ -156,10 +156,10 @@ function SchemaEditor({ tag, definitions, onError }: { tag: TagDefinitionRecord;
 
 function DefaultField({ definition, disabled, value, onChange }: { definition: PropertyDefinitionRecord; disabled: boolean; value: PropertyValue | undefined; onChange: (value: PropertyValue | undefined) => void }) {
   if (definition.type === 'boolean') {
-    return <select aria-label={`${definition.name} default`} disabled={disabled} value={value === true ? 'true' : value === false ? 'false' : ''} onChange={(event) => onChange(event.target.value === '' ? undefined : event.target.value === 'true')}><option value="">No default</option><option value="true">Yes</option><option value="false">No</option></select>
+    return <Select aria-label={`${definition.name} default`} disabled={disabled} value={value === true ? 'true' : value === false ? 'false' : ''} onChange={(event) => onChange(event.target.value === '' ? undefined : event.target.value === 'true')}><option value="">No default</option><option value="true">Yes</option><option value="false">No</option></Select>
   }
   if ((definition.type === 'select' || definition.type === 'status') && definition.options?.length) {
-    return <select aria-label={`${definition.name} default`} disabled={disabled} value={typeof value === 'string' ? value : ''} onChange={(event) => onChange(event.target.value || undefined)}><option value="">No default</option>{definition.options.map((option) => <option value={option.id} key={option.id}>{option.label}</option>)}</select>
+    return <Select aria-label={`${definition.name} default`} disabled={disabled} value={typeof value === 'string' ? value : ''} onChange={(event) => onChange(event.target.value || undefined)}><option value="">No default</option>{definition.options.map((option) => <option value={option.id} key={option.id}>{option.label}</option>)}</Select>
   }
   return <Input
     aria-label={`${definition.name} default`}

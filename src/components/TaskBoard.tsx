@@ -4,7 +4,7 @@ import type { BlockTagRecord, MentionRecord, TagDefinitionRecord, TaskRecord, Ta
 import { formatDay, isoToday } from '../lib/dates'
 import { setTaskStatus } from '../lib/tasks'
 import { TaskStatusIcon } from './TaskStatusControl'
-import { Button } from 'fiber'
+import { Button, Checkbox } from 'fiber'
 
 const EMPTY_SELECTION = new Set<string>()
 function NOOP_SELECT(): void {}
@@ -138,7 +138,7 @@ function TaskCard({
     >
       <div className="task-board-card-top">
         {selectable && <label className="task-select-control">
-          <input type="checkbox" checked={selected} onChange={(event) => onSelect(event.target.checked)} />
+          <Checkbox checked={selected} onChange={(event) => onSelect(event.target.checked)} />
           <span />
         </label>}
         {task.priority && <span className={`priority-dot priority-${task.priority}`} title={`${task.priority} priority`} />}

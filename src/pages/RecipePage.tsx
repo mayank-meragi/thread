@@ -10,7 +10,7 @@ import { addNote, addSection, addStep, addStepToSection, convertUnsectionedSteps
 import { getRecipe } from '../lib/recipes/selectors'
 import type { RecipeIngredient } from '../lib/recipes/cooklangTokens'
 import type { RecipeSectionView, RecipeStepView } from '../lib/recipes/types'
-import { Button, Input } from 'fiber'
+import { ActionGroup, Button, Input, Select, Tabs, Textarea } from 'fiber'
 
 type RecipePanel = 'ingredients' | 'cookware' | 'steps'
 
@@ -45,7 +45,7 @@ function NoteEditor({ note, onSave, onRemove }: { note: { id: string; text: stri
       <span className="recipe-note-label">Note</span>
       {editing ? (
         <div className="recipe-note-edit">
-          <textarea
+          <Textarea
             autoFocus
             value={text}
             onChange={(event) => setText(event.target.value)}
@@ -104,7 +104,7 @@ function StepEditor({ step, displayIndex, onSave, onRemove, onAddNote, onSaveNot
       <span className="recipe-step-number">{displayIndex}</span>
       {editing ? (
         <div className="recipe-step-edit-stack">
-          <textarea
+          <Textarea
             className="recipe-step-input"
             value={text}
             autoFocus
@@ -444,49 +444,26 @@ export function RecipePage() {
             {typeof cookMinutes === 'number' ? `${cookMinutes} min cook` : null}
           </p>
         </div>
-        <div className="recipe-page-hero-actions">
+        <ActionGroup className="recipe-page-hero-actions">
           <Button disabled={starting || !recipe.steps.length} onClick={() => void startCooking()}>
             <ChefHat size={16} aria-hidden="true" /> Start cooking
           </Button>
           <Button variant="danger" iconOnly className="recipe-delete" aria-label="Delete recipe" disabled={deleting} onClick={() => void deleteRecipe()}>
             <Trash2 size={16} aria-hidden="true" />
           </Button>
-        </div>
+        </ActionGroup>
       </header>
       {cookError && <p className="add-exercise-error" role="alert">{cookError}</p>}
 
-      <div className="recipe-content-tabs" role="tablist" aria-label="Recipe details">
-        <Button unstyled
-          type="button"
-          role="tab"
-          id={tabId('ingredients')}
-          aria-controls={panelId('ingredients')}
-          aria-selected={activePanel === 'ingredients'}
-          onClick={() => setActivePanel('ingredients')}
-        >
-          Ingredients
-        </Button>
-        <Button unstyled
-          type="button"
-          role="tab"
-          id={tabId('cookware')}
-          aria-controls={panelId('cookware')}
-          aria-selected={activePanel === 'cookware'}
-          onClick={() => setActivePanel('cookware')}
-        >
-          Cookware
-        </Button>
-        <Button unstyled
-          type="button"
-          role="tab"
-          id={tabId('steps')}
-          aria-controls={panelId('steps')}
-          aria-selected={activePanel === 'steps'}
-          onClick={() => setActivePanel('steps')}
-        >
-          Steps
-        </Button>
-      </div>
+      <Tabs
+        className="recipe-content-tabs"
+        aria-label="Recipe details"
+        value={activePanel}
+        onValueChange={(value) => setActivePanel(value as RecipePanel)}
+        getTabId={(value) => tabId(value as RecipePanel)}
+        getPanelId={(value) => panelId(value as RecipePanel)}
+        options={[{ value: 'ingredients', label: 'Ingredients' }, { value: 'cookware', label: 'Cookware' }, { value: 'steps', label: 'Steps' }]}
+      />
 
       <section id={panelId('ingredients')} className={`recipe-ingredients-panel recipe-tab-panel${activePanel === 'ingredients' ? ' is-active' : ''}`} role="tabpanel" aria-labelledby={tabId('ingredients')}>
         <header className="recipe-panel-head">
@@ -535,10 +512,10 @@ export function RecipePage() {
             void submitNewStep()
           }}
         >
-          {flattenSections(recipe.sections).length > 0 && <select value={newStepSectionId} onChange={(event) => setNewStepSectionId(event.target.value)} aria-label="Add step to section">
+          {flattenSections(recipe.sections).length > 0 && <Select value={newStepSectionId} onChange={(event) => setNewStepSectionId(event.target.value)} aria-label="Add step to section">
             <option value="">Recipe root</option>
             {flattenSections(recipe.sections).map((section) => <option key={section.id} value={section.id}>{'— '.repeat(Math.max(0, Math.floor(section.depth / 2)))}{section.title}</option>)}
-          </select>}
+          </Select>}
           <Input
             value={newStep}
             onChange={(event) => setNewStep(event.target.value)}

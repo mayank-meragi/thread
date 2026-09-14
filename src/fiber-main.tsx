@@ -18,9 +18,10 @@ export function FiberApp() {
         <header className="fiber-page-topbar">
           <a className="fiber-page-brand" href="/thread/">
             <span className="fiber-page-brand-mark"><FlaskConical size={15} /></span>
-            <span>Fiber UI</span>
+            <span>Fiber</span>
+            <span className="fiber-page-brand-note">Thread interface system</span>
           </a>
-          <a className="fiber-page-back" href="/thread/"><ArrowLeft size={15} /> Back to Thread</a>
+          <a className="fiber-page-back" href="/thread/"><ArrowLeft size={14} /> Thread</a>
         </header>
         <main className="fiber-page-main">
           <FiberGallery hidden={false} />

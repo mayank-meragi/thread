@@ -1,4 +1,4 @@
-import { Button, Input } from 'fiber'
+import { Button, Input, Select } from 'fiber'
 import { useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import { useWorkoutSetDraft } from '../../hooks/useWorkoutSetDraft'
@@ -96,17 +96,17 @@ export function SetRow({ set, index }: { set: WorkoutSetView; index: number }) {
           <NumberField label="Distance" value={draft.distance} placeholder="e.g. 10" inputMode="decimal" onChange={(next) => setField('distance', next)} />
           <label className="number-field">
             <span className="number-field-label">Load unit</span>
-            <select className="number-field-input" value={draft.loadUnit ?? ''} onChange={(event) => setField('loadUnit', event.target.value || null)}>
+            <Select className="number-field-input" value={draft.loadUnit ?? ''} onChange={(event) => setField('loadUnit', event.target.value || null)}>
               <option value="">—</option>
               {LOAD_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
-            </select>
+            </Select>
           </label>
           <label className="number-field">
             <span className="number-field-label">Distance unit</span>
-            <select className="number-field-input" value={draft.distanceUnit ?? ''} onChange={(event) => setField('distanceUnit', event.target.value || null)}>
+            <Select className="number-field-input" value={draft.distanceUnit ?? ''} onChange={(event) => setField('distanceUnit', event.target.value || null)}>
               <option value="">—</option>
               {DISTANCE_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
-            </select>
+            </Select>
           </label>
         </div>
       )}
