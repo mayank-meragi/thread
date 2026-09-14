@@ -30,7 +30,7 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(functi
   const resolvedAriaLabel = ariaLabel ?? (field ? undefined : 'Search')
 
   return (
-    <span className={['search-field', className].filter(Boolean).join(' ')}>
+    <span className={['search-field', 'field-with-icon', className].filter(Boolean).join(' ')}>
       <Search className="search-field-icon" size={15} aria-hidden="true" />
       <Input ref={ref} type="search" value={resolvedValue} onChange={handleChange} placeholder={placeholder} aria-label={resolvedAriaLabel} {...rest} className="search-field-control" />
       {clearable && hasValue ? <IconButton className="search-field-clear" variant="ghost" size="sm" aria-label="Clear search" onClick={clear}><X size={14} /></IconButton> : null}

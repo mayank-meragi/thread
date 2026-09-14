@@ -225,7 +225,7 @@ export function ContextualInspector() {
             <section className="inspector-section">
               <div className="inspector-section-title"><span>Subtasks</span><small>{subtasks.length}</small></div>
               {subtasks.map((subtask) => <Button unstyled type="button" className="task-detail-subtask" key={subtask.id} onClick={() => { window.location.hash = `/?date=${subtask.day}&block=${subtask.id}` }}><span className={`subtask-dot status-${subtask.status}`} />{subtask.text}</Button>)}
-              <form className="task-detail-add" onSubmit={(event) => {
+              <form className="task-detail-add field-with-icon" onSubmit={(event) => {
                 event.preventDefault()
                 if (!subtaskText.trim()) return
                 void run(async () => { await createSubtask(task.id, subtaskText); setSubtaskText('') })

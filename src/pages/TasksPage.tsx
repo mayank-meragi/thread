@@ -327,8 +327,10 @@ function QuickAdd({ autoFocus = false, onCreated }: { autoFocus?: boolean; onCre
     setBusy(true)
     void createTask({ text, dueDate: dueDate || undefined, priority: priority || undefined }).then(() => { setText(''); setDueDate(''); setPriority(''); onCreated?.() }).finally(() => setBusy(false))
   }}>
-    <Plus size={18} />
-    <Input autoFocus={autoFocus} className="task-quick-title" value={text} onChange={(event) => setText(event.target.value)} placeholder="Add a task to today’s journal" aria-label="New task title" />
+    <div className="task-quick-title-field field-with-icon">
+      <Plus size={18} aria-hidden="true" />
+      <Input autoFocus={autoFocus} className="task-quick-title" value={text} onChange={(event) => setText(event.target.value)} placeholder="Add a task to today’s journal" aria-label="New task title" />
+    </div>
     <Input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} aria-label="New task due date" />
     <Select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority | '')} aria-label="New task priority"><option value="">Priority</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></Select>
     <Button type="submit" disabled={!text.trim() || busy}>{busy ? 'Adding…' : 'Add task'}</Button>
@@ -336,7 +338,7 @@ function QuickAdd({ autoFocus = false, onCreated }: { autoFocus?: boolean; onCre
 }
 
 function FilterSelect({ icon, label, value, options, onChange }: { icon?: React.ReactNode; label: string; value: string; options: [string, string][]; onChange: (value: string) => void }) {
-  return <label className="task-filter-select">{icon}<span className="sr-only">{label}</span><Select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([option, text]) => <option key={option} value={option}>{text}</option>)}</Select></label>
+  return <label className="task-filter-select field-with-icon">{icon}<span className="sr-only">{label}</span><Select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([option, text]) => <option key={option} value={option}>{text}</option>)}</Select></label>
 }
 
 export function TaskBranch(props: {

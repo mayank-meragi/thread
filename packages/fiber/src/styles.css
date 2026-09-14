@@ -119,9 +119,9 @@ select.field-select {
   cursor: pointer;
 }
 select.field-select:disabled { cursor: default; }
-.field-control:focus,
 .field-control:focus-visible {
   border-color: var(--state-focus);
+  outline: 0;
   box-shadow: 0 0 0 var(--focus-ring-width) var(--state-focus-ring);
 }
 .field-control:disabled { opacity: var(--disabled-opacity); cursor: default; }
@@ -130,6 +130,47 @@ select.field-select:disabled { cursor: default; }
 .field-control[aria-invalid="true"] { border-color: var(--danger); }
 .field-hint { color: var(--muted); font-size: var(--text-meta); line-height: 1.4; }
 .field-hint.field-hint-error { color: var(--danger); }
+
+@media (forced-colors: active) {
+  .field-control:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+}
+
+/* Composite fields keep decorative leading icons inside the same focus target.
+   The native control remains the only tabbable element, but its own border and
+   shadow are removed so the shell can provide one continuous ring. */
+.field-with-icon {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+}
+.field-with-icon:has(.field-control:focus-visible) {
+  border-color: var(--state-focus);
+  box-shadow: 0 0 0 var(--focus-ring-width) var(--state-focus-ring);
+}
+.field-with-icon:has(.field-control[aria-invalid='true']) { border-color: var(--danger); }
+.field-with-icon:has(.field-control:disabled) { opacity: var(--disabled-opacity); }
+.field-with-icon .field-control,
+.field-with-icon .field-control:focus,
+.field-with-icon .field-control:focus-visible {
+  border-color: transparent;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+@media (forced-colors: active) {
+  .field-with-icon:has(.field-control:focus-visible) {
+    border-color: CanvasText;
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+  .field-with-icon .field-control:focus-visible { outline: 0; box-shadow: none; }
+}
 
 /* ---------------------------------------------------------------------- */
 /* Form controls — native semantics with a small amount of quiet chrome. */

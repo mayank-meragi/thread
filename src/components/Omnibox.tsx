@@ -321,7 +321,7 @@ export function Omnibox({ open, initialMode, onClose, onTogglePanel }: OmniboxPr
   return (
     <div className="layer-backdrop layer-backdrop-center layer-backdrop-blur command-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}>
       <section className="dialog command-sheet" role="dialog" aria-modal="true" aria-label="Omnibox">
-        <label className="command-input">
+        <label className="command-input field-with-icon">
           <Search size={18} />
           <Input
             ref={inputRef}
