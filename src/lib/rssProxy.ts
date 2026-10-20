@@ -1,3 +1,5 @@
+import { markCredentialChanged } from './credentialMeta'
+
 const STORAGE_KEY = 'thread.rss-proxy'
 
 export interface RssProxyConfig {
@@ -60,11 +62,21 @@ export function saveRssProxyConfig(config: RssProxyConfig): RssProxyConfig {
   const normalized = normalizeConfig(config)
   localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
   window.dispatchEvent(new Event('thread:rss-proxy-config'))
+  markCredentialChanged('rssProxy')
   return normalized
 }
 
 export function clearRssProxyConfig(): void {
   localStorage.removeItem(STORAGE_KEY)
+  window.dispatchEvent(new Event('thread:rss-proxy-config'))
+  markCredentialChanged('rssProxy')
+}
+
+// Applies a config that arrived from the data repository without recording a
+// local change (which would echo it straight back).
+export function applySyncedRssProxyConfig(config: RssProxyConfig | null): void {
+  if (config) localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
+  else localStorage.removeItem(STORAGE_KEY)
   window.dispatchEvent(new Event('thread:rss-proxy-config'))
 }
 

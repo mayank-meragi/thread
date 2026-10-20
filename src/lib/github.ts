@@ -3,6 +3,7 @@ import { emptyDayMetadata, parseDayDocument, serializeDayDocument } from './dayD
 import { applyConflictResolutions, mergeMarkdown } from './conflictMerge'
 import { applyWorkspaceManifest, buildWorkspaceManifest, mergeWorkspaceManifests, parseWorkspaceManifest, serializeWorkspaceManifest, type WorkspaceManifestV1 } from './syncManifest'
 import { applyFeedManifest, buildFeedManifest, mergeFeedManifests, parseFeedManifest, serializeFeedManifest, type FeedManifestV1 } from './feedManifest'
+import { CREDENTIALS_PATH, CredentialConflictError, queueCredentialsIfPresent, syncCredentials, type CredentialIO } from './credentialSync'
 import { applyAIUsageManifest, buildAIUsageManifest, mergeAIUsageManifests, parseAIUsageManifest, serializeAIUsageManifest, type AIUsageManifestV1 } from './aiUsageManifest'
 
 const API = 'https://api.github.com'
@@ -522,6 +523,7 @@ function managedPath(path: string): boolean {
     || path === 'workspace.json'
     || path === 'feeds.json'
     || path === 'ai-usage.json'
+    || path === CREDENTIALS_PATH
 }
 
 function dayFromPath(path: string): string | null {
@@ -626,6 +628,28 @@ async function pullAIUsage(config: GitHubConfig, headSha: string): Promise<PullR
   return 'applied'
 }
 
+async function repoIsPrivate(config: GitHubConfig): Promise<boolean> {
+  const response = await fetch(`${API}/repos/${config.repo}`, { headers: headers(config.token) })
+  const limited = rateLimitError(response)
+  if (limited) throw limited
+  if (!response.ok) throw new Error(`Could not check the data repository (${response.status}).`)
+  return Boolean(((await response.json()) as { private?: boolean }).private)
+}
+
+function credentialIO(config: GitHubConfig, ref?: string): CredentialIO {
+  return {
+    read: () => getRemoteFile(config, CREDENTIALS_PATH, ref),
+    write: async (content, sha) => {
+      try {
+        await putFile(config, CREDENTIALS_PATH, content, sha)
+      } catch (error) {
+        throw error instanceof SyncConflictError ? new CredentialConflictError(error.message) : error
+      }
+    },
+    isPrivate: () => repoIsPrivate(config),
+  }
+}
+
 async function applyRemotePath(config: GitHubConfig, path: string, headSha: string, deleted = false): Promise<PullResult> {
   const day = dayFromPath(path)
   if (day) {
@@ -648,6 +672,11 @@ async function applyRemotePath(config: GitHubConfig, path: string, headSha: stri
   if (path === 'ai-usage.json') {
     if (deleted) { await queueAIUsageSync(); return 'deleted' }
     return pullAIUsage(config, headSha)
+  }
+  if (path === CREDENTIALS_PATH) {
+    if (deleted) { queueCredentialsIfPresent(); return 'deleted' }
+    await syncCredentials(credentialIO(config, headSha), true)
+    return 'applied'
   }
   return 'unchanged'
 }
@@ -694,6 +723,7 @@ export async function catchUpFromGitHub(options: { priorityPaths?: string[]; for
       // There is nothing useful to publish for a new installation until its
       // first tracked call. Once local usage exists, queueing the missing file
       // bootstraps older installations that have no usage baseline yet.
+      if (!remotePaths.has(CREDENTIALS_PATH)) queueCredentialsIfPresent()
       if (!remotePaths.has('ai-usage.json') && (await db.aiUsageAggregates.count()) > 0) await queueAIUsageSync()
     } else {
       work = []
@@ -772,6 +802,7 @@ export function runGitHubSyncCycle(options: { priorityPaths?: string[]; forceFul
       // what turned a freshly loaded document into a conflict with the repo.
       await catchUpFromGitHub(cycleOptions)
       await syncPending()
+      await syncCredentials(credentialIO(config))
     } while (rerunSyncCycle)
   })().catch(async (error) => {
     const config = getGitHubConfig()

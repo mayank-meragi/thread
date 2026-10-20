@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RECIPE_CATEGORY_OPTIONS } from '../../lib/blockMetadata'
 import { importRecipeFromUrl, type RecipeImportDraft } from '../../lib/recipes/import'
 import { createRecipeThread, replaceRecipeMarkdown, updateRecipeProperties } from '../../lib/recipes/mutations'
@@ -7,12 +7,14 @@ import { Alert, Button, Dialog, Field, Input, Textarea, ToggleGroup } from 'fibe
 interface ImportDialogProps {
   onClose: () => void
   onImported: (threadId: string) => void
+  /** A link pasted before the dialog opened; it is fetched immediately. */
+  initialUrl?: string
 }
 
 type Stage = { kind: 'url' } | { kind: 'fetching' } | { kind: 'review'; draft: RecipeImportDraft } | { kind: 'saving' }
 
-export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
-  const [url, setUrl] = useState('')
+export function ImportDialog({ onClose, onImported, initialUrl = '' }: ImportDialogProps) {
+  const [url, setUrl] = useState(initialUrl)
   const [stage, setStage] = useState<Stage>({ kind: 'url' })
   const [error, setError] = useState<string | null>(null)
 
@@ -24,11 +26,11 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
   const [category, setCategory] = useState<string[]>([])
   const [stepsText, setStepsText] = useState('')
 
-  const fetchDraft = async () => {
+  const fetchDraft = async (target = url) => {
     setStage({ kind: 'fetching' })
     setError(null)
     try {
-      const draft = await importRecipeFromUrl(url)
+      const draft = await importRecipeFromUrl(target)
       setTitle(draft.title)
       setServings(draft.servings !== undefined ? String(draft.servings) : '')
       setPrepMinutes(draft.prepMinutes !== undefined ? String(draft.prepMinutes) : '')
@@ -41,6 +43,14 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
       setStage({ kind: 'url' })
     }
   }
+
+  const autoFetched = useRef(false)
+  useEffect(() => {
+    if (!initialUrl || autoFetched.current) return
+    autoFetched.current = true
+    void fetchDraft(initialUrl)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialUrl])
 
   const save = async () => {
     if (stage.kind !== 'review') return
@@ -76,6 +86,13 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
                 type="url"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
+                onPaste={(event) => {
+                  const pasted = event.clipboardData.getData('text').trim()
+                  if (!/^https?:\/\/\S+$/i.test(pasted)) return
+                  event.preventDefault()
+                  setUrl(pasted)
+                  void fetchDraft(pasted)
+                }}
                 placeholder="https://example.com/some-recipe"
                 disabled={stage.kind === 'fetching'}
               />

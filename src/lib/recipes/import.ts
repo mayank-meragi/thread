@@ -17,13 +17,16 @@ function htmlToText(html: string): string {
 
 const CATEGORY_IDS = RECIPE_CATEGORY_OPTIONS.map((option) => option.id)
 
+// Every field is required (nullable rather than optional): OpenAI's strict
+// structured-output mode rejects schemas whose properties aren't all listed
+// in `required`. Null means "not stated" and is mapped to undefined below.
 const recipeExtractionSchema = z.object({
   title: z.string().describe('The recipe title.'),
-  servings: z.number().positive().optional().describe('The number of servings the recipe yields, if stated.'),
-  prepMinutes: z.number().nonnegative().optional().describe('Prep time in minutes, if stated.'),
-  cookMinutes: z.number().nonnegative().optional().describe('Cook time in minutes, if stated.'),
-  category: z.array(z.enum(CATEGORY_IDS as [string, ...string[]])).optional()
-    .describe('Zero or more categories this recipe fits, from the given list.'),
+  servings: z.number().positive().nullable().describe('The number of servings the recipe yields, if stated, otherwise null.'),
+  prepMinutes: z.number().nonnegative().nullable().describe('Prep time in minutes, if stated, otherwise null.'),
+  cookMinutes: z.number().nonnegative().nullable().describe('Cook time in minutes, if stated, otherwise null.'),
+  category: z.array(z.enum(CATEGORY_IDS as [string, ...string[]])).nullable()
+    .describe('Zero or more categories this recipe fits, from the given list, or null.'),
   steps: z.array(z.string()).min(1).describe(
     'Ordered recipe outline lines written in Cooklang-style annotated Markdown. '
     + 'Use #[cook-section] for a section title, indent its child lines by two spaces, use #[cook-step] for executable instructions, and use #[cook-note] for supporting context. '
@@ -91,10 +94,10 @@ export async function importRecipeFromUrl(url: string): Promise<RecipeImportDraf
   return {
     title: object.title.trim() || article.title?.trim() || 'Imported recipe',
     sourceUrl: trimmed,
-    servings: object.servings,
-    prepMinutes: object.prepMinutes,
-    cookMinutes: object.cookMinutes,
-    category: object.category,
+    servings: object.servings ?? undefined,
+    prepMinutes: object.prepMinutes ?? undefined,
+    cookMinutes: object.cookMinutes ?? undefined,
+    category: object.category ?? undefined,
     // Keep leading whitespace: it carries section/note ownership in the
     // Markdown outline. Only trim trailing whitespace and discard blank lines.
     steps: object.steps.map((step) => step.replace(/\s+$/, '')).filter((step) => step.trim().length > 0),

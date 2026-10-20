@@ -5,6 +5,7 @@ import { createGoogle } from '@ai-sdk/google'
 import { wrapLanguageModel, type JSONValue, type LanguageModel } from 'ai'
 import { createAIUsageMiddleware, type AIUsageFeature } from './aiUsage'
 import { findModel } from './aiModels'
+import { markCredentialChanged } from './credentialMeta'
 
 type WrappableLanguageModel = Parameters<typeof wrapLanguageModel>[0]['model']
 
@@ -79,10 +80,20 @@ export function getAIConfig(): AIConfig | null {
 export function saveAIConfig(config: AIConfig): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
   window.dispatchEvent(new Event('thread:ai-config'))
+  markCredentialChanged('ai')
 }
 
 export function clearAIConfig(): void {
   localStorage.removeItem(STORAGE_KEY)
+  window.dispatchEvent(new Event('thread:ai-config'))
+  markCredentialChanged('ai')
+}
+
+// Applies a config that arrived from the data repository. Unlike
+// saveAIConfig this must not record a local change, or it would echo back.
+export function applySyncedAIConfig(config: AIConfig | null): void {
+  if (config) localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
+  else localStorage.removeItem(STORAGE_KEY)
   window.dispatchEvent(new Event('thread:ai-config'))
 }
 

@@ -32,6 +32,10 @@ function RecipeCard({ recipe }: { recipe: RecipeView }) {
   )
 }
 
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\/\S+$/i.test(value.trim())
+}
+
 export function RecipesPage() {
   const recipes = useLiveQuery(() => listRecipes(), [])
   const navigate = useNavigate()
@@ -40,6 +44,7 @@ export function RecipesPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [importUrl, setImportUrl] = useState('')
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase()
@@ -47,8 +52,14 @@ export function RecipesPage() {
     return (recipes ?? []).filter((recipe) => recipe.thread.title.toLocaleLowerCase().includes(needle))
   }, [recipes, query])
 
+  const openImport = (url = '') => {
+    setImportUrl(url)
+    setImportOpen(true)
+  }
+
   const submitNewRecipe = async () => {
     if (!title.trim()) return
+    if (isHttpUrl(title)) { openImport(title.trim()); setTitle(''); return }
     setBusy(true)
     setError(null)
     try {
@@ -75,7 +86,7 @@ export function RecipesPage() {
           <ButtonLink to="/meal-plan" variant="outline" className="recipes-import-open">
             <CalendarDays size={15} aria-hidden="true" /> Meal plan
           </ButtonLink>
-          <Button variant="outline" className="recipes-import-open recipes-import-url" onClick={() => setImportOpen(true)}>
+          <Button variant="outline" className="recipes-import-open recipes-import-url" onClick={() => openImport()}>
             <Download size={15} aria-hidden="true" /> Import from URL
           </Button>
           <form
@@ -85,7 +96,16 @@ export function RecipesPage() {
               void submitNewRecipe()
             }}
           >
-            <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="New recipe name" aria-label="New recipe name" />
+            <Input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              onPaste={(event) => {
+                const pasted = event.clipboardData.getData('text')
+                if (!isHttpUrl(pasted)) return
+                event.preventDefault()
+                openImport(pasted.trim())
+              }}
+              placeholder="New recipe name or paste a recipe link" aria-label="New recipe name" />
             <Button type="submit" disabled={busy || !title.trim()}><Plus size={16} aria-hidden="true" /> New recipe</Button>
           </form>
         </Toolbar>
@@ -93,6 +113,7 @@ export function RecipesPage() {
       {error && <Alert variant="error" className="recipes-page-error">{error}</Alert>}
       {importOpen && (
         <ImportDialog
+          initialUrl={importUrl}
           onClose={() => setImportOpen(false)}
           onImported={(threadId) => { setImportOpen(false); navigate(`/recipe/${threadId}`) }}
         />
