@@ -86,6 +86,37 @@ export async function startCook(recipeThreadId: string, options: { day?: string;
   return cookTaskId
 }
 
+/**
+ * Changes the servings of a cook already in progress. Ingredient quantities
+ * were scaled to the old servings when the cook started (or last changed), so
+ * they are rescaled by the ratio between old and new; step text is scaled at
+ * render time from `cook-servings`, so it follows automatically.
+ */
+export async function setCookServings(cookTaskId: string, servings: number): Promise<void> {
+  if (!Number.isFinite(servings) || servings < 1) throw new Error('Servings must be at least 1.')
+  await requireCook(cookTaskId)
+  const session = await getCookSession(cookTaskId)
+  if (!session) throw new Error('This cook session no longer exists.')
+  // A session without a stored servings count was started at the recipe's own.
+  const stored = session.properties.get('cook-servings')
+  let previous = typeof stored === 'number' && stored > 0 ? stored : undefined
+  if (previous === undefined) {
+    const base = (session.recipeThreadId ? await getRecipe(session.recipeThreadId) : undefined)?.properties.get('recipe-servings')
+    previous = typeof base === 'number' && base > 0 ? base : 4
+  }
+  if (previous === servings) {
+    await setBlockProperty(cookTaskId, 'cook-servings', servings)
+    return
+  }
+  const ratio = servings / previous
+  for (const ingredient of session.ingredients) {
+    if (ingredient.quantity !== undefined) {
+      await setBlockProperty(ingredient.task.id, 'cook-ingredient-quantity', ingredient.quantity * ratio)
+    }
+  }
+  await setBlockProperty(cookTaskId, 'cook-servings', servings)
+}
+
 export async function toggleCookIngredient(ingredientTaskId: string, gathered: boolean): Promise<void> {
   await setTaskStatus(ingredientTaskId, gathered ? 'done' : 'not_started')
 }

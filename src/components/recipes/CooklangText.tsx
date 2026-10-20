@@ -1,12 +1,14 @@
 import { Fragment } from 'react'
-import { splitCooklangSegments } from '../../lib/recipes/cooklangLinks'
+import { scaleCooklangQuantities, splitCooklangSegments } from '../../lib/recipes/cooklangLinks'
+import { useRecipeScale } from '../../lib/recipes/recipeScale'
 
 // Read-only rendering of Cooklang-annotated text (a recipe step, an
 // ingredient row) as highlighted chips -- the same visual treatment the
 // editor gives `@ingredient{}`/`^cookware{}`/`~{}` tokens while typing, so a
 // saved recipe reads the same way it was authored.
 export function CooklangText({ text }: { text: string }) {
-  const segments = splitCooklangSegments(text)
+  const scale = useRecipeScale()
+  const segments = splitCooklangSegments(scaleCooklangQuantities(text, scale))
   return (
     <>
       {segments.map((segment, index) => {

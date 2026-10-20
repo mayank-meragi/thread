@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChefHat, Minus, Plus, Trash2 } from 'lucide-react'
 import { CooklangText } from '../components/recipes/CooklangText'
+import { RecipeScaleContext } from '../lib/recipes/recipeScale'
 import { formatQuantity, mergeIngredients, scaleIngredient } from '../lib/recipes/cooklangTokens'
 import { isoToday } from '../lib/dates'
 import { ActiveCookConflictError, startCook } from '../lib/recipes/lifecycle'
@@ -436,6 +437,7 @@ export function RecipePage() {
   }
 
   return (
+    <RecipeScaleContext.Provider value={scaleFactor}>
     <article className="recipe-page">
       <Link to="/recipes" className="back-link">Back to recipes</Link>
       <header className="recipe-page-hero">
@@ -527,5 +529,6 @@ export function RecipePage() {
         </form>
       </section>
     </article>
+    </RecipeScaleContext.Provider>
   )
 }

@@ -119,7 +119,7 @@ export async function importRecipeFromUrl(url: string): Promise<RecipeImportDraf
       article = await articleGateway.fetchArticle(trimmed)
     } catch (error) {
       if (!(error instanceof ArticleFetchError)) throw error
-      throw new Error(`Your AI provider couldn't open this page and neither could the browser, so the site is probably blocking automated access. ${error.message} Try another site, or paste the recipe in by hand.`)
+      throw new Error(`Your AI provider couldn't open this page and neither could the browser, so the site is probably blocking automated access. ${error.message} Try another site, or paste the recipe in by hand.`, { cause: error })
     }
     const text = htmlToText(article.contentHtml)
     if (!text) throw new Error('No readable content was found on this page.')

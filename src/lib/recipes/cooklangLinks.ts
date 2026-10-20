@@ -91,6 +91,42 @@ export type CooklangSegmentKind = 'text' | 'ingredient' | 'cookware' | 'timer'
 export interface CooklangSegment { kind: CooklangSegmentKind; text: string }
 
 // Read-only counterpart to `cooklangLinksToEditor`, for rendering canonical
+function scaleAmount(amount: string, factor: number): string {
+  const single = parseQuantityUnit(amount)[0]
+  if (single !== undefined) return formatQuantity(single * factor)
+  // Ranges such as "3 to 3.5" or "1-2": scale both ends, leave anything else
+  // ("as required", "a pinch") exactly as written.
+  const range = amount.match(/^(\d+(?:\.\d+)?(?:\s*\/\s*\d+)?)\s*(to|-|–)\s*(\d+(?:\.\d+)?(?:\s*\/\s*\d+)?)$/)
+  if (range) {
+    const low = parseQuantityUnit(range[1])[0]
+    const high = parseQuantityUnit(range[3])[0]
+    if (low !== undefined && high !== undefined) {
+      return `${formatQuantity(low * factor)}${range[2] === 'to' ? ' to ' : range[2]}${formatQuantity(high * factor)}`
+    }
+  }
+  return amount
+}
+
+/**
+ * Multiplies every ingredient quantity written in `markdown`
+ * (`@flour{200%g}` -> `@flour{400%g}`) by `factor`. Timers, cookware and
+ * quantity-less or non-numeric ingredients are left untouched, so a step's
+ * wording and timings never change -- only how much of each ingredient it names.
+ */
+export function scaleCooklangQuantities(markdown: string, factor: number): string {
+  if (factor === 1 || !Number.isFinite(factor) || factor <= 0) return markdown
+  return markdown.replace(TOKEN_PATTERN, (raw: string, ...rest: unknown[]) => {
+    const groups = rest[rest.length - 1] as Record<string, string | undefined>
+    if (groups.ingName === undefined) return raw
+    const content = groups.ingContent ?? ''
+    const [amount, ...unit] = content.split('%')
+    if (!amount.trim()) return raw
+    const scaled = scaleAmount(amount.trim(), factor)
+    const tail = raw.slice(1 + groups.ingName.length + 1 + content.length + 1)
+    return `@${groups.ingName}{${[scaled, ...unit].join('%')}}${tail}`
+  })
+}
+
 // Cooklang text (e.g. a recipe step) outside the Milkdown editor -- same
 // single-pass token matching, but producing plain segments for a React
 // component to render as chips instead of a Markdown chip-link string.

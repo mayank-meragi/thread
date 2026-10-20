@@ -1,17 +1,20 @@
 import { Fragment, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Check, SkipForward } from 'lucide-react'
+import { ArrowLeft, Check, Minus, Plus, SkipForward } from 'lucide-react'
 import { CookTimer } from '../components/recipes/CookTimer'
 import { CooklangText } from '../components/recipes/CooklangText'
 import {
   UnresolvedCookStepsError,
   completeCookStep,
   finishCook,
+  setCookServings,
   skipCookStep,
   toggleCookIngredient,
 } from '../lib/recipes/lifecycle'
-import { getCookSession } from '../lib/recipes/selectors'
+import { formatQuantity } from '../lib/recipes/cooklangTokens'
+import { RecipeScaleContext } from '../lib/recipes/recipeScale'
+import { getCookSession, getRecipe } from '../lib/recipes/selectors'
 import type { CookStepView } from '../lib/recipes/types'
 import { Button, Checkbox, SectionHeader } from 'fiber'
 
@@ -31,6 +34,11 @@ export function CookPage() {
   const { day = '', blockId = '' } = useParams()
   const navigate = useNavigate()
   const session = useLiveQuery(async () => (blockId ? (await getCookSession(blockId)) ?? null : null), [blockId])
+  const baseServings = useLiveQuery(async () => {
+    const recipe = session?.recipeThreadId ? await getRecipe(session.recipeThreadId) : undefined
+    const value = recipe?.properties.get('recipe-servings')
+    return typeof value === 'number' && value > 0 ? value : 4
+  }, [session?.recipeThreadId], 4)
   const [activeStepId, setActiveStepId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,8 +56,12 @@ export function CookPage() {
   const firstPending = session.steps.find((step) => stepState(step) === 'pending')
   const activeId = activeStepId ?? firstPending?.task.id ?? session.steps[0]?.task.id
   const recipeHref = session.recipeThreadId ? `/recipe/${session.recipeThreadId}` : undefined
-  const servings = session.properties.get('cook-servings')
+  const storedServings = session.properties.get('cook-servings')
+  const servings = typeof storedServings === 'number' ? storedServings : baseServings
   const finished = session.task.status === 'done'
+  // Step text is stored as the recipe wrote it, so it is scaled from the
+  // recipe's own servings to what this cook is currently making.
+  const scaleFactor = baseServings > 0 ? servings / baseServings : 1
 
   const guard = async (action: () => Promise<void>) => {
     setBusy(true)
@@ -87,13 +99,20 @@ export function CookPage() {
   })
 
   return (
+    <RecipeScaleContext.Provider value={scaleFactor}>
     <article className="cook-page">
       <Link to={recipeHref ?? '/recipes'} className="back-link"><ArrowLeft size={15} aria-hidden="true" /> {session.recipeTitle ?? 'Recipe'}</Link>
 
       <header className="cook-page-hero">
         <h1>{session.recipeTitle ?? 'Cooking'}</h1>
         <p className="cook-page-meta">
-          {typeof servings === 'number' ? `${servings} servings` : null}
+          {!finished ? (
+            <span className="recipe-servings-scaler" aria-label="Servings">
+              <Button variant="ghost" size="sm" iconOnly disabled={busy || servings <= 1} onClick={() => void guard(() => setCookServings(session.task.id, servings - 1))} aria-label="Fewer servings"><Minus size={14} aria-hidden="true" /></Button>
+              <span>{servings} serving{servings === 1 ? '' : 's'}</span>
+              <Button variant="ghost" size="sm" iconOnly disabled={busy} onClick={() => void guard(() => setCookServings(session.task.id, servings + 1))} aria-label="More servings"><Plus size={14} aria-hidden="true" /></Button>
+            </span>
+          ) : `${servings} servings`}
           {finished ? ' · Finished' : ' · In progress'}
         </p>
       </header>
@@ -111,7 +130,7 @@ export function CookPage() {
                   onChange={(event) => void toggleCookIngredient(ingredient.task.id, event.target.checked)}
                   label={
                     <>
-                      {ingredient.quantity !== undefined ? <span className="cook-ingredient-quantity">{ingredient.quantity}{ingredient.unit ? ` ${ingredient.unit}` : ''}</span> : null}
+                      {ingredient.quantity !== undefined ? <span className="cook-ingredient-quantity">{formatQuantity(ingredient.quantity)}{ingredient.unit ? ` ${ingredient.unit}` : ''}</span> : null}
                       <span>{stripStructuralPrefix(ingredient.task.text, 'cook-ingredient')}</span>
                     </>
                   }
@@ -167,5 +186,6 @@ export function CookPage() {
         </Button>
       )}
     </article>
+    </RecipeScaleContext.Provider>
   )
 }

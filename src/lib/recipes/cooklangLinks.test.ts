@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cooklangLinksToEditor, editorLinksToCooklang } from './cooklangLinks'
+import { cooklangLinksToEditor, editorLinksToCooklang, scaleCooklangQuantities } from './cooklangLinks'
 
 describe('cooklangLinksToEditor', () => {
   it('converts a braced ingredient into a labeled chip link', () => {
@@ -55,5 +55,27 @@ describe('editorLinksToCooklang', () => {
   it('leaves ordinary links untouched', () => {
     const markdown = 'See [the docs](https://example.com) for more.'
     expect(editorLinksToCooklang(markdown)).toBe(markdown)
+  })
+})
+
+describe('scaleCooklangQuantities', () => {
+  it('scales ingredient quantities and keeps preparation, units and wording', () => {
+    expect(scaleCooklangQuantities('Add @onion{1}(sliced) and @flour{200%g} to a ^bowl{}.', 2))
+      .toBe('Add @onion{2}(sliced) and @flour{400%g} to a ^bowl{}.')
+  })
+
+  it('handles fractions and ranges, and leaves non-numeric amounts alone', () => {
+    expect(scaleCooklangQuantities('@milk{1/2%cup} @water{3 to 3.5%cups} @salt{as required} @garlic{2}', 2))
+      .toBe('@milk{1%cup} @water{6 to 7%cups} @salt{as required} @garlic{4}')
+  })
+
+  it('never scales timers, and ignores quantity-less ingredients', () => {
+    expect(scaleCooklangQuantities('Simmer @water{2%cups} for ~{20%minutes} with @salt and @pepper{}', 3))
+      .toBe('Simmer @water{6%cups} for ~{20%minutes} with @salt and @pepper{}')
+  })
+
+  it('is a no-op at factor 1', () => {
+    const text = 'Add @flour{200%g}.'
+    expect(scaleCooklangQuantities(text, 1)).toBe(text)
   })
 })
