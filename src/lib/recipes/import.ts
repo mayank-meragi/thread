@@ -1,6 +1,9 @@
-import { generateObject } from 'ai'
+import { generateObject, generateText, stepCountIs, type ToolSet } from 'ai'
+import { anthropic } from '@ai-sdk/anthropic'
+import { openai } from '@ai-sdk/openai'
+import { google } from '@ai-sdk/google'
 import { z } from 'zod'
-import { getAIConfig, resolveModel, resolveReasoningOptions } from '../ai'
+import { getAIConfig, resolveModel, resolveReasoningOptions, type AIConfig } from '../ai'
 import { articleGateway, ArticleFetchError } from '../rssArticle'
 import { sanitizeFeedHtml } from '../rss'
 import { RECIPE_CATEGORY_OPTIONS } from '../blockMetadata'
@@ -21,6 +24,7 @@ const CATEGORY_IDS = RECIPE_CATEGORY_OPTIONS.map((option) => option.id)
 // structured-output mode rejects schemas whose properties aren't all listed
 // in `required`. Null means "not stated" and is mapped to undefined below.
 const recipeExtractionSchema = z.object({
+  isSingleRecipe: z.boolean().describe('True only if the text is one specific recipe with ingredients and steps. False for a category page, roundup, search result or list of several recipes, or when no recipe is present.'),
   title: z.string().describe('The recipe title.'),
   servings: z.number().positive().nullable().describe('The number of servings the recipe yields, if stated, otherwise null.'),
   prepMinutes: z.number().nonnegative().nullable().describe('Prep time in minutes, if stated, otherwise null.'),
@@ -38,6 +42,39 @@ const recipeExtractionSchema = z.object({
     + 'Example: "#[cook-section] Make the broth" followed by "  - #[cook-step] Add @water{2.5%cups} to a ^pot{} and simmer for ~{20%minutes}."',
   ),
 })
+
+const MIN_PAGE_TEXT_CHARS = 200
+
+// Each provider can open a URL itself with a server-side tool, so the browser
+// never has to fetch the page (which most recipe sites block via CORS).
+function urlReadingTools(config: AIConfig): ToolSet {
+  if (config.provider === 'anthropic') return { web_fetch: anthropic.tools.webFetch_20250910({ maxUses: 2 }) }
+  if (config.provider === 'google') return { url_context: google.tools.urlContext({}) }
+  return { web_search: openai.tools.webSearch({}) }
+}
+
+/**
+ * Asks the configured model to open the link itself and hand back the recipe
+ * page's text. Returns null when the model can't (tool unsupported by the
+ * chosen model, page unreachable, nothing useful returned), so the caller can
+ * fall back to fetching the page from the browser.
+ */
+async function readRecipePageWithModel(config: AIConfig, url: string): Promise<{ title?: string; text: string } | null> {
+  try {
+    const { text } = await generateText({
+      model: resolveModel(config, 'recipe-import'),
+      tools: urlReadingTools(config),
+      stopWhen: stepCountIs(4),
+      prompt: `Open this page: ${url}\n\nReturn the page's recipe content as plain text: first line "Title: <recipe title>", then servings, prep and cook time, the full ingredient list with quantities, and every instruction step in order. Copy it faithfully from the page; do not summarize, invent, or add commentary. If the page is a list or category of several recipes, or you cannot open it, or it has no recipe, reply with exactly: NO_RECIPE`,
+    })
+    const trimmed = text.trim()
+    if (trimmed.length < MIN_PAGE_TEXT_CHARS || trimmed.includes('NO_RECIPE')) return null
+    const title = trimmed.match(/^Title:\s*(.+)$/im)?.[1]?.trim()
+    return { title, text: trimmed }
+  } catch {
+    return null
+  }
+}
 
 export interface RecipeImportDraft {
   title: string
@@ -73,15 +110,23 @@ export async function importRecipeFromUrl(url: string): Promise<RecipeImportDraf
   const config = getAIConfig()
   if (!config) throw new Error('Set up an AI provider in Settings before importing a recipe.')
 
-  let article
-  try {
-    article = await articleGateway.fetchArticle(trimmed)
-  } catch (error) {
-    throw error instanceof ArticleFetchError ? new Error(error.message) : error
+  // Preferred: the model opens the link itself. Fallback: fetch and extract
+  // the page in the browser (needs an RSS Worker for sites that block CORS).
+  let page = await readRecipePageWithModel(config, trimmed)
+  if (!page) {
+    let article
+    try {
+      article = await articleGateway.fetchArticle(trimmed)
+    } catch (error) {
+      if (!(error instanceof ArticleFetchError)) throw error
+      throw new Error(`Your AI provider couldn't open this page and neither could the browser, so the site is probably blocking automated access. ${error.message} Try another site, or paste the recipe in by hand.`)
+    }
+    const text = htmlToText(article.contentHtml)
+    if (!text) throw new Error('No readable content was found on this page.')
+    page = { title: article.title, text }
   }
-
-  const text = htmlToText(article.contentHtml)
-  if (!text) throw new Error('No readable content was found on this page.')
+  const article = { title: page.title }
+  const text = page.text
 
   const reasoning = resolveReasoningOptions(config)
   const { object } = await generateObject({
@@ -90,6 +135,10 @@ export async function importRecipeFromUrl(url: string): Promise<RecipeImportDraf
     schema: recipeExtractionSchema,
     prompt: `Extract a cooking recipe from this article so it can be saved into a recipe app that uses Cooklang-style inline annotations for ingredients, cookware, and timers (see the schema field descriptions for the exact syntax). Ignore surrounding site chrome, comments, ads, and unrelated content -- extract only the actual recipe (title, servings, prep/cook time, category, and step-by-step instructions).\n\nArticle title: ${article.title ?? '(unknown)'}\n\nArticle text:\n${text.slice(0, MAX_ARTICLE_TEXT_CHARS)}`,
   })
+
+  if (!object.isSingleRecipe) {
+    throw new Error('That link is a list of recipes, not a single recipe. Open one recipe and import its link instead.')
+  }
 
   return {
     title: object.title.trim() || article.title?.trim() || 'Imported recipe',
