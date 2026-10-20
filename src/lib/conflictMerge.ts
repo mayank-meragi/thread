@@ -26,6 +26,11 @@ function labelForLine(blocks: ReturnType<typeof parseOutline>['blocks'], line: n
   return label.length > 60 ? `${label.slice(0, 60)}…` : label
 }
 
+function isPlaceholder(markdown: string): boolean {
+  const trimmed = markdown.trim()
+  return trimmed === '' || trimmed === '-'
+}
+
 // A three-way merge (git's diff3 algorithm, via node-diff3) between the last
 // content both sides agreed on (`base`) and the two versions that diverged
 // from it. Any line only one side touched -- or that both sides changed to
@@ -36,6 +41,10 @@ export function mergeMarkdown(base: string | null, local: string, remote: string
   if (local === remote) return { markdown: local, conflicts: [] }
 
   if (base === null) {
+    // A side that is still the empty placeholder a day/note starts with has no
+    // edits worth protecting, so the other side simply wins.
+    if (isPlaceholder(local)) return { markdown: remote, conflicts: [] }
+    if (isPlaceholder(remote)) return { markdown: local, conflicts: [] }
     // No known common ancestor (e.g. a pre-migration record) -- there's
     // nothing to diff against, so the whole document is the conflict. This
     // matches the previous whole-file behavior rather than guessing. Still

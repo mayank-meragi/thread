@@ -768,7 +768,8 @@ export function runGitHubSyncCycle(options: { priorityPaths?: string[]; forceFul
       if (!state.lastSyncedAIUsage && !(await db.outbox.get('ai-usage')) && (await db.aiUsageAggregates.count()) > 0) {
         await db.outbox.put({ key: 'ai-usage', kind: 'ai-usage', aggregateId: 'ai-usage', createdAt: new Date().toISOString(), attempts: 0 })
       }
-      await syncPending()
+      // Pull first: pushing before this browser knows the remote's content is
+      // what turned a freshly loaded document into a conflict with the repo.
       await catchUpFromGitHub(cycleOptions)
       await syncPending()
     } while (rerunSyncCycle)

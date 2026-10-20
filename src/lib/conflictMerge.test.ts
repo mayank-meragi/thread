@@ -82,3 +82,10 @@ describe('applyConflictResolutions', () => {
     expect(resolved).toBe('- a (mine)')
   })
 })
+
+describe('mergeMarkdown with no common ancestor', () => {
+  it('lets the remote win over an untouched placeholder instead of conflicting', () => {
+    expect(mergeMarkdown(null, '- ', '- real content')).toEqual({ markdown: '- real content', conflicts: [] })
+    expect(mergeMarkdown(null, '- real content', '')).toEqual({ markdown: '- real content', conflicts: [] })
+  })
+})

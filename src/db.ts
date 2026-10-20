@@ -953,7 +953,10 @@ export async function ensureDay(date: string): Promise<void> {
     blockCount: hasAnyDay ? 1 : countMarkdownBlocks(DEMO_MARKDOWN),
     updatedAt: now,
     localRevision: 1,
-  })
+    // A starter page is not a user edit: queueing it would push it ahead of
+    // the remote pull and collide with the real document already in the repo.
+    // It queues normally once the user actually types.
+  }, undefined, { queueOutbox: false })
 }
 
 export async function ensureThreadNote(threadId: string): Promise<void> {

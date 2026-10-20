@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useSearchParams } from 'react-router-dom'
 import { db, ensureDay, saveDay } from '../db'
 import { daysBetween, formatDay, isoToday, shiftDay } from '../lib/dates'
-import { getGitHubConfig, runGitHubSyncCycle } from '../lib/github'
+import { getGitHubConfig, pullDay, runGitHubSyncCycle } from '../lib/github'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { TodayCooking } from '../components/TodayCooking'
 import { TodayTasks } from '../components/TodayTasks'
@@ -263,17 +263,27 @@ function DaySection({ date, isToday, registerSection, onActive, onChange, paramB
       done = true
       setRemoteHydrated(true)
     }
-    // Never let a slow or hanging request block editing outright; pullDay
-    // already swallows transient failures (and no-ops instantly when GitHub
-    // isn't connected), so this timer only covers a genuinely stuck round-trip.
+    // Pull just this day directly (one request) rather than waiting on the
+    // whole sync cycle: after a long absence the cycle has to walk the repo
+    // tree, which routinely outlasts any sensible timeout and left the editor
+    // opening on stale content that later collided with the remote. The full
+    // cycle still runs, in the background, for everything else.
+    // pullDay already swallows transient failures (and no-ops instantly when
+    // GitHub isn't connected); the timer only covers a genuinely stuck request.
     // A pull that lands afterwards is absorbed by MarkdownEditor's own
     // external-update guard.
-    const timer = window.setTimeout(finish, 2500)
-    void runGitHubSyncCycle({ priorityPaths: [`days/${date.slice(0, 4)}/${date}.md`] }).finally(() => {
+    const timer = window.setTimeout(finish, 6000)
+    void pullDay(date)
+      .catch(() => undefined)
+      .finally(() => {
+        window.clearTimeout(timer)
+        finish()
+        void runGitHubSyncCycle({ priorityPaths: [`days/${date.slice(0, 4)}/${date}.md`] }).catch(() => undefined)
+      })
+    return () => {
+      done = true
       window.clearTimeout(timer)
-      finish()
-    })
-    return () => window.clearTimeout(timer)
+    }
   }, [hasBeenVisible, date, remoteHydrated])
 
   const sectionRefEl = useRef<HTMLElement | null>(null)
